@@ -15,5 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Loorve"
-includeBuild("build-logic")
 include(":app")
