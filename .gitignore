@@ -6,3 +6,12 @@ keystore.properties
 *.jks
 *.keystore
 local.properties
+
+# IDE / ºôµå Ä³½Ã (Ä¿¹Ô ±ÝÁö)
+.gradle/
+.idea/
+build/
+app/build/
+*.iml
+local.properties
+.kotlin/
