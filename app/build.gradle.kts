@@ -1,14 +1,15 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-// keystore.properties 로드 (로컬 전용, 커밋 금지)
 val keystorePropsFile = rootProject.file("keystore.properties")
 val keystoreProps = Properties().apply {
-    if (keystorePropsFile.exists()) load(keystorePropsFile.inputStream())
+    if (keystorePropsFile.exists()) {
+        load(keystorePropsFile.inputStream())
+    }
 }
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
@@ -30,10 +31,13 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = keystoreProps["storeFile"]?.let { file(it) }
-            storePassword = keystoreProps["storePassword"] as String?
-            keyAlias = keystoreProps["keyAlias"] as String?
-            keyPassword = keystoreProps["keyPassword"] as String?
+            val storeFilePath = keystoreProps.getProperty("storeFile")
+            if (!storeFilePath.isNullOrBlank()) {
+                storeFile = file(storeFilePath)
+            }
+            storePassword = keystoreProps.getProperty("storePassword")
+            keyAlias = keystoreProps.getProperty("keyAlias")
+            keyPassword = keystoreProps.getProperty("keyPassword")
         }
     }
 
@@ -49,7 +53,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            if (keystorePropsFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
@@ -58,18 +64,19 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
-    // Compose BOM — 버전 한 줄로 전체 Compose 관리
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -82,38 +89,30 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.navigation.compose)
 
-    // Lifecycle
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
 
-    // Hilt DI
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
 
-    // Firebase BOM
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
 
-    // Google 로그인 (Credential Manager)
     implementation(libs.credential.manager)
     implementation(libs.credential.manager.play)
     implementation(libs.google.id.sign.in)
 
-    // AdMob
     implementation(libs.admob)
 
-    // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
-    // Coroutines
     implementation(libs.coroutines.android)
 
-    // Test
     testImplementation(libs.junit)
     androidTestImplementation(libs.junit.android)
     androidTestImplementation(libs.espresso.core)
