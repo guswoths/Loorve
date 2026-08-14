@@ -103,7 +103,7 @@ dependencies {
 
     implementation(libs.credential.manager)
     implementation(libs.credential.manager.play)
-    implementation(libs.google.id.sign.in)
+    implementation(libs.google.id)
 
     implementation(libs.admob)
 
