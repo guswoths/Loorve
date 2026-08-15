@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import android.content.Context
+import androidx.credentials.exceptions.GetCredentialException
 
 // ⚠️ 변경: FirebaseUser 제거 → 도메인 User 사용 (보안 원칙 준수)
 // ⚠️ 추가: Cancelled 케이스 (사용자 취소 시 에러 노출 방지)
