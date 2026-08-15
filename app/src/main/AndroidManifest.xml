@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    파일: app/src/main/AndroidManifest.xml
+    패키지: com.loorve
+    - namespace / applicationId: com.loorve (app/build.gradle.kts 기준)
+    - debug 빌드 suffix(.debug)는 build.gradle.kts에서 처리하므로 여기선 고정값 사용
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ── 필수 권한 ── -->
+    <!-- 네트워크 통신: Firebase, AdMob 등 필수 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        광고 식별자 권한: AdMob 사용 시 Android 13+ 타겟에서 필수
+        참고: app/build.gradle.kts 주석에 명시된 요구사항
+    -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+
+    <!--
+        android:name: Hilt DI 필수 - @HiltAndroidApp 어노테이션 적용 Application 클래스
+        android:supportsRtl: RTL 레이아웃 지원
+        android:allowBackup: 자동 백업 활성화
+    -->
+    <application
+        android:name=".LoorveApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Loorve">
+
+        <!-- ── MainActivity: 앱 진입점 ── -->
+        <!--
+            android:exported="true": Android 12(API 31)+ 필수 명시
+            windowSoftInputMode: Compose에서 IME 대응 (adjustResize)
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ── Firebase Cloud Messaging (FCM) 서비스 ── -->
+        <!--
+            libs.firebase.messaging 의존성이 선언되어 있으므로 포함
+            android:exported="false": 외부 앱이 직접 바인딩 불가 (보안)
+            MESSAGING_EVENT 인텐트: FCM 메시지 수신을 위한 필수 필터
+        -->
+        <service
+            android:name=".service.LoorveFcmService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+    </application>
+
+</manifest>
