@@ -69,6 +69,48 @@ class AuthRepositoryImpl @Inject constructor(
         awaitClose { firebaseAuth.removeAuthStateListener(listener) }
     }
 
+
+    // ──────────────────────────────────────────────
+    // Google 로그인 진입점: Credential Manager로 계정 선택 팝업 실행
+    // ──────────────────────────────────────────────
+    override suspend fun launchGoogleSignIn(activityContext: Context): Result<User>
+    {
+        return try {
+            val credentialManager = CredentialManager.create(activityContext)
+
+            val googleIdOption = GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(false) // 기존 계정 필터 OFF → 모든 계정 표시
+                .setServerClientId(WEB_CLIENT_ID)
+                .setAutoSelectEnabled(false)
+                .build()
+
+            val request = GetCredentialRequest.Builder()
+                .addCredentialOption(googleIdOption)
+                .build()
+
+            val credentialResponse = credentialManager.getCredential(
+                request = request,
+                context = activityContext
+            )
+
+            val googleIdTokenCredential = GoogleIdTokenCredential
+                .createFrom(credentialResponse.credential.data)
+            val idToken = googleIdTokenCredential.idToken
+
+            // idToken 획득 후 Firebase Auth 처리
+            signInWithGoogle(idToken)
+
+        } catch (e: GetCredentialException) {
+            // 사용자가 팝업 취소하거나 계정 없을 때
+            Log.w(TAG, "Credential 취소 또는 실패: ${e.type}", e)
+            Result.failure(Exception("CANCELLED"))
+        } catch (e: Exception) {
+            Log.e(TAG, "Google 로그인 실행 오류", e)
+            Result.failure(Exception("인증 처리 중 오류가 발생했습니다."))
+        }
+    }
+
+
     // ──────────────────────────────────────────────
     // Google 로그인 (Credential Manager API)
     // ──────────────────────────────────────────────
@@ -158,7 +200,7 @@ class AuthRepositoryImpl @Inject constructor(
 
     companion object {
         private const val TAG = "AuthRepository"
-        private const val WEB_CLIENT_ID = "YOUR_WEB_CLIENT_ID_HERE"
+        private const val WEB_CLIENT_ID = "711486350418-plbdidlveqnocbqngk3324grffaf9aj8.apps.googleusercontent.com"
     }
 }
 

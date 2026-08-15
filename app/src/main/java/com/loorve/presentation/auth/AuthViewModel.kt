@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.content.Context
 
 // ⚠️ 변경: FirebaseUser 제거 → 도메인 User 사용 (보안 원칙 준수)
 // ⚠️ 추가: Cancelled 케이스 (사용자 취소 시 에러 노출 방지)
@@ -40,6 +41,31 @@ class AuthViewModel @Inject constructor(
                     _uiState.value = classifyError(e)
                 }
         }
+    }
+
+    fun launchGoogleSignIn(context: Context) {
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            authRepository.launchGoogleSignIn(context)
+                .onSuccess { user -> _uiState.value = AuthUiState.Success(user) }
+                .onFailure { e ->
+                    if (e.message == "CANCELLED") {
+                        _uiState.value = AuthUiState.Cancelled
+                    } else {
+                        _uiState.value = classifyError(e)
+                    }
+                }
+        }
+    }
+
+
+    // AuthViewModel.kt 내부 추가
+    fun handleGoogleCredentialError(e: GetCredentialException) {
+        _uiState.value = classifyError(e)
+    }
+
+    fun handleGoogleTokenParsingError() {
+        _uiState.value = AuthUiState.Error("인증 토큰 처리 중 오류가 발생했습니다.")
     }
 
     fun onLoginCancelled() {

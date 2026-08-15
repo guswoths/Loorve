@@ -19,14 +19,19 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.loorve.presentation.auth.AuthUiState
+import com.loorve.presentation.auth.AuthViewModel
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToSignUp: () -> Unit = {},
     viewModel: LoginViewModel = hiltViewModel()
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     // UI 입력 상태
@@ -54,6 +59,22 @@ fun LoginScreen(
         }
     }
 
+
+    LaunchedEffect(authUiState) {
+        when (val state = authUiState) {
+            is AuthUiState.Success -> onLoginSuccess()
+            is AuthUiState.Error -> {
+                snackbarHostState.showSnackbar(state.message)
+                authViewModel.resetState()
+            }
+            is AuthUiState.NetworkError -> {
+                snackbarHostState.showSnackbar(state.message)
+                authViewModel.resetState()
+            }
+            else -> Unit
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
@@ -73,7 +94,7 @@ fun LoginScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "나만의 러브 다이어리",
+                text = "시험일까지 가장 효율적인 복습 루프를 설계하는 학습 플래너",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -100,6 +121,17 @@ fun LoginScreen(
                 enabled = !isLoading
             )
             Spacer(modifier = Modifier.height(8.dp))
+
+            // ── Google 로그인 버튼 ──
+            OutlinedButton(
+                onClick = { authViewModel.launchGoogleSignIn(context) },
+                enabled = !isLoading && authUiState !is AuthUiState.Loading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Text("Google로 로그인")
+            }
 
             // ── 비밀번호 입력 ──
             OutlinedTextField(

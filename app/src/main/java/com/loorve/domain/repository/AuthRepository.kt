@@ -62,4 +62,5 @@ interface AuthRepository {
      *         실패 시 [Result.failure]와 함께 예외를 반환합니다.
      */
     suspend fun signInWithGoogle(idToken: String): Result<User>
+    suspend fun launchGoogleSignIn(activityContext: Context): Result<User>
 }
