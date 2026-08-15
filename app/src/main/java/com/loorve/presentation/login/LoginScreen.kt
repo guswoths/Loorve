@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -31,7 +32,7 @@ fun LoginScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current  // ✅ 수정: androidx.compose.ui.platform.LocalContext.current 로 import 정리
     val snackbarHostState = remember { SnackbarHostState() }
 
     // UI 입력 상태
@@ -47,7 +48,7 @@ fun LoginScreen(
     val focusManager = LocalFocusManager.current
     val isLoading = uiState is LoginUiState.Loading
 
-    // 상태 처리
+    // 이메일/비밀번호 로그인 상태 처리
     LaunchedEffect(uiState) {
         when (val state = uiState) {
             is LoginUiState.Success -> onLoginSuccess()
@@ -59,7 +60,7 @@ fun LoginScreen(
         }
     }
 
-
+    // Google 로그인 상태 처리
     LaunchedEffect(authUiState) {
         when (val state = authUiState) {
             is AuthUiState.Success -> onLoginSuccess()
@@ -122,18 +123,7 @@ fun LoginScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ── Google 로그인 버튼 ──
-            OutlinedButton(
-                onClick = { authViewModel.launchGoogleSignIn(context) },
-                enabled = !isLoading && authUiState !is AuthUiState.Loading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-            ) {
-                Text("Google로 로그인")
-            }
-
-            // ── 비밀번호 입력 ──
+            // ── 비밀번호 입력 ── ✅ Google 버튼보다 먼저 위치
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -193,6 +183,33 @@ fun LoginScreen(
                 } else {
                     Text("로그인")
                 }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ── 구분선 ── ✅ 이메일 로그인과 소셜 로그인 시각적 구분
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HorizontalDivider(modifier = Modifier.weight(1f))
+                Text(
+                    text = "  또는  ",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(modifier = Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ── Google 로그인 버튼 ── ✅ 로그인 버튼 아래로 이동
+            OutlinedButton(
+                onClick = { authViewModel.launchGoogleSignIn(context) },
+                enabled = !isLoading && authUiState !is AuthUiState.Loading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Text("Google로 로그인")
             }
             Spacer(modifier = Modifier.height(12.dp))
 
