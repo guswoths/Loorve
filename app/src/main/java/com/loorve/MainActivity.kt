@@ -28,11 +28,11 @@ class MainActivity : ComponentActivity() {
                                 navController.navigate("home") {
                                     popUpTo("login") { inclusive = true }
                                 }
-                            },
+                            }
+                            // ✅ onNavigateToSignUp 파라미터 제거됨 (Google 로그인 통합)
                         )
                     }
                     composable("home") {
-                        // TODO: HomeScreen 구현 후 교체
                         androidx.compose.material3.Text("메인 화면 (준비 중)")
                     }
                 }
