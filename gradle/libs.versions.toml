@@ -1,21 +1,22 @@
 [versions]
 agp = "9.2.0"
+kotlin = "2.3.10"
 ksp = "2.3.10"
 
-composeBom = "2025.06.00"
+composeBom = "2026.08.00"
 activityCompose = "1.10.1"
 navigationCompose = "2.9.0"
 lifecycle = "2.9.1"
 
-hilt = "2.59.2"
-hiltNavigationCompose = "1.2.0"
+hilt = "2.60"
+hiltNavigationCompose = "1.4.0"
 
-firebaseBom = "33.13.0"
+firebaseBom = "34.17.0"
 googleServices = "4.4.2"
 credentialManager = "1.3.0"
 googleIdSignIn = "1.1.1"
 
-admob = "24.3.0"
+admob = "25.4.0"
 room = "2.7.1"
 coroutines = "1.9.0"
 
@@ -29,6 +30,8 @@ compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+compose-runtime = { group = "androidx.compose.runtime", name = "runtime" }
+compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 compose-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -40,11 +43,15 @@ lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-ru
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref = "hiltNavigationCompose" }
 
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
+firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
 
 credential-manager = { group = "androidx.credentials", name = "credentials", version.ref = "credentialManager" }
 credential-manager-play = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentialManager" }
@@ -66,7 +73,7 @@ compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-mani
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version = "2.3.10" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
