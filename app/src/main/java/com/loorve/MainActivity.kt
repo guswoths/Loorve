@@ -6,8 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.loorve.presentation.auth.LoginScreen
-import com.loorve.presentation.login.LoginScreen as EmailLoginScreen
+import com.loorve.presentation.login.LoginScreen
 import com.loorve.ui.theme.LoorveTheme
 import dagger.hilt.android.AndroidEntryPoint
 

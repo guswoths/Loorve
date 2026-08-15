@@ -145,24 +145,3 @@ class AuthRepositoryImpl @Inject constructor(
     }
 }
 
-override suspend fun signInWithGoogle(idToken: String): Result<User> {
-    return try {
-        val credential = GoogleAuthProvider.getCredential(idToken, null)
-
-        val authResult = firebaseAuth
-            .signInWithCredential(credential)
-            .await()
-
-        val firebaseUser = authResult.user
-            ?: return Result.failure(Exception("Google 로그인에 실패했습니다."))
-
-        val domainUser = firebaseUser.toDomainUser()
-        createUserDocumentIfAbsent(domainUser)
-
-        Result.success(domainUser)
-    } catch (e: FirebaseAuthException) {
-        Result.failure(Exception(mapFirebaseAuthError(e.errorCode), e))
-    } catch (e: Exception) {
-        Result.failure(Exception("Google 로그인 처리 중 오류가 발생했습니다.", e))
-    }
-}

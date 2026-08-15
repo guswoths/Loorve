@@ -11,7 +11,7 @@ import com.loorve.domain.model.User
 /** UserDto → User (Domain) */
 fun UserDto.toDomain(): User = User(
     id = this.id,
-    email = this.email,
+    email = firebaseUser.email ?: "",
     nickname = this.nickname,
     profileImageUrl = this.profileImageUrl,
     createdAt = this.createdAt,
