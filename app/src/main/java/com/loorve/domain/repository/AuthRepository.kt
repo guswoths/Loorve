@@ -47,4 +47,19 @@ interface AuthRepository {
      * @return 인증 상태를 방출하는 [Flow]. 로그인: [User], 미로그인: null
      */
     fun getCurrentUser(): Flow<User?>
+
+    /**
+     * Google 계정의 ID 토큰으로 로그인합니다.
+     *
+     * @param idToken Google Sign-In 또는 Firebase Auth로부터 전달받은 ID 토큰 문자열
+     *
+     * ⚠️ 보안 주의사항:
+     *  - idToken은 민감한 인증 자격증명입니다. 절대 로그(Logcat 등)에 출력하지 마세요.
+     *  - idToken의 유효기간은 1시간이므로 장기 저장하지 마세요.
+     *  - 네트워크 전송 시 반드시 HTTPS를 사용하세요.
+     *
+     * @return 로그인 성공 시 [Result.success]와 함께 [User]를 반환,
+     *         실패 시 [Result.failure]와 함께 예외를 반환합니다.
+     */
+    suspend fun signInWithGoogle(idToken: String): Result<User>
 }
