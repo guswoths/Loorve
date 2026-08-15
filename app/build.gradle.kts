@@ -148,4 +148,17 @@ dependencies {
     androidTestImplementation(libs.junit.android)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.compose.ui.test.junit4)
+
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+
+    // Google ID (Credential Manager용 Google 로그인)
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
+    // Firebase Auth (이미 있다면 생략)
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+
+    // Coroutines (이미 있다면 생략)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 }
