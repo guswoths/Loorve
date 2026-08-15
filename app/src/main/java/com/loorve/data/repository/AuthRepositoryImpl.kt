@@ -41,7 +41,7 @@ class AuthRepositoryImpl @Inject constructor(
             val firebaseUser = result.user
                 ?: return Result.failure(Exception("로그인 실패: 사용자 정보 없음"))
             val domainUser = firebaseUser.toDomainUser()
-            createUserDocumentIfAbsent(domainUser)
+            createOrUpdateUserDocument(domainUser)
             Result.success(domainUser)
         } catch (e: java.io.IOException) {
             Result.failure(Exception("네트워크 연결을 확인해주세요.", e))
@@ -80,7 +80,7 @@ class AuthRepositoryImpl @Inject constructor(
             val user = authResult.user
                 ?: return Result.failure(Exception("Google 로그인 실패: 사용자 정보 없음"))
             val domainUser = user.toDomainUser()
-            createUserDocumentIfAbsent(domainUser)
+            createOrUpdateUserDocument(domainUser)
             Result.success(domainUser)
         } catch (e: com.google.firebase.auth.FirebaseAuthException) {
             Result.failure(Exception(mapFirebaseAuthError(e.errorCode), e))
@@ -95,22 +95,38 @@ class AuthRepositoryImpl @Inject constructor(
     // Firestore 사용자 문서 최초 생성
     // ──────────────────────────────────────────────
 
-    private suspend fun createUserDocumentIfAbsent(user: User) {
+    private suspend fun createOrUpdateUserDocument(user: User) {
         try {
             val docRef = firestore.collection("users").document(user.id)
+
+            // 최초 생성 여부 확인 (createdAt은 최초 1회만 기록)
             val snapshot = docRef.get().await()
-            if (!snapshot.exists()) {
-                val data = mapOf(
-                    "uid"             to user.id,
-                    "email"           to user.email,
-                    "nickname"        to user.nickname,
-                    "profileImageUrl" to user.profileImageUrl,
-                    "createdAt"       to FieldValue.serverTimestamp()
-                )
-                docRef.set(data).await()
+            val isNewUser = !snapshot.exists()
+
+            val data = buildMap<String, Any?> {
+                put("uid",         user.id)
+                put("email",       user.email)
+                put("displayName", user.nickname)      // 도메인 nickname → Firestore displayName
+                put("photoUrl",    user.profileImageUrl) // null 허용
+                put("lastLoginAt", FieldValue.serverTimestamp()) // 매 로그인마다 갱신
+                if (isNewUser) {
+                    put("createdAt", FieldValue.serverTimestamp()) // 최초 생성 시만 기록
+                }
             }
+
+            // SetOptions.merge() → 기존 필드 보존, 새 필드만 추가/갱신 (중복 방지)
+            docRef.set(data, com.google.firebase.firestore.SetOptions.merge()).await()
+
+            Log.d(TAG, "Firestore users 문서 ${if (isNewUser) "생성" else "업데이트"} 완료 (uid=${user.id})")
+
+        } catch (e: com.google.firebase.firestore.FirebaseFirestoreException) {
+            // Firestore 권한/가용성 오류 — 로그만 남기고 로그인 흐름은 중단하지 않음
+            Log.e(TAG, "Firestore 권한 오류 (uid=${user.id}): ${e.code}", e)
+        } catch (e: java.io.IOException) {
+            // 네트워크 오류 — 재시도 없이 로그만 남김 (오프라인 캐시로 나중에 처리 가능)
+            Log.e(TAG, "Firestore 네트워크 오류 (uid=${user.id})", e)
         } catch (e: Exception) {
-            Log.e("AuthRepositoryImpl", "Firestore 사용자 문서 생성 실패 (uid=${user.id})", e)
+            Log.e(TAG, "Firestore 문서 저장 실패 (uid=${user.id})", e)
         }
     }
 
@@ -141,6 +157,7 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     companion object {
+        private const val TAG = "AuthRepository"
         private const val WEB_CLIENT_ID = "YOUR_WEB_CLIENT_ID_HERE"
     }
 }

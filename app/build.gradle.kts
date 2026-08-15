@@ -156,9 +156,9 @@ dependencies {
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     // Firebase Auth (이미 있다면 생략)
-    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
-    implementation("com.google.firebase:firebase-auth-ktx")
+    dependencies {
+        implementation(platform("com.google.firebase:firebase-bom:34.0.0"))
+        implementation("com.google.firebase:firebase-auth")
+    }
 
-    // Coroutines (이미 있다면 생략)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 }
