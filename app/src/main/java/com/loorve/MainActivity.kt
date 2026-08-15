@@ -30,9 +30,6 @@ class MainActivity : ComponentActivity() {
                                     popUpTo("login") { inclusive = true }
                                 }
                             },
-                            onNavigateToSignUp = {
-                                navController.navigate("signup")
-                            }
                         )
                     }
                     composable("home") {

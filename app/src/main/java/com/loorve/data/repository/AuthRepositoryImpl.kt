@@ -73,44 +73,19 @@ class AuthRepositoryImpl @Inject constructor(
     // Google 로그인 (Credential Manager API)
     // ──────────────────────────────────────────────
 
-    suspend fun loginWithGoogle(activityContext: Context): Result<User> {
+    override suspend fun signInWithGoogle(idToken: String): Result<User> {
         return try {
-            val credentialManager = CredentialManager.create(activityContext)
-
-            val googleIdOption = GetGoogleIdOption.Builder()
-                .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(WEB_CLIENT_ID)
-                .setAutoSelectEnabled(false)
-                .build()
-
-            val request = GetCredentialRequest.Builder()
-                .addCredentialOption(googleIdOption)
-                .build()
-
-            val credentialResponse = credentialManager.getCredential(
-                request = request,
-                context = activityContext
-            )
-
-            val googleIdTokenCredential = GoogleIdTokenCredential
-                .createFrom(credentialResponse.credential.data)
-
-            val idToken = googleIdTokenCredential.idToken
             val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
             val authResult = firebaseAuth.signInWithCredential(firebaseCredential).await()
-
             val user = authResult.user
                 ?: return Result.failure(Exception("Google 로그인 실패: 사용자 정보 없음"))
             val domainUser = user.toDomainUser()
             createUserDocumentIfAbsent(domainUser)
             Result.success(domainUser)
-
-        } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
-            Result.failure(e)
-        } catch (e: GetCredentialException) {
-            Result.failure(e)
+        } catch (e: com.google.firebase.auth.FirebaseAuthException) {
+            Result.failure(Exception(mapFirebaseAuthError(e.errorCode), e))
         } catch (e: java.io.IOException) {
-            Result.failure(e)
+            Result.failure(Exception("네트워크 연결을 확인해주세요.", e))
         } catch (e: Exception) {
             Result.failure(Exception("인증 처리 중 오류가 발생했습니다.", e))
         }
@@ -167,5 +142,27 @@ class AuthRepositoryImpl @Inject constructor(
 
     companion object {
         private const val WEB_CLIENT_ID = "YOUR_WEB_CLIENT_ID_HERE"
+    }
+}
+
+override suspend fun signInWithGoogle(idToken: String): Result<User> {
+    return try {
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+
+        val authResult = firebaseAuth
+            .signInWithCredential(credential)
+            .await()
+
+        val firebaseUser = authResult.user
+            ?: return Result.failure(Exception("Google 로그인에 실패했습니다."))
+
+        val domainUser = firebaseUser.toDomainUser()
+        createUserDocumentIfAbsent(domainUser)
+
+        Result.success(domainUser)
+    } catch (e: FirebaseAuthException) {
+        Result.failure(Exception(mapFirebaseAuthError(e.errorCode), e))
+    } catch (e: Exception) {
+        Result.failure(Exception("Google 로그인 처리 중 오류가 발생했습니다.", e))
     }
 }

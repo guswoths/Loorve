@@ -45,16 +45,8 @@ fun LoginScreen(
     // 상태 처리
     LaunchedEffect(uiState) {
         when (val state = uiState) {
-            is AuthUiState.Success -> onLoginSuccess()
-            is AuthUiState.Cancelled -> {
-                // 사용자 취소: 조용히 Idle로 복원 (에러 메시지 없음)
-                viewModel.resetState()
-            }
-            is AuthUiState.NetworkError -> {
-                snackbarHostState.showSnackbar(state.message)
-                viewModel.resetState()
-            }
-            is AuthUiState.Error -> {
+            is LoginUiState.Success -> onLoginSuccess()
+            is LoginUiState.Error -> {
                 snackbarHostState.showSnackbar(state.message)
                 viewModel.resetState()
             }
