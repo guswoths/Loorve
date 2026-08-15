@@ -1,46 +1,29 @@
-// 파일: app/src/main/java/com/loorve/data/mapper/UserMapper.kt
 package com.loorve.data.mapper
 
-import com.loorve.data.model.UserDto          // 예: Retrofit 응답 DTO
-import com.loorve.data.local.entity.UserEntity // 예: Room Entity
+import com.loorve.data.model.UserDto  // Data Layer DTO (별도 생성 필요)
 import com.loorve.domain.model.User
 
-// ── DTO → Domain ──────────────────────────────────────────
+/**
+ * Data Layer ↔ Domain Layer 변환 매퍼
+ * Mapper 함수는 확장 함수 형태로 작성하여 호출 가독성을 높입니다.
+ */
+
+/** UserDto → User (Domain) */
 fun UserDto.toDomain(): User = User(
-    id = id,
-    email = email,
-    nickname = nickname,
-    profileImageUrl = profileImageUrl,
-    createdAt = createdAt,
-    updatedAt = updatedAt,
+    id = this.id,
+    email = this.email,
+    nickname = this.nickname,
+    profileImageUrl = this.profileImageUrl,
+    createdAt = this.createdAt,
+    updatedAt = this.updatedAt
 )
 
-// ── Domain → DTO (필요 시) ────────────────────────────────
+/** User (Domain) → UserDto */
 fun User.toDto(): UserDto = UserDto(
-    id = id,
-    email = email,
-    nickname = nickname,
-    profileImageUrl = profileImageUrl,
-    createdAt = createdAt,
-    updatedAt = updatedAt,
-)
-
-// ── Room Entity → Domain ──────────────────────────────────
-fun UserEntity.toDomain(): User = User(
-    id = id,
-    email = email,
-    nickname = nickname,
-    profileImageUrl = profileImageUrl,
-    createdAt = createdAt,
-    updatedAt = updatedAt,
-)
-
-// ── Domain → Room Entity ──────────────────────────────────
-fun User.toEntity(): UserEntity = UserEntity(
-    id = id,
-    email = email,
-    nickname = nickname,
-    profileImageUrl = profileImageUrl,
-    createdAt = createdAt,
-    updatedAt = updatedAt,
+    id = this.id,
+    email = this.email,
+    nickname = this.nickname,
+    profileImageUrl = this.profileImageUrl,
+    createdAt = this.createdAt,
+    updatedAt = this.updatedAt
 )
