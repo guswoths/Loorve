@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.loorve.presentation.auth.LoginScreen
+import com.loorve.presentation.login.LoginScreen as EmailLoginScreen
 import com.loorve.ui.theme.LoorveTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -28,6 +29,9 @@ class MainActivity : ComponentActivity() {
                                 navController.navigate("home") {
                                     popUpTo("login") { inclusive = true }
                                 }
+                            },
+                            onNavigateToSignUp = {
+                                navController.navigate("signup")
                             }
                         )
                     }
