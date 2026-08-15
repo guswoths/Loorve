@@ -25,7 +25,7 @@ plugins {
 // ── Android 빌드 설정 ──
 android {
     namespace = "com.loorve"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.loorve"
@@ -52,7 +52,6 @@ android {
     // ── 빌드 타입: debug / release 분리 ──
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"  // debug 빌드는 .debug suffix로 분리
             isDebuggable = true
         }
         release {
