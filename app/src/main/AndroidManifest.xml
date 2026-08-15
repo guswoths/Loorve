@@ -31,6 +31,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Loorve">
 
+         <meta-data
+             android:name="com.google.android.gms.ads.APPLICATION_ID"
+             android:value="ca-app-pub-3940256099942544~3347511713" />
+
         <!-- ── MainActivity: 앱 진입점 ── -->
         <!--
             android:exported="true": Android 12(API 31)+ 필수 명시
