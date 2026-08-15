@@ -43,7 +43,15 @@ class LoginViewModel @Inject constructor(
             _uiState.value = LoginUiState.Loading
             authRepository.login(email, password)
                 .onSuccess { user -> _uiState.value = LoginUiState.Success(user) }
-                .onFailure { e -> _uiState.value = LoginUiState.Error(e.message ?: "알 수 없는 오류") }
+                .onFailure { e ->
+                   val userMessage = when {
+                       e.message?.contains("네트워크", ignoreCase = true) == true ||
+                       e.message?.contains("network", ignoreCase = true) == true ->
+                           "네트워크 연결을 확인해주세요."
+                       else -> e.message ?: "로그인에 실패했습니다. 다시 시도해주세요."
+                    }
+                    _uiState.value = LoginUiState.Error(userMessage)
+                }
         }
     }
 

@@ -44,8 +44,13 @@ class AuthRepositoryImpl @Inject constructor(
             val firebaseUser = result.user
                 ?: return Result.failure(Exception("로그인 실패: 사용자 정보 없음"))
             Result.success(firebaseUser.toDomainUser())
+        } catch (e: java.io.IOException) {
+            Result.failure(Exception("네트워크 연결을 확인해주세요.", e))
+        } catch (e: com.google.firebase.auth.FirebaseAuthException) {
+            // Firebase 에러 코드를 한국어 메시지로 변환 (내부 코드 노출 차단)
+            Result.failure(Exception(mapFirebaseAuthError(e.errorCode), e))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception("로그인 중 오류가 발생했습니다. 다시 시도해주세요.", e))
         }
     }
 
@@ -110,10 +115,18 @@ class AuthRepositoryImpl @Inject constructor(
                 ?: return Result.failure(Exception("Google 로그인 실패: 사용자 정보 없음"))
             Result.success(user.toDomainUser())
 
+        } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
+            // 취소는 별도 예외 타입으로 그대로 전달 (ViewModel에서 분류)
+            Result.failure(e)
         } catch (e: GetCredentialException) {
+            // 네트워크 에러, 일반 Credential 에러
+            Result.failure(e)
+        } catch (e: java.io.IOException) {
+            // 네트워크 타임아웃, 연결 불가
             Result.failure(e)
         } catch (e: Exception) {
-            Result.failure(e)
+            // 그 외 예외: 보안상 원본 메시지 래핑
+            Result.failure(Exception("인증 처리 중 오류가 발생했습니다.", e))
         }
     }
 
@@ -137,6 +150,16 @@ class AuthRepositoryImpl @Inject constructor(
             createdAt = metadata?.creationTimestamp ?: now,
             updatedAt = now
         )
+    }
+
+    private fun mapFirebaseAuthError(errorCode: String): String = when (errorCode) {
+        "ERROR_INVALID_EMAIL"         -> "이메일 형식이 올바르지 않습니다."
+        "ERROR_WRONG_PASSWORD"        -> "이메일 또는 비밀번호가 올바르지 않습니다."
+        "ERROR_USER_NOT_FOUND"        -> "이메일 또는 비밀번호가 올바르지 않습니다."
+        "ERROR_USER_DISABLED"         -> "비활성화된 계정입니다. 고객센터에 문의해주세요."
+        "ERROR_TOO_MANY_REQUESTS"     -> "잠시 후 다시 시도해주세요."
+        "ERROR_NETWORK_REQUEST_FAILED"-> "네트워크 연결을 확인해주세요."
+        else                          -> "로그인에 실패했습니다. 다시 시도해주세요."
     }
 
     companion object {

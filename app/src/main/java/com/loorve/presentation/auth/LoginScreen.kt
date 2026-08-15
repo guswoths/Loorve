@@ -21,6 +21,7 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import kotlinx.coroutines.launch
+import androidx.credentials.exceptions.GetCredentialCancellationException
 
 @Composable
 fun LoginScreen(
@@ -77,9 +78,16 @@ fun LoginScreen(
                     snackbarHostState.showSnackbar("지원하지 않는 인증 방식입니다.")
                 }
             } catch (e: GetCredentialException) {
-                snackbarHostState.showSnackbar("Google 로그인 실패: ${e.message}")
+                // 취소 예외: 사용자가 직접 닫은 경우 → 에러 미노출, Idle 복원
+                val isCancelled = e is androidx.credentials.exceptions.GetCredentialCancellationException
+                if (isCancelled) {
+                    viewModel.onLoginCancelled()  // Cancelled 상태로 전환 후 Idle 복원
+                } else {
+                    // 실제 에러만 ViewModel에 위임 (에러 분류는 ViewModel에서)
+                    viewModel.handleGoogleCredentialError(e)
+                }
             } catch (e: GoogleIdTokenParsingException) {
-                snackbarHostState.showSnackbar("토큰 파싱 오류: ${e.message}")
+                viewModel.handleGoogleTokenParsingError()
             }
         }
     }
