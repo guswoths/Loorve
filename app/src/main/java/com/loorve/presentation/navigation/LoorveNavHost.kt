@@ -12,16 +12,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
+import com.loorve.presentation.exam.ExamSettingScreen
 import com.loorve.presentation.login.LoginScreen
 import com.loorve.presentation.onboarding.OnboardingScreen
 import kotlinx.coroutines.delay
 
 // ─── 타입 안전 라우트 정의 ───────────────────────────────────────────────
 sealed class Screen(val route: String) {
-    object Splash    : Screen("splash")
-    object Onboarding: Screen("onboarding")
-    object Login     : Screen("login")
-    object Home      : Screen("home")
+    object Splash       : Screen("splash")
+    object Onboarding   : Screen("onboarding")
+    object Login        : Screen("login")
+    object Home         : Screen("home")
+    object ExamSetting  : Screen("exam_setting")
 }
 
 // ─── 앱 전체 네비게이션 그래프 ───────────────────────────────────────────
@@ -62,7 +64,7 @@ fun LoorveNavHost(
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
-                    navController.navigate(Screen.Home.route) {
+                    navController.navigate(Screen.ExamSetting.route) {
                         // 로그인 성공 시 스택 전체 비움 (뒤로 가기로 로그인 화면 접근 불가)
                         popUpTo(Screen.Splash.route) { inclusive = true }
                     }
@@ -70,7 +72,18 @@ fun LoorveNavHost(
             )
         }
 
-        // ── 4. 홈 (스텁) ─────────────────────────────────────────────────
+        // ── 4. 시험 설정 ─────────────────────────────────────────────────
+        composable(Screen.ExamSetting.route) {
+            ExamSettingScreen(
+                onSaveSuccess = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.ExamSetting.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // ── 5. 홈 (스텁) ─────────────────────────────────────────────────
         composable(Screen.Home.route) {
             // TODO: HomeScreen composable로 교체 예정
             Text("메인 화면 (준비 중)")
