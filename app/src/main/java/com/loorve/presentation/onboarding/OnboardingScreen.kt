@@ -32,18 +32,18 @@ data class OnboardingPage(
 private val onboardingPages = listOf(
     OnboardingPage(
         imageRes = 0,
-        title = "Loorve에 오신 것을 환영합니다",
-        description = "소중한 사람들과의 추억을\n한 곳에서 기록하고 공유하세요."
+        title = "복습 타이밍, 이제 앱이 계산해드려요",
+        description = "공부한 내용과 시험일만 입력하면\n에빙하우스 망각곡선에 맞춰\n복습 일정이 자동으로 완성됩니다."
     ),
     OnboardingPage(
         imageRes = 0,
-        title = "감정을 담은 다이어리",
-        description = "매일의 감정과 일상을 기록하며\n나만의 이야기를 만들어 보세요."
+        title = "진도 기록 한 번으로\n복습 캘린더 완성",
+        description = "오늘 배운 내용을 짧게 기록하면\n시험일까지 남은 기간에 맞춰\n최적의 복습 날짜를 자동으로 잡아드려요."
     ),
     OnboardingPage(
         imageRes = 0,
-        title = "함께하는 특별한 순간",
-        description = "파트너와 함께 추억을 공유하고\n더욱 특별한 관계를 만들어가세요."
+        title = "어디서든 이어서 공부하세요",
+        description = "Google 계정으로 로그인하면\n기기를 바꿔도 복습 일정과\n진도 기록이 그대로 유지됩니다."
     )
 )
 
