@@ -1,6 +1,7 @@
 package com.loorve.data.repository
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.loorve.data.model.ExamDto
 import com.loorve.domain.model.Exam
 import com.loorve.domain.model.ExamResult
 import com.loorve.domain.repository.ExamRepository
@@ -26,7 +27,7 @@ class ExamRepositoryImpl @Inject constructor(
                 return@addSnapshotListener
             }
             val exams = snapshot?.documents?.mapNotNull { doc ->
-                doc.toObject(Exam::class.java)?.copy(id = doc.id)
+                doc.toObject(ExamDto::class.java)?.copy(id = doc.id)?.toDomain()
             } ?: emptyList()
             trySend(exams)
         }
@@ -40,7 +41,9 @@ class ExamRepositoryImpl @Inject constructor(
                     close(error)
                     return@addSnapshotListener
                 }
-                val exam = snapshot?.toObject(Exam::class.java)?.copy(id = snapshot.id)
+                val exam = snapshot?.toObject(ExamDto::class.java)
+                    ?.copy(id = snapshot.id)
+                    ?.toDomain()
                 if (exam != null) {
                     trySend(exam)
                 } else {
@@ -75,7 +78,6 @@ class ExamRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }
 
-    // ✅ 누락된 함수 - 핵심 수정 지점
     override suspend fun addExam(exam: Exam): Result<Unit> {
         return try {
             examsCollection.add(exam).await()
