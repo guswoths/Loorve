@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color                          // ← 추가
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -49,14 +50,12 @@ fun ExamSettingScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // ── 저장 성공 처리 ──────────────────────────────────────────────────
     LaunchedEffect(uiState.isSaveSuccess) {
         if (uiState.isSaveSuccess) {
             onSaveSuccess()
         }
     }
 
-    // ── 에러 Snackbar 처리 ──────────────────────────────────────────────
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { message ->
             snackbarHostState.showSnackbar(message)
@@ -64,12 +63,10 @@ fun ExamSettingScreen(
         }
     }
 
-    // ── 날짜 포맷터 ─────────────────────────────────────────────────────
     val dateFormatter = remember {
         DateTimeFormatter.ofPattern("yyyy년 MM월 dd일")
     }
 
-    // ── DatePickerDialog 팩토리 ──────────────────────────────────────────
     val calendar = remember { Calendar.getInstance() }
     val datePickerDialog = remember {
         DatePickerDialog(
@@ -85,7 +82,6 @@ fun ExamSettingScreen(
         )
     }
 
-    // ── D-day 텍스트 색상 결정 ───────────────────────────────────────────
     val dDayColor = when {
         uiState.dDayText == "D-Day" -> MaterialTheme.colorScheme.error
         uiState.dDayText.startsWith("D+") -> MaterialTheme.colorScheme.outline
@@ -104,7 +100,6 @@ fun ExamSettingScreen(
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
 
-            // ① 타이틀
             Text(
                 text = "시험 설정",
                 style = MaterialTheme.typography.headlineMedium.copy(
@@ -115,7 +110,6 @@ fun ExamSettingScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ② 과목명 입력
             OutlinedTextField(
                 value = uiState.subjectName,
                 onValueChange = { viewModel.onSubjectNameChange(it) },
@@ -124,7 +118,6 @@ fun ExamSettingScreen(
                 singleLine = true
             )
 
-            // ③ 시험일 선택
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { datePickerDialog.show() }) {
                     Text(
@@ -148,7 +141,6 @@ fun ExamSettingScreen(
                 }
             }
 
-            // ④ D-day 표시 영역
             if (uiState.dDayText.isNotEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -171,7 +163,6 @@ fun ExamSettingScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ⑤ 저장 버튼
             Button(
                 onClick = { viewModel.saveExam() },
                 modifier = Modifier
@@ -185,7 +176,7 @@ fun ExamSettingScreen(
                 if (uiState.isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.height(24.dp),
-                        color = Color(0xFF1A1A1A),  // 검은색 계열
+                        color = Color(0xFF1A1A1A),
                         strokeWidth = 2.dp
                     )
                 } else {
@@ -199,7 +190,6 @@ fun ExamSettingScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // ⑥ Snackbar
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -211,7 +201,6 @@ fun ExamSettingScreen(
 @Composable
 private fun ExamSettingScreenPreview() {
     MaterialTheme {
-        // Preview용 더미 상태 (ViewModel 없이 UI 구조만 확인)
         Box(
             modifier = Modifier
                 .fillMaxSize()
