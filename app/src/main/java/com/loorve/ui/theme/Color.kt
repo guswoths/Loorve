@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Color
 
 // -- Primary: Deep Indigo --
 val md_theme_light_primary = Color(0xFF3949AB)          // 인디고 600
-val md_theme_light_onPrimary = Color(0xFFFFFFFF)
+val md_theme_light_onPrimary = Color(0xFF1A1A1A)
 val md_theme_light_primaryContainer = Color(0xFFDDE1FF)  // 인디고 50
 val md_theme_light_onPrimaryContainer = Color(0xFF001082)
 

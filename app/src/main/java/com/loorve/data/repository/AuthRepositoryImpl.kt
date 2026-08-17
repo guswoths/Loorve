@@ -189,13 +189,16 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     private fun mapFirebaseAuthError(errorCode: String): String = when (errorCode) {
-        "ERROR_INVALID_EMAIL"          -> "이메일 형식이 올바르지 않습니다."
-        "ERROR_WRONG_PASSWORD"         -> "이메일 또는 비밀번호가 올바르지 않습니다."
-        "ERROR_USER_NOT_FOUND"         -> "이메일 또는 비밀번호가 올바르지 않습니다."
-        "ERROR_USER_DISABLED"          -> "비활성화된 계정입니다. 고객센터에 문의해주세요."
-        "ERROR_TOO_MANY_REQUESTS"      -> "잠시 후 다시 시도해주세요."
-        "ERROR_NETWORK_REQUEST_FAILED" -> "네트워크 연결을 확인해주세요."
-        else                           -> "로그인에 실패했습니다. 다시 시도해주세요."
+        "ERROR_INVALID_EMAIL"            -> "이메일 형식이 올바르지 않습니다."
+        "ERROR_WRONG_PASSWORD"           -> "이메일 또는 비밀번호가 올바르지 않습니다."
+        "ERROR_USER_NOT_FOUND"           -> "이메일 또는 비밀번호가 올바르지 않습니다."
+        "ERROR_USER_DISABLED"            -> "비활성화된 계정입니다. 고객센터에 문의해주세요."
+        "ERROR_TOO_MANY_REQUESTS"        -> "잠시 후 다시 시도해주세요."
+        "ERROR_NETWORK_REQUEST_FAILED"   -> "네트워크 연결을 확인해주세요."
+        "ERROR_INVALID_CREDENTIAL"       -> "이메일 또는 비밀번호가 올바르지 않습니다."  // ← 신규 추가
+        "ERROR_OPERATION_NOT_ALLOWED"    -> "이 로그인 방식은 현재 비활성화되어 있습니다." // ← 신규 추가
+        "ERROR_EMAIL_ALREADY_IN_USE"     -> "이미 사용 중인 이메일입니다."              // ← 신규 추가
+        else -> "로그인에 실패했습니다. (코드: $errorCode)"  // 디버깅용 임시 코드 표시
     }
 
     companion object {
