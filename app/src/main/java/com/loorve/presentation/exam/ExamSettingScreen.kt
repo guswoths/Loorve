@@ -54,6 +54,7 @@ fun ExamSettingScreen(
 
     LaunchedEffect(uiState.isSaveSuccess) {
         if (uiState.isSaveSuccess) {
+            viewModel.resetSaveSuccess()
             onSaveSuccess()
         }
     }
@@ -107,7 +108,7 @@ fun ExamSettingScreen(
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold
                 ),
-                color = MaterialTheme.colorScheme.onBackground
+                color = Color(0xFF1A1A1A)
             )
 
             Spacer(modifier = Modifier.height(8.dp))

@@ -70,6 +70,7 @@ class ExamSettingViewModel @Inject constructor(
                 result.fold(
                     onSuccess = {
                         _uiState.update { it.copy(isLoading = false, isSaveSuccess = true) }
+                        // 네비게이션 완료 후 중복 트리거 방지
                     },
                     onFailure = { throwable ->
                         _uiState.update {
@@ -94,6 +95,10 @@ class ExamSettingViewModel @Inject constructor(
     /** 에러 메시지 초기화 */
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    fun resetSaveSuccess() {
+        _uiState.update { it.copy(isSaveSuccess = false) }
     }
 
     /**

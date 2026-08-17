@@ -16,6 +16,17 @@ import com.loorve.presentation.exam.ExamSettingScreen
 import com.loorve.presentation.login.LoginScreen
 import com.loorve.presentation.onboarding.OnboardingScreen
 import kotlinx.coroutines.delay
+import com.loorve.presentation.home.HomeScreen
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 // ─── 타입 안전 라우트 정의 ───────────────────────────────────────────────
 sealed class Screen(val route: String) {
@@ -85,8 +96,7 @@ fun LoorveNavHost(
 
         // ── 5. 홈 (스텁) ─────────────────────────────────────────────────
         composable(Screen.Home.route) {
-            // TODO: HomeScreen composable로 교체 예정
-            Text("메인 화면 (준비 중)")
+            HomeScreen()
         }
     }
 }
@@ -96,15 +106,30 @@ fun LoorveNavHost(
 private fun SplashScreen(
     onSplashComplete: (isLoggedIn: Boolean) -> Unit
 ) {
-    // 확인 필요: 실제 스플래시 UI(로고 등)는 추후 디자인 확정 후 추가 권장
     var triggered by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        delay(2_000L) // 2초 대기
+        delay(2_000L)
         if (!triggered) {
             triggered = true
             val isLoggedIn = FirebaseAuth.getInstance().currentUser != null
             onSplashComplete(isLoggedIn)
+        }
+    }
+
+    // 스플래시 대기 중 로딩 UI 표시
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "Loorve",
+                style = MaterialTheme.typography.displayMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            CircularProgressIndicator()
         }
     }
 }
