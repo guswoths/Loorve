@@ -136,6 +136,14 @@ dependencies {
     implementation(libs.room.ktx)                  // Coroutine/Flow 확장
     ksp(libs.room.compiler)                        // ✅ KSP로 처리
 
+    // ── [Room] 로컬 SQLite DB: KSP로 컴파일러 처리 ──
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+
+    // ── [DataStore] 온보딩 등 간단한 Key-Value 설정 저장 ──
+    implementation(libs.datastore.preferences)
+
     // ── [Coroutines] 비동기 처리 ──
     implementation(libs.coroutines.android)
 
