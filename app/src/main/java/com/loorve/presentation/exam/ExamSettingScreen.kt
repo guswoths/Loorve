@@ -185,11 +185,14 @@ fun ExamSettingScreen(
                 if (uiState.isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.height(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = Color(0xFF1A1A1A),  // 검은색 계열
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text(text = "저장")
+                    Text(
+                        text = "저장",
+                        color = Color(0xFF1A1A1A)
+                    )
                 }
             }
 
