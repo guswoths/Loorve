@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.loorve.presentation.login.LoginScreen
+import com.loorve.presentation.onboarding.OnboardingScreen  // ← 신규 import 추가
 import com.loorve.ui.theme.LoorveTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -20,8 +21,19 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 NavHost(
                     navController = navController,
-                    startDestination = "login"
+                    startDestination = "onboarding"  // ← "login"에서 "onboarding"으로 변경
                 ) {
+                    // 온보딩 라우트 (신규 추가)
+                    composable("onboarding") {
+                        OnboardingScreen(
+                            onOnboardingComplete = {
+                                navController.navigate("login") {
+                                    // 온보딩 완료 후 백스택에서 onboarding 제거
+                                    popUpTo("onboarding") { inclusive = true }
+                                }
+                            }
+                        )
+                    }
                     composable("login") {
                         LoginScreen(
                             onLoginSuccess = {
