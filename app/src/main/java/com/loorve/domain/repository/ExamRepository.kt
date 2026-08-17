@@ -64,5 +64,20 @@ interface ExamRepository {
      *
      * @return 해당 사용자의 시험 결과 목록을 방출하는 [Flow]
      */
+
     fun getExamResults(userId: String): Flow<List<ExamResult>>
+
+    /**
+     * 새로운 시험을 저장합니다.
+     *
+     * @param exam 저장할 [Exam] 객체
+     *
+     * ⚠️ 보안 주의사항:
+     *  - exam 데이터는 서버 사이드 보안 규칙에 의해 인증된 사용자만 저장 가능해야 합니다.
+     *  - 클라이언트에서 전달된 examDate 등의 값은 구현체에서 서버 타임스탬프로 대체하는 것을 권장합니다.
+     *
+     * @return 저장 성공 시 [Result.success(Unit)],
+     *         실패 시 [Result.failure]와 함께 예외를 반환합니다.
+     */
+    suspend fun addExam(exam: Exam): Result<Unit>
 }
