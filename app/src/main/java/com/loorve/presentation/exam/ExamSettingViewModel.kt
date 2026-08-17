@@ -60,25 +60,34 @@ class ExamSettingViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
         viewModelScope.launch {
-            val result = addExamUseCase(
-                Exam(
-                    subjectName = state.subjectName,
-                    examDate = state.examDate
+            try {
+                val result = addExamUseCase(
+                    Exam(
+                        subjectName = state.subjectName,
+                        examDate = state.examDate
+                    )
                 )
-            )
-            result.fold(
-                onSuccess = {
-                    _uiState.update { it.copy(isLoading = false, isSaveSuccess = true) }
-                },
-                onFailure = { throwable ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = throwable.message ?: "저장 중 오류가 발생했습니다."
-                        )
+                result.fold(
+                    onSuccess = {
+                        _uiState.update { it.copy(isLoading = false, isSaveSuccess = true) }
+                    },
+                    onFailure = { throwable ->
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                errorMessage = throwable.message ?: "저장 중 오류가 발생했습니다."
+                            )
+                        }
                     }
+                )
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = e.message ?: "알 수 없는 오류가 발생했습니다."
+                    )
                 }
-            )
+            }
         }
     }
 

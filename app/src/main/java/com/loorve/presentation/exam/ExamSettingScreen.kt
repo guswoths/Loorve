@@ -24,16 +24,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color                          // ← 추가
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.text.TextStyle
 
 /**
  * 시험 설정 화면
@@ -115,7 +117,13 @@ fun ExamSettingScreen(
                 onValueChange = { viewModel.onSubjectNameChange(it) },
                 label = { Text("과목명") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                textStyle = TextStyle(color = Color(0xFF1A1A1A)),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color(0xFF1A1A1A),
+                    unfocusedTextColor = Color(0xFF1A1A1A),
+                    cursorColor = Color(0xFF1A1A1A)
+                )
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
