@@ -21,8 +21,26 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy년 MM월 dd일") }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    Scaffold { paddingValues ->
+    // ── 진도 저장 결과에 따른 Snackbar 피드백 ──────────────────
+    LaunchedEffect(uiState.progressSaveResult) {
+        when (uiState.progressSaveResult) {
+            true  -> {
+                snackbarHostState.showSnackbar("진도가 저장되었습니다 ✅")
+                viewModel.consumeProgressSaveResult()
+            }
+            false -> {
+                snackbarHostState.showSnackbar("저장에 실패했습니다. 다시 시도해 주세요.")
+                viewModel.consumeProgressSaveResult()
+            }
+            null  -> Unit
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -52,21 +70,39 @@ fun HomeScreen(
                 }
 
                 uiState.exams.isEmpty() -> {
-                    Column(
-                        modifier            = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    LazyColumn(
+                        modifier            = Modifier.fillMaxSize(),
+                        contentPadding      = PaddingValues(vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text  = "등록된 시험이 없습니다.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text  = "시험을 추가해 보세요!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
+                        // ── 시험이 없어도 진도 입력은 노출 (빈 목록 안내는 아래에) ──
+                        item {
+                            ProgressInputSection(
+                                exams  = uiState.exams,
+                                onSave = { examId, content, completed, total ->
+                                    viewModel.addProgress(examId, content, completed, total)
+                                }
+                            )
+                        }
+                        item {
+                            Column(
+                                modifier            = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Spacer(modifier = Modifier.height(24.dp))
+                                Text(
+                                    text  = "등록된 시험이 없습니다.",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text  = "시험을 추가해 보세요!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -76,13 +112,23 @@ fun HomeScreen(
                         contentPadding      = PaddingValues(vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // ── 오늘의 학습 진도 입력 섹션 (상단 추가) ──────────────
+                        item {
+                            ProgressInputSection(
+                                exams  = uiState.exams,
+                                onSave = { examId, content, completed, total ->
+                                    viewModel.addProgress(examId, content, completed, total)
+                                }
+                            )
+                        }
+
                         item {
                             Text(
-                                text       = "내 시험 목록",
-                                style      = MaterialTheme.typography.headlineSmall.copy(
+                                text     = "내 시험 목록",
+                                style    = MaterialTheme.typography.headlineSmall.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
-                                modifier   = Modifier.padding(bottom = 4.dp)
+                                modifier = Modifier.padding(bottom = 4.dp)
                             )
                         }
                         items(uiState.exams) { exam ->
@@ -118,15 +164,15 @@ private fun ExamListItem(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier            = Modifier
+            modifier               = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment   = Alignment.CenterVertically
+            horizontalArrangement  = Arrangement.SpaceBetween,
+            verticalAlignment      = Alignment.CenterVertically
         ) {
             Text(
-                text       = subjectName,
-                style      = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                text  = subjectName,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
             )
             Text(
                 text  = formattedDate,
