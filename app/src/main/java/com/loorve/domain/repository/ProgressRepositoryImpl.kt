@@ -6,7 +6,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
-import com.loorve.domain.model.ProgressEntity
+import com.loorve.domain.model.Progress
 import com.loorve.domain.repository.ProgressRepository
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -29,7 +29,7 @@ class ProgressRepositoryImpl @Inject constructor(
     private fun progressDocument(uid: String, progressId: String) =
         userProgressCollection(uid).document(progressId)
 
-    override suspend fun saveProgress(uid: String, progress: ProgressEntity): Result<Unit> {
+    override suspend fun saveProgress(uid: String, progress: Progress): Result<Unit> {
         return try {
             require(uid.isNotBlank()) { "uid는 비어 있을 수 없습니다." }
 
@@ -61,56 +61,35 @@ class ProgressRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getProgressById(uid: String, progressId: String): Result<ProgressEntity> {
+    override suspend fun getProgressById(uid: String, progressId: String): Result<Progress> {
         return try {
             require(uid.isNotBlank()) { "uid는 비어 있을 수 없습니다." }
             require(progressId.isNotBlank()) { "progressId는 비어 있을 수 없습니다." }
-
             val snapshot = progressDocument(uid, progressId).get().await()
-
             if (!snapshot.exists()) {
                 Result.failure(NoSuchElementException("Progress not found: $progressId"))
             } else {
-                val entity = snapshot.toProgressEntity()
+                val p = snapshot.toProgress()
                     ?: return Result.failure(IllegalStateException("Progress 매핑 실패: $progressId"))
-
-                Result.success(entity)
+                Result.success(p)
             }
-        } catch (e: IllegalArgumentException) {
-            Log.e(TAG, "progress 단건 조회 실패 - 잘못된 파라미터 (uid=$uid, progressId=$progressId)", e)
-            Result.failure(e)
-        } catch (e: IOException) {
-            Log.e(TAG, "progress 단건 조회 실패 - 네트워크 오류 (uid=$uid, progressId=$progressId)", e)
-            Result.failure(Exception("네트워크 연결을 확인해주세요.", e))
         } catch (e: Exception) {
             Log.e(TAG, "progress 단건 조회 실패 (uid=$uid, progressId=$progressId)", e)
-            Result.failure(Exception("progress 조회 중 오류가 발생했습니다.", e))
+            Result.failure(e)
         }
     }
 
-    override suspend fun getProgressList(uid: String): Result<List<ProgressEntity>> {
+    override suspend fun getProgressList(uid: String): Result<List<Progress>> {
         return try {
             require(uid.isNotBlank()) { "uid는 비어 있을 수 없습니다." }
-
             val snapshot = userProgressCollection(uid)
-                .orderBy("updatedAt", Query.Direction.DESCENDING)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
                 .get()
                 .await()
-
-            val progressList = snapshot.documents.mapNotNull { document ->
-                document.toProgressEntity()
-            }
-
-            Result.success(progressList)
-        } catch (e: IllegalArgumentException) {
-            Log.e(TAG, "progress 목록 조회 실패 - 잘못된 파라미터 (uid=$uid)", e)
-            Result.failure(e)
-        } catch (e: IOException) {
-            Log.e(TAG, "progress 목록 조회 실패 - 네트워크 오류 (uid=$uid)", e)
-            Result.failure(Exception("네트워크 연결을 확인해주세요.", e))
+            Result.success(snapshot.documents.mapNotNull { it.toProgress() })
         } catch (e: Exception) {
             Log.e(TAG, "progress 목록 조회 실패 (uid=$uid)", e)
-            Result.failure(Exception("progress 목록 조회 중 오류가 발생했습니다.", e))
+            Result.failure(e)
         }
     }
 
@@ -118,81 +97,64 @@ class ProgressRepositoryImpl @Inject constructor(
         return try {
             require(uid.isNotBlank()) { "uid는 비어 있을 수 없습니다." }
             require(progressId.isNotBlank()) { "progressId는 비어 있을 수 없습니다." }
-
             progressDocument(uid, progressId).delete().await()
             Log.d(TAG, "progress 삭제 완료 (uid=$uid, progressId=$progressId)")
             Result.success(Unit)
-        } catch (e: IllegalArgumentException) {
-            Log.e(TAG, "progress 삭제 실패 - 잘못된 파라미터 (uid=$uid, progressId=$progressId)", e)
-            Result.failure(e)
-        } catch (e: IOException) {
-            Log.e(TAG, "progress 삭제 실패 - 네트워크 오류 (uid=$uid, progressId=$progressId)", e)
-            Result.failure(Exception("네트워크 연결을 확인해주세요.", e))
         } catch (e: Exception) {
             Log.e(TAG, "progress 삭제 실패 (uid=$uid, progressId=$progressId)", e)
-            Result.failure(Exception("progress 삭제 중 오류가 발생했습니다.", e))
+            Result.failure(e)
         }
     }
 
-    override fun observeProgressList(uid: String): Flow<List<ProgressEntity>> = callbackFlow {
+    override fun observeProgressList(uid: String): Flow<List<Progress>> = callbackFlow {
         if (uid.isBlank()) {
             close(IllegalArgumentException("uid는 비어 있을 수 없습니다."))
             return@callbackFlow
         }
-
-        val listenerRegistration = userProgressCollection(uid)
-            .orderBy("updatedAt", Query.Direction.DESCENDING)
+        val reg = userProgressCollection(uid)
+            .orderBy("createdAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e(TAG, "progress 실시간 구독 실패 (uid=$uid)", error)
-                    close(error)
-                    return@addSnapshotListener
-                }
-
-                val progressList = snapshot?.documents?.mapNotNull { document ->
-                    document.toProgressEntity()
-                } ?: emptyList()
-
-                trySend(progressList)
+                if (error != null) { close(error); return@addSnapshotListener }
+                trySend(snapshot?.documents?.mapNotNull { it.toProgress() } ?: emptyList())
             }
-
-        awaitClose { listenerRegistration.remove() }
+        awaitClose { reg.remove() }
     }
+
+    // ── 내부 헬퍼 ──────────────────────────────────────────────────────────
 
     private fun buildProgressMap(
         uid: String,
-        progress: ProgressEntity,
+        progress: Progress,
         existingCreatedAt: Timestamp?
     ): Map<String, Any?> {
-        val now = Timestamp.now()
+        val nowTimestamp = Timestamp.now()
+        val createdAtTimestamp = existingCreatedAt
+            ?: if (progress.createdAt > 0L)
+                Timestamp(progress.createdAt / 1000, ((progress.createdAt % 1000) * 1_000_000).toInt())
+               else nowTimestamp
 
         return mapOf(
-            "uid" to uid,
-            "examId" to progress.examId,
-            "subjectName" to progress.subjectName,
-            "content" to progress.content,
-            "studyDate" to progress.studyDate,
-            "reviewCount" to progress.reviewCount,
-            "isCompleted" to progress.isCompleted,
-            "createdAt" to (existingCreatedAt ?: progress.createdAt?.let { Timestamp(it.seconds, it.nanoseconds) } ?: now),
-            "updatedAt" to now
+            "uid"            to uid,
+            "examId"         to progress.examId,
+            "content"        to progress.content,
+            "completedCount" to progress.completedCount,
+            "totalCount"     to progress.totalCount,
+            "isCompleted"    to progress.isCompleted,
+            "createdAt"      to createdAtTimestamp,
+            "updatedAt"      to nowTimestamp
         )
     }
 
-    private fun DocumentSnapshot.toProgressEntity(): ProgressEntity? {
+    private fun DocumentSnapshot.toProgress(): Progress? {
         val data = data ?: return null
-
-        return ProgressEntity(
-            progressId = id,
-            uid = data["uid"] as? String ?: "",
-            examId = data["examId"] as? String ?: "",
-            subjectName = data["subjectName"] as? String ?: "",
-            content = data["content"] as? String ?: "",
-            studyDate = data["studyDate"] as? String ?: "",
-            reviewCount = (data["reviewCount"] as? Long)?.toInt() ?: 0,
-            isCompleted = data["isCompleted"] as? Boolean ?: false,
-            createdAt = getTimestamp("createdAt"),
-            updatedAt = getTimestamp("updatedAt")
+        return Progress(
+            progressId     = id,
+            examId         = data["examId"] as? String ?: "",
+            content        = data["content"] as? String ?: "",
+            completedCount = (data["completedCount"] as? Long)?.toInt() ?: 0,
+            totalCount     = (data["totalCount"] as? Long)?.toInt() ?: 0,
+            isCompleted    = data["isCompleted"] as? Boolean ?: false,
+            createdAt      = getTimestamp("createdAt")?.toDate()?.time ?: 0L
         )
     }
 
