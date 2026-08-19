@@ -1,7 +1,8 @@
-// 경로: app/src/main/java/com/loorve/data/repository/ExamRepositoryImpl.kt
 package com.loorve.data.repository
 
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.loorve.data.model.ExamDto
@@ -18,21 +19,33 @@ import javax.inject.Singleton
 @Singleton
 class ExamRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val auth: FirebaseAuth          // ← FirebaseAuth 추가
+    private val auth: FirebaseAuth
 ) : ExamRepository {
-
-    // users/{uid}/exams 경로를 동적으로 반환
-    private fun userExamsCollection() = auth.currentUser?.uid
-        ?.let { uid -> firestore.collection("users").document(uid).collection("exams") }
-        ?: throw IllegalStateException("로그인 상태가 아닙니다.")
 
     private val resultsCollection = firestore.collection("examResults")
 
+    /**
+     * ✅ 수정 B: throw 대신 null을 반환하여 Flow caller가 close(error)로 안전하게 처리.
+     * 비로그인 상태에서 callbackFlow 내부에서 throw 시 앱 크래시 방지.
+     */
+    private fun userExamsCollectionOrNull(): CollectionReference? =
+        auth.currentUser?.uid
+            ?.let { uid -> firestore.collection("users").document(uid).collection("exams") }
+
     override fun getExamList(): Flow<List<Exam>> = callbackFlow {
-        val listener = userExamsCollection()
+        // ✅ 수정 B: null 체크 후 close로 안전하게 에러 전파
+        val collection = userExamsCollectionOrNull()
+        if (collection == null) {
+            Log.w(TAG, "getExamList 실패: 로그인 상태가 아닙니다.")
+            close(IllegalStateException("로그인 상태가 아닙니다."))
+            return@callbackFlow
+        }
+
+        val listener = collection
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    Log.e(TAG, "getExamList 스냅샷 오류", error)
                     close(error)
                     return@addSnapshotListener
                 }
@@ -45,9 +58,18 @@ class ExamRepositoryImpl @Inject constructor(
     }
 
     override fun getExamById(examId: String): Flow<Exam> = callbackFlow {
-        val listener = userExamsCollection().document(examId)
+        // ✅ 수정 B: null 체크 후 close로 안전하게 에러 전파
+        val collection = userExamsCollectionOrNull()
+        if (collection == null) {
+            Log.w(TAG, "getExamById 실패: 로그인 상태가 아닙니다.")
+            close(IllegalStateException("로그인 상태가 아닙니다."))
+            return@callbackFlow
+        }
+
+        val listener = collection.document(examId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    Log.e(TAG, "getExamById 스냅샷 오류 (examId=$examId)", error)
                     close(error)
                     return@addSnapshotListener
                 }
@@ -65,6 +87,7 @@ class ExamRepositoryImpl @Inject constructor(
             resultsCollection.add(result).await()
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e(TAG, "saveExamResult 실패", e)
             Result.failure(e)
         }
     }
@@ -73,7 +96,11 @@ class ExamRepositoryImpl @Inject constructor(
         val listener = resultsCollection
             .whereEqualTo("userId", userId)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) { close(error); return@addSnapshotListener }
+                if (error != null) {
+                    Log.e(TAG, "getExamResults 스냅샷 오류 (userId=$userId)", error)
+                    close(error)
+                    return@addSnapshotListener
+                }
                 val results = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(ExamResult::class.java)
                 } ?: emptyList()
@@ -84,15 +111,24 @@ class ExamRepositoryImpl @Inject constructor(
 
     override suspend fun addExam(exam: Exam): Result<Unit> {
         return try {
+            // ✅ 수정 B: null 체크 후 Result.failure로 안전하게 처리
+            val collection = userExamsCollectionOrNull()
+                ?: return Result.failure(IllegalStateException("로그인 상태가 아닙니다."))
+
             val data = hashMapOf(
                 "subjectName" to exam.subjectName,
                 "examDate"    to exam.examDate,
                 "createdAt"   to com.google.firebase.Timestamp.now()
             )
-            userExamsCollection().add(data).await()
+            collection.add(data).await()
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e(TAG, "addExam 실패 (subjectName=${exam.subjectName})", e)
             Result.failure(e)
         }
+    }
+
+    companion object {
+        private const val TAG = "ExamRepository"
     }
 }

@@ -12,6 +12,7 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.loorve.domain.model.User
 import com.loorve.domain.repository.AuthRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -25,7 +26,8 @@ import javax.inject.Singleton
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
-    @ApplicationContext private val context: Context,
+    // ✅ 수정 A: @param: 타겟 명시로 KT-73255 컴파일러 경고 제거
+    @param:ApplicationContext private val context: Context,
     private val firestore: FirebaseFirestore
 ) : AuthRepository {
 
@@ -69,17 +71,16 @@ class AuthRepositoryImpl @Inject constructor(
         awaitClose { firebaseAuth.removeAuthStateListener(listener) }
     }
 
-
     // ──────────────────────────────────────────────
     // Google 로그인 진입점: Credential Manager로 계정 선택 팝업 실행
     // ──────────────────────────────────────────────
-    override suspend fun launchGoogleSignIn(activityContext: Context): Result<User>
-    {
+
+    override suspend fun launchGoogleSignIn(activityContext: Context): Result<User> {
         return try {
             val credentialManager = CredentialManager.create(activityContext)
 
             val googleIdOption = GetGoogleIdOption.Builder()
-                .setFilterByAuthorizedAccounts(false) // 기존 계정 필터 OFF → 모든 계정 표시
+                .setFilterByAuthorizedAccounts(false)
                 .setServerClientId(WEB_CLIENT_ID)
                 .setAutoSelectEnabled(false)
                 .build()
@@ -97,11 +98,9 @@ class AuthRepositoryImpl @Inject constructor(
                 .createFrom(credentialResponse.credential.data)
             val idToken = googleIdTokenCredential.idToken
 
-            // idToken 획득 후 Firebase Auth 처리
             signInWithGoogle(idToken)
 
         } catch (e: GetCredentialException) {
-            // 사용자가 팝업 취소하거나 계정 없을 때
             Log.w(TAG, "Credential 취소 또는 실패: ${e.type}", e)
             Result.failure(Exception("CANCELLED"))
         } catch (e: Exception) {
@@ -109,7 +108,6 @@ class AuthRepositoryImpl @Inject constructor(
             Result.failure(Exception("인증 처리 중 오류가 발생했습니다."))
         }
     }
-
 
     // ──────────────────────────────────────────────
     // Google 로그인 (Credential Manager API)
@@ -134,38 +132,32 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     // ──────────────────────────────────────────────
-    // Firestore 사용자 문서 최초 생성
+    // Firestore 사용자 문서 최초 생성 / 갱신
     // ──────────────────────────────────────────────
 
     private suspend fun createOrUpdateUserDocument(user: User) {
         try {
             val docRef = firestore.collection("users").document(user.id)
-
-            // 최초 생성 여부 확인 (createdAt은 최초 1회만 기록)
             val snapshot = docRef.get().await()
             val isNewUser = !snapshot.exists()
 
             val data = buildMap<String, Any?> {
                 put("uid",         user.id)
                 put("email",       user.email)
-                put("displayName", user.nickname)      // 도메인 nickname → Firestore displayName
-                put("photoUrl",    user.profileImageUrl) // null 허용
-                put("lastLoginAt", FieldValue.serverTimestamp()) // 매 로그인마다 갱신
+                put("displayName", user.nickname)
+                put("photoUrl",    user.profileImageUrl)
+                put("lastLoginAt", FieldValue.serverTimestamp())
                 if (isNewUser) {
-                    put("createdAt", FieldValue.serverTimestamp()) // 최초 생성 시만 기록
+                    put("createdAt", FieldValue.serverTimestamp())
                 }
             }
 
-            // SetOptions.merge() → 기존 필드 보존, 새 필드만 추가/갱신 (중복 방지)
-            docRef.set(data, com.google.firebase.firestore.SetOptions.merge()).await()
-
+            docRef.set(data, SetOptions.merge()).await()
             Log.d(TAG, "Firestore users 문서 ${if (isNewUser) "생성" else "업데이트"} 완료 (uid=${user.id})")
 
         } catch (e: com.google.firebase.firestore.FirebaseFirestoreException) {
-            // Firestore 권한/가용성 오류 — 로그만 남기고 로그인 흐름은 중단하지 않음
             Log.e(TAG, "Firestore 권한 오류 (uid=${user.id}): ${e.code}", e)
         } catch (e: java.io.IOException) {
-            // 네트워크 오류 — 재시도 없이 로그만 남김 (오프라인 캐시로 나중에 처리 가능)
             Log.e(TAG, "Firestore 네트워크 오류 (uid=${user.id})", e)
         } catch (e: Exception) {
             Log.e(TAG, "Firestore 문서 저장 실패 (uid=${user.id})", e)
@@ -179,31 +171,31 @@ class AuthRepositoryImpl @Inject constructor(
     private fun FirebaseUser.toDomainUser(): User {
         val now = System.currentTimeMillis()
         return User(
-            id = uid,
-            email = email ?: "",
-            nickname = displayName ?: email?.substringBefore("@") ?: "사용자",
+            id              = uid,
+            email           = email ?: "",
+            nickname        = displayName ?: email?.substringBefore("@") ?: "사용자",
             profileImageUrl = photoUrl?.toString(),
-            createdAt = metadata?.creationTimestamp ?: now,
-            updatedAt = now
+            createdAt       = metadata?.creationTimestamp ?: now,
+            updatedAt       = now
         )
     }
 
     private fun mapFirebaseAuthError(errorCode: String): String = when (errorCode) {
-        "ERROR_INVALID_EMAIL"            -> "이메일 형식이 올바르지 않습니다."
-        "ERROR_WRONG_PASSWORD"           -> "이메일 또는 비밀번호가 올바르지 않습니다."
-        "ERROR_USER_NOT_FOUND"           -> "이메일 또는 비밀번호가 올바르지 않습니다."
-        "ERROR_USER_DISABLED"            -> "비활성화된 계정입니다. 고객센터에 문의해주세요."
-        "ERROR_TOO_MANY_REQUESTS"        -> "잠시 후 다시 시도해주세요."
-        "ERROR_NETWORK_REQUEST_FAILED"   -> "네트워크 연결을 확인해주세요."
-        "ERROR_INVALID_CREDENTIAL"       -> "이메일 또는 비밀번호가 올바르지 않습니다."  // ← 신규 추가
-        "ERROR_OPERATION_NOT_ALLOWED"    -> "이 로그인 방식은 현재 비활성화되어 있습니다." // ← 신규 추가
-        "ERROR_EMAIL_ALREADY_IN_USE"     -> "이미 사용 중인 이메일입니다."              // ← 신규 추가
-        else -> "로그인에 실패했습니다. (코드: $errorCode)"  // 디버깅용 임시 코드 표시
+        "ERROR_INVALID_EMAIL"          -> "이메일 형식이 올바르지 않습니다."
+        "ERROR_WRONG_PASSWORD"         -> "이메일 또는 비밀번호가 올바르지 않습니다."
+        "ERROR_USER_NOT_FOUND"         -> "이메일 또는 비밀번호가 올바르지 않습니다."
+        "ERROR_USER_DISABLED"          -> "비활성화된 계정입니다. 고객센터에 문의해주세요."
+        "ERROR_TOO_MANY_REQUESTS"      -> "잠시 후 다시 시도해주세요."
+        "ERROR_NETWORK_REQUEST_FAILED" -> "네트워크 연결을 확인해주세요."
+        "ERROR_INVALID_CREDENTIAL"     -> "이메일 또는 비밀번호가 올바르지 않습니다."
+        "ERROR_OPERATION_NOT_ALLOWED"  -> "이 로그인 방식은 현재 비활성화되어 있습니다."
+        "ERROR_EMAIL_ALREADY_IN_USE"   -> "이미 사용 중인 이메일입니다."
+        else -> "로그인에 실패했습니다. (코드: $errorCode)"
     }
 
     companion object {
         private const val TAG = "AuthRepository"
-        private const val WEB_CLIENT_ID = "711486350418-plbdidlveqnocbqngk3324grffaf9aj8.apps.googleusercontent.com"
+        private const val WEB_CLIENT_ID =
+            "711486350418-plbdidlveqnocbqngk3324grffaf9aj8.apps.googleusercontent.com"
     }
 }
-
