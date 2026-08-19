@@ -406,7 +406,7 @@ private fun ProgressEditBody(
 @Composable
 private fun ProgressDetailContentViewModePreview() {
     val sampleProgress = Progress(
-        id             = "preview-id",
+        progressId     = "preview-id",
         examId         = "exam-001",
         content        = "Chapter 3: Kotlin Coroutines 정리 및 Flow 학습",
         completedCount = 7,
@@ -436,7 +436,7 @@ private fun ProgressDetailContentViewModePreview() {
 @Composable
 private fun ProgressDetailContentEditModePreview() {
     val sampleProgress = Progress(
-        id             = "preview-id",
+        progressId     = "preview-id",
         examId         = "exam-001",
         content        = "Chapter 3: Kotlin Coroutines 정리",
         completedCount = 7,
