@@ -15,24 +15,23 @@ import com.loorve.domain.model.Exam
  * 오늘의 학습 진도 입력 섹션.
  *
  * @param exams 선택 가능한 시험 목록
- * @param onSave 저장 버튼 클릭 콜백 (examId, content, completedCount, totalCount)
+ * @param onSave 저장 버튼 클릭 콜백 (id, content, completedCount, totalCount)
  * @param modifier 외부에서 주입 가능한 Modifier
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressInputSection(
     exams: List<Exam>,
-    onSave: (examId: String, content: String, completedCount: Int, totalCount: Int) -> Unit,
+    // ✅ 수정: examId → id 로 파라미터명 통일 (caller인 HomeScreen과 일치)
+    onSave: (id: String, content: String, completedCount: Int, totalCount: Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // ── 로컬 상태 ──────────────────────────────────────
     var selectedExam by remember { mutableStateOf<Exam?>(null) }
     var dropdownExpanded by remember { mutableStateOf(false) }
     var content by remember { mutableStateOf("") }
     var completedCountText by remember { mutableStateOf("") }
     var totalCountText by remember { mutableStateOf("") }
 
-    // 저장 버튼 활성 조건: 시험 선택 + 내용 입력 필수
     val isSaveEnabled = selectedExam != null && content.isNotBlank()
 
     Card(
@@ -50,7 +49,6 @@ fun ProgressInputSection(
                 style = MaterialTheme.typography.titleMedium
             )
 
-            // ── 시험 선택 드롭다운 ────────────────────────────
             ExposedDropdownMenuBox(
                 expanded         = dropdownExpanded,
                 onExpandedChange = { dropdownExpanded = it }
@@ -90,7 +88,6 @@ fun ProgressInputSection(
                 }
             }
 
-            // ── 학습 내용 입력 ────────────────────────────────
             OutlinedTextField(
                 value         = content,
                 onValueChange = { content = it },
@@ -101,39 +98,37 @@ fun ProgressInputSection(
                 modifier      = Modifier.fillMaxWidth()
             )
 
-            // ── 완료 항목 수 / 전체 항목 수 (선택) ───────────
             Row(
-                modifier            = Modifier.fillMaxWidth(),
+                modifier              = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
-                    value         = completedCountText,
-                    onValueChange = { if (it.length <= 5 && it.all(Char::isDigit)) completedCountText = it },
-                    label         = { Text("완료 수") },
-                    placeholder   = { Text("0") },
+                    value           = completedCountText,
+                    onValueChange   = { if (it.length <= 5 && it.all(Char::isDigit)) completedCountText = it },
+                    label           = { Text("완료 수") },
+                    placeholder     = { Text("0") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine    = true,
-                    modifier      = Modifier.weight(1f)
+                    singleLine      = true,
+                    modifier        = Modifier.weight(1f)
                 )
                 OutlinedTextField(
-                    value         = totalCountText,
-                    onValueChange = { if (it.length <= 5 && it.all(Char::isDigit)) totalCountText = it },
-                    label         = { Text("전체 수") },
-                    placeholder   = { Text("0") },
+                    value           = totalCountText,
+                    onValueChange   = { if (it.length <= 5 && it.all(Char::isDigit)) totalCountText = it },
+                    label           = { Text("전체 수") },
+                    placeholder     = { Text("0") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine    = true,
-                    modifier      = Modifier.weight(1f)
+                    singleLine      = true,
+                    modifier        = Modifier.weight(1f)
                 )
             }
 
-            // ── 저장 버튼 ─────────────────────────────────────
             Button(
                 onClick  = {
-                    val examId         = selectedExam?.id ?: return@Button
-                    val completed      = completedCountText.toIntOrNull() ?: 0
-                    val total          = totalCountText.toIntOrNull() ?: 0
-                    onSave(examId, content.trim(), completed, total)
-                    // 저장 후 입력 초기화
+                    // ✅ 수정: examId → id (Exam 모델의 실제 필드명 및 onSave 시그니처와 일치)
+                    val id        = selectedExam?.id ?: return@Button
+                    val completed = completedCountText.toIntOrNull() ?: 0
+                    val total     = totalCountText.toIntOrNull() ?: 0
+                    onSave(id, content.trim(), completed, total)
                     content            = ""
                     completedCountText = ""
                     totalCountText     = ""

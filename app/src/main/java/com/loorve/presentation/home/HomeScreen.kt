@@ -23,7 +23,6 @@ fun HomeScreen(
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy년 MM월 dd일") }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // ── 진도 저장 결과에 따른 Snackbar 피드백 ──────────────────
     LaunchedEffect(uiState.progressSaveResult) {
         when (uiState.progressSaveResult) {
             true  -> {
@@ -75,12 +74,12 @@ fun HomeScreen(
                         contentPadding      = PaddingValues(vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // ── 시험이 없어도 진도 입력은 노출 (빈 목록 안내는 아래에) ──
                         item {
                             ProgressInputSection(
                                 exams  = uiState.exams,
-                                onSave = { examId, content, completed, total ->
-                                    viewModel.addProgress(examId, content, completed, total)
+                                // ✅ 수정: examId → id (ProgressInputSection의 onSave 시그니처와 일치)
+                                onSave = { id, content, completed, total ->
+                                    viewModel.addProgress(id, content, completed, total)
                                 }
                             )
                         }
@@ -112,12 +111,12 @@ fun HomeScreen(
                         contentPadding      = PaddingValues(vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // ── 오늘의 학습 진도 입력 섹션 (상단 추가) ──────────────
                         item {
                             ProgressInputSection(
                                 exams  = uiState.exams,
-                                onSave = { examId, content, completed, total ->
-                                    viewModel.addProgress(examId, content, completed, total)
+                                // ✅ 수정: examId → id (ProgressInputSection의 onSave 시그니처와 일치)
+                                onSave = { id, content, completed, total ->
+                                    viewModel.addProgress(id, content, completed, total)
                                 }
                             )
                         }
