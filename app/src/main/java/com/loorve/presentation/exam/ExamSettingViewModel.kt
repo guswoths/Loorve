@@ -66,7 +66,11 @@ class ExamSettingViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val result = addExamUseCase(
-                    Exam(subjectName = state.subjectName, examDate = state.examDate)
+                    Exam(
+                        id          = "",   // ✅ 신규 생성이므로 빈 문자열 (Firestore가 ID 부여)
+                        subjectName = state.subjectName,
+                        examDate    = state.examDate
+                    )
                 )
                 result.fold(
                     onSuccess = {

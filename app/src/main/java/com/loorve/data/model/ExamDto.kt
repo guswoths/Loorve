@@ -11,6 +11,7 @@ data class ExamDto(
     val createdAt: Timestamp? = null
 ) {
     fun toDomain(): Exam = Exam(
+        id          = id,          // ✅ id 추가
         subjectName = subjectName,
         examDate    = examDate
     )
