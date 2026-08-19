@@ -1,4 +1,3 @@
-// 경로: app/src/main/java/com/loorve/presentation/progress/ProgressDetailViewModel.kt
 package com.loorve.presentation.progress
 
 import androidx.lifecycle.ViewModel
@@ -33,6 +32,8 @@ class ProgressDetailViewModel @Inject constructor(
 
     /**
      * 특정 progressId의 Progress를 로드합니다.
+     * ✅ 원인3 수정: getProgressById 반환 타입이 Result<Progress>로 통일되어
+     *    result.getOrNull()이 Progress? 타입으로 직접 바인딩됩니다.
      */
     fun loadProgress(uid: String, progressId: String) {
         viewModelScope.launch {
@@ -43,7 +44,7 @@ class ProgressDetailViewModel @Inject constructor(
             } else {
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
+                        isLoading    = false,
                         errorMessage = result.exceptionOrNull()?.message ?: "불러오지 못했습니다."
                     )
                 }
@@ -65,6 +66,9 @@ class ProgressDetailViewModel @Inject constructor(
      * 수정된 Progress를 저장합니다.
      * id, examId, createdAt은 기존 값을 유지하고,
      * content / completedCount / totalCount / isCompleted 만 갱신합니다.
+     *
+     * ✅ 원인3 수정: Progress data class에 모든 필드가 정의되어 있으므로
+     *    copy() 호출 시 Unresolved reference 에러 해소됩니다.
      */
     fun saveProgress(uid: String, updatedProgress: Progress) {
         val current = _uiState.value.progress ?: return
@@ -103,6 +107,7 @@ class ProgressDetailViewModel @Inject constructor(
 
     /**
      * Progress를 삭제합니다.
+     * progressId는 Progress.id 필드 값을 전달해야 합니다.
      */
     fun deleteProgress(uid: String, progressId: String) {
         if (uid.isBlank() || progressId.isBlank()) {
