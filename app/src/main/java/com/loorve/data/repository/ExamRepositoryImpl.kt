@@ -1,6 +1,6 @@
-// app/src/main/java/com/loorve/data/repository/ExamRepositoryImpl.kt
 package com.loorve.data.repository
 
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.loorve.domain.model.Exam
 import com.loorve.domain.model.ExamResult
@@ -8,21 +8,27 @@ import com.loorve.domain.repository.ExamRepository
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 class ExamRepositoryImpl @Inject constructor(
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val firebaseAuth: FirebaseAuth          // ← 추가
 ) : ExamRepository {
 
     private val examsCollection = firestore.collection("exams")
     private val resultsCollection = firestore.collection("examResults")
 
+    private fun requireAuth(): String =
+        firebaseAuth.currentUser?.uid
+            ?: throw SecurityException("로그인이 필요합니다.")
+
     override fun getExamList(): Flow<List<Exam>> = callbackFlow {
         val listener = examsCollection.addSnapshotListener { snapshot, error ->
             if (error != null) { close(error); return@addSnapshotListener }
-            val exams = snapshot?.documents?.mapNotNull { it.toObject(Exam::class.java) } ?: emptyList()
+            val exams = snapshot?.documents
+                ?.mapNotNull { it.toObject(Exam::class.java) }  // no-arg 생성자 필요
+                ?: emptyList()
             trySend(exams)
         }
         awaitClose { listener.remove() }
@@ -39,6 +45,7 @@ class ExamRepositoryImpl @Inject constructor(
     }
 
     override suspend fun saveExamResult(result: ExamResult): Result<Unit> = runCatching {
+        requireAuth()
         resultsCollection.add(result).await()
         Unit
     }
@@ -48,14 +55,19 @@ class ExamRepositoryImpl @Inject constructor(
             .whereEqualTo("userId", userId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) { close(error); return@addSnapshotListener }
-                val results = snapshot?.documents?.mapNotNull { it.toObject(ExamResult::class.java) } ?: emptyList()
+                val results = snapshot?.documents
+                    ?.mapNotNull { it.toObject(ExamResult::class.java) }
+                    ?: emptyList()
                 trySend(results)
             }
         awaitClose { listener.remove() }
     }
 
     override suspend fun addExam(exam: Exam): Result<Unit> = runCatching {
-        examsCollection.add(exam).await()
+        val uid = requireAuth()
+        // createdBy에 현재 로그인 uid 자동 삽입
+        val examWithOwner = exam.copy(createdBy = uid)
+        examsCollection.add(examWithOwner).await()
         Unit
     }
 }

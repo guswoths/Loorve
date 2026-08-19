@@ -29,10 +29,16 @@ fun ExamSettingScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     // SharedFlow ONE-SHOT 이벤트 수신
+    var navigated by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is ExamSettingEvent.SaveSuccess -> onSaveSuccess()
+                is ExamSettingEvent.SaveSuccess -> {
+                    if (!navigated) {
+                        navigated = true
+                        onSaveSuccess()
+                    }
+                }
             }
         }
     }
