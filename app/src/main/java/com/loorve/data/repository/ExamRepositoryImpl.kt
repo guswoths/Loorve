@@ -13,7 +13,7 @@ import javax.inject.Inject
 
 class ExamRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val firebaseAuth: FirebaseAuth          // ← 추가
+    private val firebaseAuth: FirebaseAuth
 ) : ExamRepository {
 
     private val examsCollection = firestore.collection("exams")
@@ -26,9 +26,10 @@ class ExamRepositoryImpl @Inject constructor(
     override fun getExamList(): Flow<List<Exam>> = callbackFlow {
         val listener = examsCollection.addSnapshotListener { snapshot, error ->
             if (error != null) { close(error); return@addSnapshotListener }
-            val exams = snapshot?.documents
-                ?.mapNotNull { it.toObject(Exam::class.java) }  // no-arg 생성자 필요
-                ?: emptyList()
+            val exams = snapshot?.documents?.mapNotNull { doc ->
+                // ✅ 수정: toObject() 후 document ID를 명시적으로 copy하여 주입
+                doc.toObject(Exam::class.java)?.copy(id = doc.id)
+            } ?: emptyList()
             trySend(exams)
         }
         awaitClose { listener.remove() }
@@ -37,8 +38,14 @@ class ExamRepositoryImpl @Inject constructor(
     override fun getExamById(examId: String): Flow<Exam> = callbackFlow {
         val listener = examsCollection.document(examId).addSnapshotListener { snapshot, error ->
             if (error != null) { close(error); return@addSnapshotListener }
-            val exam = snapshot?.toObject(Exam::class.java)
-                ?: run { close(NoSuchElementException("Exam $examId not found")); return@addSnapshotListener }
+            val exam = snapshot
+                ?.toObject(Exam::class.java)
+                // ✅ 수정: document ID를 id 필드에 명시적으로 주입
+                ?.copy(id = snapshot.id)
+                ?: run {
+                    close(NoSuchElementException("Exam $examId not found"))
+                    return@addSnapshotListener
+                }
             trySend(exam)
         }
         awaitClose { listener.remove() }
@@ -65,7 +72,6 @@ class ExamRepositoryImpl @Inject constructor(
 
     override suspend fun addExam(exam: Exam): Result<Unit> = runCatching {
         val uid = requireAuth()
-        // createdBy에 현재 로그인 uid 자동 삽입
         val examWithOwner = exam.copy(createdBy = uid)
         examsCollection.add(examWithOwner).await()
         Unit
