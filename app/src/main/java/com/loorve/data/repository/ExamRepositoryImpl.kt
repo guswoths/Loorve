@@ -20,9 +20,21 @@ class ExamRepositoryImpl @Inject constructor(
     private val examsCollection = firestore.collection("exams")
     private val resultsCollection = firestore.collection("examResults")
 
-    private fun requireAuth(): String =
-        firebaseAuth.currentUser?.uid
+    // ✅ 저장 전 토큰 강제 갱신으로 만료 방지
+    private suspend fun requireAuthFresh(): String {
+        val user = firebaseAuth.currentUser
             ?: throw SecurityException("로그인이 필요합니다.")
+        // forceRefresh=true: 만료된 토큰을 갱신 후 Firestore 요청에 사용
+        user.getIdToken(true).await()
+        return user.uid
+    }
+
+    override suspend fun addExam(exam: Exam): Result<Unit> = runCatching {
+        val uid = requireAuthFresh()   // ← requireAuth() 에서 변경
+        val examWithOwner = exam.copy(createdBy = uid)
+        examsCollection.add(examWithOwner).await()
+        Unit
+    }
 
     /**
      * 현재 로그인 사용자가 생성한 시험 목록만 실시간 스트림으로 반환.
