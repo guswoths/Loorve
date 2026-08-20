@@ -2,10 +2,10 @@ package com.loorve.di
 
 import com.loorve.data.repository.AuthRepositoryImpl
 import com.loorve.data.repository.ExamRepositoryImpl
-import com.loorve.data.repository.ProgressRepositoryImpl
 import com.loorve.domain.repository.AuthRepository
 import com.loorve.domain.repository.ExamRepository
 import com.loorve.domain.repository.ProgressRepository
+import com.loorve.domain.repository.ProgressRepositoryImpl  // ← domain 패키지로 변경
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -34,4 +34,3 @@ abstract class RepositoryModule {
         impl: ExamRepositoryImpl
     ): ExamRepository
 }
-// ✅ 하단의 object FirebaseModule 블록 완전 삭제
