@@ -43,9 +43,17 @@ fun ProgressDetailScreen(
     LaunchedEffect(uiState.saveResult) {
         when (uiState.saveResult) {
             true -> {
-                snackbarHostState.showSnackbar("저장되었습니다 ✓")
+                val result = snackbarHostState.showSnackbar(
+                    message    = "저장되었습니다 ✓",
+                    actionLabel = "다시 수정",
+                    duration   = SnackbarDuration.Short
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    viewModel.enterEditMode()   // 다시 수정 클릭 시 편집 모드 재진입
+                }
                 viewModel.consumeSaveResult()
             }
+
             false -> {
                 snackbarHostState.showSnackbar("저장에 실패했습니다. 다시 시도해 주세요.")
                 viewModel.consumeSaveResult()
