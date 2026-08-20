@@ -17,9 +17,9 @@ val keystoreProps = Properties().apply {
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)   // Compose 컴파일러 플러그인 (Kotlin 2.x+)
-    alias(libs.plugins.ksp)             // ✅ kapt 완전 제거, KSP만 사용
-    alias(libs.plugins.hilt)            // Hilt DI 플러그인
-    alias(libs.plugins.google.services) // Firebase google-services.json 처리
+    alias(libs.plugins.ksp)              // ✅ kapt 완전 제거, KSP만 사용
+    alias(libs.plugins.hilt)             // Hilt DI 플러그인
+    alias(libs.plugins.google.services)  // Firebase google-services.json 처리
 }
 
 // ── Android 빌드 설정 ──
@@ -44,8 +44,8 @@ android {
                 storeFile = file(storeFilePath)
             }
             storePassword = keystoreProps.getProperty("storePassword")
-            keyAlias     = keystoreProps.getProperty("keyAlias")
-            keyPassword  = keystoreProps.getProperty("keyPassword")
+            keyAlias = keystoreProps.getProperty("keyAlias")
+            keyPassword = keystoreProps.getProperty("keyPassword")
         }
     }
 
@@ -55,8 +55,8 @@ android {
             isDebuggable = true
         }
         release {
-            isMinifyEnabled    = true       // 코드 난독화 및 축소
-            isShrinkResources  = true       // 미사용 리소스 제거
+            isMinifyEnabled = true      // 코드 난독화 및 축소
+            isShrinkResources = true    // 미사용 리소스 제거
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -76,8 +76,8 @@ android {
 
     // ── 빌드 기능 활성화 ──
     buildFeatures {
-        compose      = true  // Jetpack Compose 활성화
-        buildConfig  = true  // BuildConfig 클래스 생성 (환경 변수 접근용)
+        compose = true     // Jetpack Compose 활성화
+        buildConfig = true // BuildConfig 클래스 생성 (환경 변수 접근용)
     }
 }
 
@@ -90,14 +90,13 @@ kotlin {
 
 // ── 의존성 선언 ──
 dependencies {
-
     // ── [Compose] BOM으로 버전 통합 관리 ──
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
     implementation(libs.compose.ui)
-    implementation(libs.compose.ui.graphics)       // UI 그래픽 레이어
+    implementation(libs.compose.ui.graphics)        // UI 그래픽 레이어
     implementation(libs.compose.ui.tooling.preview) // 프리뷰 지원 (런타임 경량)
     implementation(libs.compose.material3)          // Material You 디자인 시스템
     implementation(libs.compose.icons.extended)     // 확장 아이콘 세트
@@ -108,38 +107,32 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
 
-    // ── [Hilt] DI 프레임워크: KSP 컴파일러 처리 (annotationProcessor/kapt 사용 금지) ──
-    // @HiltAndroidApp이 적용된 Application 클래스와 연동
+    // ── [Hilt] DI 프레임워크: KSP 컴파일러 처리 ──
     implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)                        // ✅ KSP로 처리
-    implementation(libs.hilt.navigation.compose)   // Compose NavHost + Hilt 통합
+    ksp(libs.hilt.compiler)                       // ✅ KSP로 처리
+    implementation(libs.hilt.navigation.compose)  // Compose NavHost + Hilt 통합
 
     // ── [Firebase] BOM 패턴으로 버전 통합 관리 ──
     implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth)             // Firebase 인증
-    implementation(libs.firebase.firestore)        // Cloud Firestore DB
-    implementation(libs.firebase.messaging)        // FCM 푸시 알림
+    implementation(libs.firebase.auth)      // Firebase 인증
+    implementation(libs.firebase.firestore) // Cloud Firestore DB
+    implementation(libs.firebase.messaging) // FCM 푸시 알림
 
     // ── [Google Sign-In] Credential Manager 기반 구글 로그인 ──
     implementation(libs.credential.manager)
     implementation(libs.credential.manager.play)
     implementation(libs.google.id)
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     // ── [AdMob] 광고 SDK ──
-    // ✅ ADDED: AndroidManifest.xml에 AD_ID 권한 선언 필요:
-    // <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
-    // (Android 13+ 타겟 시 또는 광고 식별자 접근이 필요한 경우 필수)
     implementation(libs.admob)
 
     // ── [Room] 로컬 SQLite DB: KSP로 컴파일러 처리 ──
     implementation(libs.room.runtime)
-    implementation(libs.room.ktx)                  // Coroutine/Flow 확장
-    ksp(libs.room.compiler)                        // ✅ KSP로 처리
-
-    // ── [Room] 로컬 SQLite DB: KSP로 컴파일러 처리 ──
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
+    implementation(libs.room.ktx) // Coroutine/Flow 확장
+    ksp(libs.room.compiler)       // ✅ KSP로 처리
 
     // ── [DataStore] 온보딩 등 간단한 Key-Value 설정 저장 ──
     implementation(libs.datastore.preferences)
@@ -147,7 +140,7 @@ dependencies {
     // ── [Coroutines] 비동기 처리 ──
     implementation(libs.coroutines.android)
 
-    // ── [UI Tooling] Debug 전용: release 빌드에 포함되지 않음 ──
+    // ── [UI Tooling] Debug 전용 ──
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 
@@ -157,16 +150,7 @@ dependencies {
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.compose.ui.test.junit4)
 
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-
-    // Google ID (Credential Manager용 Google 로그인)
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
-
-    // Firebase Auth (이미 있다면 생략)
-    dependencies {
-        implementation(platform("com.google.firebase:firebase-bom:34.0.0"))
-        implementation("com.google.firebase:firebase-auth")
-    }
-
+    // ── [Test] MockK + Coroutines Test (망각곡선 TDD 단위 테스트용) ──
+    testImplementation("io.mockk:mockk:1.13.10")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 }
