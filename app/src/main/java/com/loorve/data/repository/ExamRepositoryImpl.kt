@@ -20,26 +20,21 @@ class ExamRepositoryImpl @Inject constructor(
     private val examsCollection = firestore.collection("exams")
     private val resultsCollection = firestore.collection("examResults")
 
-    // ✅ 저장 전 토큰 강제 갱신으로 만료 방지
     private suspend fun requireAuthFresh(): String {
         val user = firebaseAuth.currentUser
             ?: throw SecurityException("로그인이 필요합니다.")
-        // forceRefresh=true: 만료된 토큰을 갱신 후 Firestore 요청에 사용
         user.getIdToken(true).await()
         return user.uid
     }
 
+    // ✅ addExam 단 하나만 유지 (중복 제거)
     override suspend fun addExam(exam: Exam): Result<Unit> = runCatching {
-        val uid = requireAuthFresh()   // ← requireAuth() 에서 변경
+        val uid = requireAuthFresh()
         val examWithOwner = exam.copy(createdBy = uid)
         examsCollection.add(examWithOwner).await()
         Unit
     }
 
-    /**
-     * 현재 로그인 사용자가 생성한 시험 목록만 실시간 스트림으로 반환.
-     * Firestore 보안 규칙의 createdBy == request.auth.uid 조건과 쿼리를 일치시킴.
-     */
     override fun getExamList(): Flow<List<Exam>> = callbackFlow {
         val uid = firebaseAuth.currentUser?.uid
         if (uid == null) {
@@ -47,9 +42,8 @@ class ExamRepositoryImpl @Inject constructor(
             awaitClose()
             return@callbackFlow
         }
-
         val listener = examsCollection
-            .whereEqualTo("createdBy", uid)   // ← 핵심 수정: 소유자 필터 추가
+            .whereEqualTo("createdBy", uid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "getExamList 오류: ${error.message}", error)
@@ -80,8 +74,9 @@ class ExamRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }
 
+    // ✅ requireAuth() → requireAuthFresh() 로 수정
     override suspend fun saveExamResult(result: ExamResult): Result<Unit> = runCatching {
-        requireAuth()
+        requireAuthFresh()
         resultsCollection.add(result).await()
         Unit
     }
@@ -97,13 +92,6 @@ class ExamRepositoryImpl @Inject constructor(
                 trySend(results)
             }
         awaitClose { listener.remove() }
-    }
-
-    override suspend fun addExam(exam: Exam): Result<Unit> = runCatching {
-        val uid = requireAuth()
-        val examWithOwner = exam.copy(createdBy = uid)
-        examsCollection.add(examWithOwner).await()
-        Unit
     }
 
     companion object {
