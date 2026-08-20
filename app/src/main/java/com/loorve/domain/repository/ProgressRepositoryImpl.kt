@@ -1,4 +1,4 @@
-package com.loorve.domain.repository  // ✅ 패키지 수정
+package com.loorve.domain.repository
 
 import android.util.Log
 import com.google.firebase.Timestamp
@@ -7,7 +7,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import com.loorve.domain.model.Progress
-import com.loorve.domain.repository.ProgressRepository
+// ✅ ProgressRepository import 제거 (같은 패키지)
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
