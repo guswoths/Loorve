@@ -24,10 +24,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-// ─────────────────────────────────────────────────────────────
-// 진입점 컴포저블
-// ─────────────────────────────────────────────────────────────
-
 @Composable
 fun ProgressDetailScreen(
     progressId: String,
@@ -38,7 +34,6 @@ fun ProgressDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // 최초 진입 시 데이터 로드
     LaunchedEffect(progressId) {
         if (uid.isNotBlank()) viewModel.loadProgress(uid, progressId)
     }
@@ -49,7 +44,7 @@ fun ProgressDetailScreen(
             true -> {
                 snackbarHostState.showSnackbar("저장되었습니다 ✅")
                 viewModel.consumeSaveResult()
-                onNavigateBack()
+                // onNavigateBack() 제거 → 상세화면에서 수정 내용 바로 확인
             }
             false -> {
                 snackbarHostState.showSnackbar("저장에 실패했습니다. 다시 시도해 주세요.")
@@ -87,10 +82,6 @@ fun ProgressDetailScreen(
     )
 }
 
-// ─────────────────────────────────────────────────────────────
-// 내부 Stateless 컴포저블 (Preview 재사용 목적)
-// ─────────────────────────────────────────────────────────────
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProgressDetailContent(
@@ -103,13 +94,11 @@ private fun ProgressDetailContent(
     onDelete: () -> Unit,
     onRetry: () -> Unit
 ) {
-    // 편집 로컬 상태 (편집 모드 진입 시 progress 값으로 초기화)
     var editContent        by remember { mutableStateOf("") }
     var editCompletedCount by remember { mutableStateOf("") }
     var editTotalCount     by remember { mutableStateOf("") }
     var editIsCompleted    by remember { mutableStateOf(false) }
 
-    // 편집 모드 진입 시 현재 값으로 초기화
     LaunchedEffect(uiState.isEditMode, uiState.progress) {
         if (uiState.isEditMode) {
             uiState.progress?.let { p ->
@@ -121,7 +110,27 @@ private fun ProgressDetailContent(
         }
     }
 
+    // [추가] 미저장 경고 다이얼로그 상태
+    var showExitConfirmDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // ── 미저장 경고 다이얼로그 ────────────────────────────────
+    if (showExitConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirmDialog = false },
+            title   = { Text("변경사항 미저장") },
+            text    = { Text("저장하지 않은 변경사항이 있습니다.\n나가시겠습니까?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitConfirmDialog = false
+                    onExitEditMode()
+                }) { Text("나가기") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirmDialog = false }) { Text("계속 편집") }
+            }
+        )
+    }
 
     // ── 삭제 확인 다이얼로그 ───────────────────────────────────
     if (showDeleteDialog) {
@@ -151,7 +160,8 @@ private fun ProgressDetailContent(
                 navigationIcon = {
                     IconButton(
                         onClick = {
-                            if (uiState.isEditMode) onExitEditMode()
+                            // [수정] 편집 모드 뒤로가기 → 미저장 경고 다이얼로그 표시
+                            if (uiState.isEditMode) showExitConfirmDialog = true
                             else onNavigateBack()
                         }
                     ) {
@@ -163,7 +173,6 @@ private fun ProgressDetailContent(
                 },
                 actions = {
                     if (!uiState.isEditMode && uiState.progress != null) {
-                        // 뷰 모드: 편집 + 삭제 버튼
                         IconButton(onClick = onEnterEditMode) {
                             Icon(
                                 imageVector        = Icons.Filled.Edit,
@@ -179,7 +188,6 @@ private fun ProgressDetailContent(
                         }
                     }
                     if (uiState.isEditMode) {
-                        // 편집 모드: 저장 버튼
                         TextButton(
                             onClick = {
                                 val base = uiState.progress ?: return@TextButton
@@ -207,12 +215,9 @@ private fun ProgressDetailContent(
                 .padding(horizontal = 24.dp)
         ) {
             when {
-                // ── 로딩 ──────────────────────────────────────
                 uiState.isLoading -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
-
-                // ── 에러 ──────────────────────────────────────
                 uiState.errorMessage != null -> {
                     Column(
                         modifier            = Modifier.align(Alignment.Center),
@@ -227,8 +232,6 @@ private fun ProgressDetailContent(
                         Button(onClick = onRetry) { Text("다시 시도") }
                     }
                 }
-
-                // ── 데이터 없음 ───────────────────────────────
                 uiState.progress == null -> {
                     Text(
                         text     = "데이터를 찾을 수 없습니다.",
@@ -237,8 +240,6 @@ private fun ProgressDetailContent(
                         color    = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-
-                // ── 정상 표시 ─────────────────────────────────
                 else -> {
                     val progress = uiState.progress
                     if (uiState.isEditMode) {
@@ -261,16 +262,8 @@ private fun ProgressDetailContent(
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// 뷰 모드 본문
-// ─────────────────────────────────────────────────────────────
-
 @Composable
 private fun ProgressViewBody(progress: Progress) {
-    val dateFormatter = remember {
-        DateTimeFormatter.ofPattern("yyyy년 MM월 dd일")
-            .withZone(ZoneId.of("Asia/Seoul"))
-    }
     val formattedDate = remember(progress.createdAt) {
         if (progress.createdAt <= 0L) "날짜 미설정"
         else Instant.ofEpochMilli(progress.createdAt)
@@ -334,10 +327,6 @@ private fun DetailRow(label: String, value: String) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// 편집 모드 본문
-// ─────────────────────────────────────────────────────────────
-
 @Composable
 private fun ProgressEditBody(
     editContent: String,
@@ -364,7 +353,6 @@ private fun ProgressEditBody(
             minLines      = 3,
             maxLines      = 6
         )
-
         OutlinedTextField(
             value         = editCompletedCount,
             onValueChange = { if (it.all(Char::isDigit)) onCompletedCountChange(it) },
@@ -372,7 +360,6 @@ private fun ProgressEditBody(
             modifier      = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
-
         OutlinedTextField(
             value         = editTotalCount,
             onValueChange = { if (it.all(Char::isDigit)) onTotalCountChange(it) },
@@ -380,27 +367,16 @@ private fun ProgressEditBody(
             modifier      = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
-
         Row(
             modifier          = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text  = "완료 여부",
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Switch(
-                checked         = editIsCompleted,
-                onCheckedChange = onIsCompletedChange
-            )
+            Text(text = "완료 여부", style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = editIsCompleted, onCheckedChange = onIsCompletedChange)
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────
-// Preview
-// ─────────────────────────────────────────────────────────────
 
 @Preview(showBackground = true, name = "뷰 모드 Preview")
 @Composable
@@ -412,7 +388,7 @@ private fun ProgressDetailContentViewModePreview() {
         completedCount = 7,
         totalCount     = 10,
         isCompleted    = false,
-        createdAt      = 1_753_884_000_000L  // 2025-07-31 KST 기준 예시
+        createdAt      = 1_753_884_000_000L
     )
     MaterialTheme {
         ProgressDetailContent(
