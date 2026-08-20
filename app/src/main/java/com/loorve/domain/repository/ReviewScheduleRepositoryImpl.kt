@@ -1,4 +1,4 @@
-package com.loorve.data.repository
+package com.loorve.domain.repository
 
 import android.util.Log
 import com.google.firebase.Timestamp
@@ -272,6 +272,47 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
     }
 
     // ──────────────────────────────────────────────
+    // BATCH SAVE
+    // ──────────────────────────────────────────────
+
+    override suspend fun saveReviewSchedules(
+        uid: String,
+        schedules: List<ReviewSchedule>
+    ): Result<Unit> {
+        return try {
+            require(uid.isNotBlank()) { "uid는 비어 있을 수 없습니다." }
+            require(schedules.isNotEmpty()) { "schedules는 비어 있을 수 없습니다." }
+
+            val batch = firestore.batch()
+            schedules.forEach { schedule ->
+                val docRef = if (schedule.reviewScheduleId.isBlank()) {
+                    reviewSchedulesCollection(uid).document()
+                } else {
+                    reviewScheduleDocument(uid, schedule.reviewScheduleId)
+                }
+                batch.set(docRef, buildScheduleMap(schedule))
+            }
+            batch.commit().await()
+
+            Log.d(TAG, "reviewSchedules 배치 저장 완료: uid=$uid, count=${schedules.size}")
+            Result.success(Unit)
+        } catch (e: FirebaseFirestoreException) {
+            Log.e(TAG, "Firestore 배치 저장 실패: code=${e.code}, uid=$uid", e)
+            val message = when (e.code) {
+                FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                    "저장 권한이 없습니다. Firestore 보안 규칙과 로그인 상태를 확인해주세요."
+                FirebaseFirestoreException.Code.UNAVAILABLE ->
+                    "서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요."
+                else -> "복습 일정 배치 저장 실패: ${e.message}"
+            }
+            Result.failure(IllegalStateException(message, e))
+        } catch (e: Exception) {
+            Log.e(TAG, "reviewSchedules 배치 저장 실패: uid=$uid", e)
+            Result.failure(e)
+        }
+    }
+
+    // ──────────────────────────────────────────────
     // DELETE
     // ──────────────────────────────────────────────
 
@@ -289,6 +330,49 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "reviewSchedule 삭제 실패: uid=$uid, scheduleId=$scheduleId", e)
+            Result.failure(e)
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // CREATE (Batch) - 배치 저장
+    // ──────────────────────────────────────────────
+
+    override suspend fun saveReviewSchedules(
+        uid: String,
+        schedules: List<ReviewSchedule>
+    ): Result<Unit> {
+        return try {
+            require(uid.isNotBlank()) { "uid는 비어 있을 수 없습니다." }
+            require(schedules.isNotEmpty()) { "schedules는 비어 있을 수 없습니다." }
+            // Firestore WriteBatch 최대 500건 제한 방어
+            require(schedules.size <= 500) { "한 번에 저장 가능한 스케줄은 최대 500개입니다." }
+
+            val batch = firestore.batch()
+            schedules.forEach { schedule ->
+                val docRef = if (schedule.reviewScheduleId.isBlank()) {
+                    reviewSchedulesCollection(uid).document()
+                } else {
+                    reviewScheduleDocument(uid, schedule.reviewScheduleId)
+                }
+                batch.set(docRef, buildScheduleMap(schedule))
+            }
+            batch.commit().await()
+
+            Log.d(TAG, "reviewSchedules 배치 저장 완료: uid=$uid, count=${schedules.size}")
+            Result.success(Unit)
+        } catch (e: FirebaseFirestoreException) {
+            Log.e(TAG, "Firestore 배치 저장 실패: code=${e.code}, uid=$uid", e)
+            val message = when (e.code) {
+                FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                    "저장 권한이 없습니다. Firestore 보안 규칙을 확인해주세요."
+                FirebaseFirestoreException.Code.UNAVAILABLE ->
+                    "서버에 연결할 수 없습니다."
+                else -> "복습 일정 배치 저장 실패: ${e.message}"
+            }
+            Result.failure(IllegalStateException(message, e))
+        } catch (e: Exception) {
+            Log.e(TAG, "배치 저장 실패: uid=$uid", e)
             Result.failure(e)
         }
     }
