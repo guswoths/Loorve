@@ -101,6 +101,7 @@ class ProgressDetailViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         progress        = merged,
+                        isLoading       = false,
                         isEditMode      = false,
                         saveResult      = true,
                         errorMessage    = null,
@@ -111,7 +112,11 @@ class ProgressDetailViewModel @Inject constructor(
             } else {
                 val errMsg = result.exceptionOrNull()?.message ?: "저장 중 알 수 없는 오류가 발생했습니다."
                 Log.e(TAG, "saveProgress 실패: $errMsg")
-                _uiState.update { it.copy(saveResult = false, errorMessage = errMsg) }
+                _uiState.update { it.copy(
+                    isLoading    = false,   // ← 추가
+                    saveResult   = false,
+                    errorMessage = errMsg
+                ) }
             }
         }
     }
