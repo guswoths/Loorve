@@ -1,5 +1,6 @@
 package com.loorve.presentation.progress
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loorve.domain.model.Progress
@@ -17,7 +18,6 @@ data class ProgressDetailUiState(
     val isLoading: Boolean = true,
     val isEditMode: Boolean = false,
     val errorMessage: String? = null,
-    /** null=초기, true=성공, false=실패. 소비 후 null로 리셋 */
     val saveResult: Boolean? = null,
     val deleteResult: Boolean? = null
 )
@@ -30,11 +30,6 @@ class ProgressDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ProgressDetailUiState())
     val uiState: StateFlow<ProgressDetailUiState> = _uiState.asStateFlow()
 
-    /**
-     * 특정 progressId의 Progress를 로드합니다.
-     * ✅ 원인3 수정: getProgressById 반환 타입이 Result<Progress>로 통일되어
-     *    result.getOrNull()이 Progress? 타입으로 직접 바인딩됩니다.
-     */
     fun loadProgress(uid: String, progressId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
@@ -52,33 +47,32 @@ class ProgressDetailViewModel @Inject constructor(
         }
     }
 
-    /** 편집 모드 진입 */
     fun enterEditMode() {
         _uiState.update { it.copy(isEditMode = true) }
     }
 
-    /** 편집 모드 종료 (변경 사항 미저장, 원본 유지) */
     fun exitEditMode() {
         _uiState.update { it.copy(isEditMode = false) }
     }
 
-    /**
-     * 수정된 Progress를 저장합니다.
-     * id, examId, createdAt은 기존 값을 유지하고,
-     * content / completedCount / totalCount / isCompleted 만 갱신합니다.
-     *
-     * ✅ 원인3 수정: Progress data class에 모든 필드가 정의되어 있으므로
-     *    copy() 호출 시 Unresolved reference 에러 해소됩니다.
-     */
     fun saveProgress(uid: String, updatedProgress: Progress) {
-        val current = _uiState.value.progress ?: return
-
-        if (uid.isBlank()) {
-            _uiState.update { it.copy(saveResult = false) }
+        val current = _uiState.value.progress ?: run {
+            Log.w(TAG, "saveProgress 호출됐지만 현재 progress 상태가 null입니다.")
+            _uiState.update { it.copy(saveResult = false, errorMessage = "저장할 데이터가 없습니다.") }
             return
         }
+
+        // ✅ uid 빈값 시 명시적 에러 메시지 추가
+        if (uid.isBlank()) {
+            Log.e(TAG, "saveProgress 실패: uid가 비어 있습니다. 로그인 상태를 확인하세요.")
+            _uiState.update { it.copy(saveResult = false, errorMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요.") }
+            return
+        }
+
+        // ✅ content 빈값 시 명시적 에러 메시지 추가
         if (updatedProgress.content.isBlank()) {
-            _uiState.update { it.copy(saveResult = false) }
+            Log.w(TAG, "saveProgress 실패: content가 비어 있습니다.")
+            _uiState.update { it.copy(saveResult = false, errorMessage = "학습 내용을 입력해주세요.") }
             return
         }
 
@@ -96,19 +90,19 @@ class ProgressDetailViewModel @Inject constructor(
                     it.copy(
                         progress   = merged,
                         isEditMode = false,
-                        saveResult = true
+                        saveResult = true,
+                        errorMessage = null
                     )
                 }
             } else {
-                _uiState.update { it.copy(saveResult = false) }
+                // ✅ 실제 예외 메시지를 errorMessage에 전달
+                val errMsg = result.exceptionOrNull()?.message ?: "저장 중 알 수 없는 오류가 발생했습니다."
+                Log.e(TAG, "saveProgress 실패: $errMsg")
+                _uiState.update { it.copy(saveResult = false, errorMessage = errMsg) }
             }
         }
     }
 
-    /**
-     * Progress를 삭제합니다.
-     * progressId는 Progress.id 필드 값을 전달해야 합니다.
-     */
     fun deleteProgress(uid: String, progressId: String) {
         if (uid.isBlank() || progressId.isBlank()) {
             _uiState.update { it.copy(deleteResult = false) }
@@ -120,13 +114,15 @@ class ProgressDetailViewModel @Inject constructor(
         }
     }
 
-    /** UI에서 저장 결과 이벤트를 소비한 후 상태를 초기화합니다. */
     fun consumeSaveResult() {
         _uiState.update { it.copy(saveResult = null) }
     }
 
-    /** UI에서 삭제 결과 이벤트를 소비한 후 상태를 초기화합니다. */
     fun consumeDeleteResult() {
         _uiState.update { it.copy(deleteResult = null) }
+    }
+
+    companion object {
+        private const val TAG = "ProgressDetailViewModel"
     }
 }

@@ -1,4 +1,4 @@
-package com.loorve.data.repository
+package com.loorve.domain.repository  // ✅ 패키지 수정
 
 import android.util.Log
 import com.google.firebase.Timestamp
@@ -119,8 +119,6 @@ class ProgressRepositoryImpl @Inject constructor(
             }
         awaitClose { reg.remove() }
     }
-
-    // ── 내부 헬퍼 ──────────────────────────────────────────────────────────
 
     private fun buildProgressMap(
         uid: String,
