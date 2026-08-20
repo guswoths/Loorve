@@ -7,6 +7,7 @@ import com.loorve.domain.model.Exam
 import com.loorve.domain.model.Progress
 import com.loorve.domain.usecase.AddProgressUseCase
 import com.loorve.domain.usecase.GetExamsUseCase
+import com.loorve.domain.usecase.GetProgressListUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +19,7 @@ import javax.inject.Inject
 
 data class HomeUiState(
     val exams: List<Exam> = emptyList(),
+    val progressList: List<Progress> = emptyList(),   // ← 추가
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
     val progressSaveResult: Boolean? = null
@@ -26,7 +28,8 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val getExamsUseCase: GetExamsUseCase,
-    private val addProgressUseCase: AddProgressUseCase
+    private val addProgressUseCase: AddProgressUseCase,
+    private val getProgressListUseCase: GetProgressListUseCase  // ← 추가
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -34,28 +37,34 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadExams()
+        loadProgressList()
     }
 
     fun loadExams() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-
             getExamsUseCase()
                 .catch { exception ->
                     _uiState.update {
                         it.copy(
-                            isLoading = false,
+                            isLoading    = false,
                             errorMessage = exception.message ?: "목록을 불러오지 못했습니다."
                         )
                     }
                 }
                 .collect { exams ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            exams = exams
-                        )
-                    }
+                    _uiState.update { it.copy(isLoading = false, exams = exams) }
+                }
+        }
+    }
+
+    fun loadProgressList() {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        viewModelScope.launch {
+            getProgressListUseCase(uid)
+                .catch { /* 진도 로딩 실패는 조용히 무시 */ }
+                .collect { list ->
+                    _uiState.update { it.copy(progressList = list) }
                 }
         }
     }
@@ -71,40 +80,31 @@ class HomeViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     progressSaveResult = false,
-                    errorMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요."
+                    errorMessage       = "로그인 정보가 없습니다. 다시 로그인해 주세요."
                 )
             }
             return
         }
 
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    progressSaveResult = null,
-                    errorMessage = null
-                )
-            }
+            _uiState.update { it.copy(progressSaveResult = null, errorMessage = null) }
 
             val progress = Progress(
-                examId = examId,
-                content = content.trim(),
+                examId         = examId,
+                content        = content.trim(),
                 completedCount = completedCount,
-                totalCount = totalCount,
-                isCompleted = totalCount > 0 && completedCount >= totalCount
+                totalCount     = totalCount,
+                isCompleted    = totalCount > 0 && completedCount >= totalCount
             )
 
             val result = addProgressUseCase(uid, progress)
-
             _uiState.update {
                 if (result.isSuccess) {
-                    it.copy(
-                        progressSaveResult = true,
-                        errorMessage = null
-                    )
+                    it.copy(progressSaveResult = true, errorMessage = null)
                 } else {
                     it.copy(
                         progressSaveResult = false,
-                        errorMessage = result.exceptionOrNull()?.message
+                        errorMessage       = result.exceptionOrNull()?.message
                             ?: "학습 진도를 저장하지 못했습니다."
                     )
                 }
@@ -113,14 +113,10 @@ class HomeViewModel @Inject constructor(
     }
 
     fun consumeProgressSaveResult() {
-        _uiState.update {
-            it.copy(progressSaveResult = null)
-        }
+        _uiState.update { it.copy(progressSaveResult = null) }
     }
 
     fun consumeErrorMessage() {
-        _uiState.update {
-            it.copy(errorMessage = null)
-        }
+        _uiState.update { it.copy(errorMessage = null) }
     }
 }
