@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loorve.domain.model.Progress
 import com.loorve.domain.repository.ProgressRepository
+import com.loorve.domain.usecase.SaveProgressAndScheduleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,14 +20,15 @@ data class ProgressDetailUiState(
     val isEditMode: Boolean = false,
     val errorMessage: String? = null,
     val saveResult: Boolean? = null,
-    val deleteResult: Boolean? = null,   // ← 쉼표 추가
+    val deleteResult: Boolean? = null,
     val isDirty: Boolean = false,
     val initialSnapshot: Progress? = null
 )
 
 @HiltViewModel
 class ProgressDetailViewModel @Inject constructor(
-    private val progressRepository: ProgressRepository
+    private val progressRepository: ProgressRepository,
+    private val saveProgressAndScheduleUseCase: SaveProgressAndScheduleUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProgressDetailUiState())
@@ -96,7 +98,8 @@ class ProgressDetailViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
-            val result = progressRepository.saveProgress(uid, merged)
+            // SaveProgressAndScheduleUseCase: 진도 저장 + 복습 일정 자동 등록
+            val result = saveProgressAndScheduleUseCase(uid, merged)
             if (result.isSuccess) {
                 _uiState.update {
                     it.copy(
@@ -112,11 +115,13 @@ class ProgressDetailViewModel @Inject constructor(
             } else {
                 val errMsg = result.exceptionOrNull()?.message ?: "저장 중 알 수 없는 오류가 발생했습니다."
                 Log.e(TAG, "saveProgress 실패: $errMsg")
-                _uiState.update { it.copy(
-                    isLoading    = false,   // ← 추가
-                    saveResult   = false,
-                    errorMessage = errMsg
-                ) }
+                _uiState.update {
+                    it.copy(
+                        isLoading    = false,
+                        saveResult   = false,
+                        errorMessage = errMsg
+                    )
+                }
             }
         }
     }

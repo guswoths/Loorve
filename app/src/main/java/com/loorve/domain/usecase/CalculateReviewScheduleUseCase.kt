@@ -4,6 +4,7 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.max
 import kotlin.math.roundToInt
+import javax.inject.Inject
 
 /**
  * 망각곡선(Forgetting Curve) 기반 복습 일정 자동 계산 UseCase.
@@ -14,7 +15,7 @@ import kotlin.math.roundToInt
  *
  * 외부 의존성 없음 — 순수 도메인 계산 함수.
  */
-class CalculateReviewScheduleUseCase {
+class CalculateReviewScheduleUseCase @Inject constructor() {
 
     private val standardIntervals = listOf(1L, 3L, 7L, 14L, 30L)
 
