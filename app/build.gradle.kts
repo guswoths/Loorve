@@ -13,6 +13,25 @@ val keystoreProps = Properties().apply {
     }
 }
 
+// ── [수정 1] google-services.json CI 환경 폴백 처리 ──
+// 로컬: app/google-services.json 직접 배치
+// CI: 환경변수 GOOGLE_SERVICES_JSON에 파일 내용을 주입
+val googleServicesFile = file("google-services.json")
+if (!googleServicesFile.exists()) {
+    val envJson = System.getenv("GOOGLE_SERVICES_JSON")
+    require(envJson != null) {
+        """
+        ❌ google-services.json 파일이 없습니다.
+        해결 방법:
+          [로컬] Firebase Console → 프로젝트 설정 → google-services.json 다운로드 후
+                 app/ 폴더에 배치: C:\Users\hjson\Loorve\app\google-services.json
+          [CI]   환경변수 GOOGLE_SERVICES_JSON 에 파일 내용을 설정하세요.
+        """.trimIndent()
+    }
+    googleServicesFile.writeText(envJson)
+    logger.lifecycle("✅ google-services.json written from GOOGLE_SERVICES_JSON env var")
+}
+
 // ── 플러그인 선언: 버전 카탈로그(libs.versions.toml) alias 참조 ──
 plugins {
     alias(libs.plugins.android.application)
@@ -44,8 +63,8 @@ android {
                 storeFile = file(storeFilePath)
             }
             storePassword = keystoreProps.getProperty("storePassword")
-            keyAlias = keystoreProps.getProperty("keyAlias")
-            keyPassword = keystoreProps.getProperty("keyPassword")
+            keyAlias     = keystoreProps.getProperty("keyAlias")
+            keyPassword  = keystoreProps.getProperty("keyPassword")
         }
     }
 
@@ -53,10 +72,13 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
+            // [수정 2] debug 빌드에서도 applicationIdSuffix 추가 권장
+            applicationIdSuffix = ".debug"
+            versionNameSuffix   = "-debug"
         }
         release {
-            isMinifyEnabled = true      // 코드 난독화 및 축소
-            isShrinkResources = true    // 미사용 리소스 제거
+            isMinifyEnabled  = true   // 코드 난독화 및 축소
+            isShrinkResources = true  // 미사용 리소스 제거
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -76,8 +98,16 @@ android {
 
     // ── 빌드 기능 활성화 ──
     buildFeatures {
-        compose = true     // Jetpack Compose 활성화
-        buildConfig = true // BuildConfig 클래스 생성 (환경 변수 접근용)
+        compose     = true  // Jetpack Compose 활성화
+        buildConfig = true  // BuildConfig 클래스 생성 (환경 변수 접근용)
+    }
+
+    // [수정 3] Packaging: 중복 라이선스 파일 충돌 방지 (Firebase/Coroutines 혼용 시 필수)
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/versions/9/previous-compilation-data.bin"
+        }
     }
 }
 
@@ -85,23 +115,26 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
+        // [수정 4] 명시적 API 모드 - 공개 API 노출 실수 방지 (선택사항, 팀 합의 후 적용)
+        // explicitApi()
     }
 }
 
 // ── 의존성 선언 ──
 dependencies {
+
     // ── [Compose] BOM으로 버전 통합 관리 ──
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
     implementation(libs.compose.ui)
-    implementation(libs.compose.ui.graphics)        // UI 그래픽 레이어
-    implementation(libs.compose.ui.tooling.preview) // 프리뷰 지원 (런타임 경량)
-    implementation(libs.compose.material3)          // Material You 디자인 시스템
-    implementation(libs.compose.icons.extended)     // 확장 아이콘 세트
-    implementation(libs.activity.compose)           // ComponentActivity + Compose
-    implementation(libs.navigation.compose)         // Compose 내비게이션
+    implementation(libs.compose.ui.graphics)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.icons.extended)
+    implementation(libs.activity.compose)
+    implementation(libs.navigation.compose)
 
     // ── [Lifecycle] ViewModel + Runtime Compose 연동 ──
     implementation(libs.lifecycle.viewmodel.compose)
@@ -109,16 +142,18 @@ dependencies {
 
     // ── [Hilt] DI 프레임워크: KSP 컴파일러 처리 ──
     implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)                       // ✅ KSP로 처리
-    implementation(libs.hilt.navigation.compose)  // Compose NavHost + Hilt 통합
+    ksp(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
 
     // ── [Firebase] BOM 패턴으로 버전 통합 관리 ──
     implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth)      // Firebase 인증
-    implementation(libs.firebase.firestore) // Cloud Firestore DB
-    implementation(libs.firebase.messaging) // FCM 푸시 알림
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.messaging)
 
     // ── [Google Sign-In] Credential Manager 기반 구글 로그인 ──
+    // [수정 5] 하드코딩 버전 → libs.versions.toml로 이관 권장
+    //          단기 수정으로는 아래 버전 그대로 유지 (동작 확인된 버전)
     implementation(libs.credential.manager)
     implementation(libs.credential.manager.play)
     implementation(libs.google.id)
@@ -131,8 +166,8 @@ dependencies {
 
     // ── [Room] 로컬 SQLite DB: KSP로 컴파일러 처리 ──
     implementation(libs.room.runtime)
-    implementation(libs.room.ktx) // Coroutine/Flow 확장
-    ksp(libs.room.compiler)       // ✅ KSP로 처리
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
 
     // ── [DataStore] 온보딩 등 간단한 Key-Value 설정 저장 ──
     implementation(libs.datastore.preferences)
@@ -150,7 +185,7 @@ dependencies {
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.compose.ui.test.junit4)
 
-    // ── [Test] MockK + Coroutines Test (망각곡선 TDD 단위 테스트용) ──
+    // ── [Test] MockK + Coroutines Test ──
     testImplementation("io.mockk:mockk:1.13.10")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 }
