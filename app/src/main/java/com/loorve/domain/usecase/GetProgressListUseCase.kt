@@ -8,7 +8,6 @@ import javax.inject.Inject
 class GetProgressListUseCase @Inject constructor(
     private val progressRepository: ProgressRepository
 ) {
-    // Flow 기반 실시간 관찰 (HomeViewModel에서 사용)
     operator fun invoke(uid: String): Flow<List<Progress>> =
         progressRepository.observeProgressList(uid)
 }
