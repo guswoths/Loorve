@@ -1,5 +1,6 @@
 package com.loorve.data.repository
 
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.loorve.domain.model.Exam
@@ -23,31 +24,47 @@ class ExamRepositoryImpl @Inject constructor(
         firebaseAuth.currentUser?.uid
             ?: throw SecurityException("로그인이 필요합니다.")
 
+    /**
+     * 현재 로그인 사용자가 생성한 시험 목록만 실시간 스트림으로 반환.
+     * Firestore 보안 규칙의 createdBy == request.auth.uid 조건과 쿼리를 일치시킴.
+     */
     override fun getExamList(): Flow<List<Exam>> = callbackFlow {
-        val listener = examsCollection.addSnapshotListener { snapshot, error ->
-            if (error != null) { close(error); return@addSnapshotListener }
-            val exams = snapshot?.documents?.mapNotNull { doc ->
-                // ✅ 수정: toObject() 후 document ID를 명시적으로 copy하여 주입
-                doc.toObject(Exam::class.java)?.copy(id = doc.id)
-            } ?: emptyList()
-            trySend(exams)
+        val uid = firebaseAuth.currentUser?.uid
+        if (uid == null) {
+            trySend(emptyList())
+            awaitClose()
+            return@callbackFlow
         }
+
+        val listener = examsCollection
+            .whereEqualTo("createdBy", uid)   // ← 핵심 수정: 소유자 필터 추가
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "getExamList 오류: ${error.message}", error)
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val exams = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(Exam::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
+                trySend(exams)
+            }
         awaitClose { listener.remove() }
     }
 
     override fun getExamById(examId: String): Flow<Exam> = callbackFlow {
-        val listener = examsCollection.document(examId).addSnapshotListener { snapshot, error ->
-            if (error != null) { close(error); return@addSnapshotListener }
-            val exam = snapshot
-                ?.toObject(Exam::class.java)
-                // ✅ 수정: document ID를 id 필드에 명시적으로 주입
-                ?.copy(id = snapshot.id)
-                ?: run {
-                    close(NoSuchElementException("Exam $examId not found"))
-                    return@addSnapshotListener
-                }
-            trySend(exam)
-        }
+        val listener = examsCollection.document(examId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { close(error); return@addSnapshotListener }
+                val exam = snapshot
+                    ?.toObject(Exam::class.java)
+                    ?.copy(id = snapshot.id)
+                    ?: run {
+                        close(NoSuchElementException("Exam $examId not found"))
+                        return@addSnapshotListener
+                    }
+                trySend(exam)
+            }
         awaitClose { listener.remove() }
     }
 
@@ -75,5 +92,9 @@ class ExamRepositoryImpl @Inject constructor(
         val examWithOwner = exam.copy(createdBy = uid)
         examsCollection.add(examWithOwner).await()
         Unit
+    }
+
+    companion object {
+        private const val TAG = "ExamRepository"
     }
 }
