@@ -35,10 +35,10 @@ if (!googleServicesFile.exists()) {
 // ── 플러그인 선언: 버전 카탈로그(libs.versions.toml) alias 참조 ──
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.compose)   // Compose 컴파일러 플러그인 (Kotlin 2.x+)
-    alias(libs.plugins.ksp)              // ✅ kapt 완전 제거, KSP만 사용
-    alias(libs.plugins.hilt)             // Hilt DI 플러그인
-    alias(libs.plugins.google.services)  // Firebase google-services.json 처리
+    alias(libs.plugins.kotlin.compose) // Compose 컴파일러 플러그인 (Kotlin 2.x+)
+    alias(libs.plugins.ksp)            // ✅ kapt 완전 제거, KSP만 사용
+    alias(libs.plugins.hilt)           // Hilt DI 플러그인
+    alias(libs.plugins.google.services) apply false
 }
 
 // ── Android 빌드 설정 ──
@@ -63,8 +63,8 @@ android {
                 storeFile = file(storeFilePath)
             }
             storePassword = keystoreProps.getProperty("storePassword")
-            keyAlias     = keystoreProps.getProperty("keyAlias")
-            keyPassword  = keystoreProps.getProperty("keyPassword")
+            keyAlias = keystoreProps.getProperty("keyAlias")
+            keyPassword = keystoreProps.getProperty("keyPassword")
         }
     }
 
@@ -72,13 +72,11 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
-            // [수정 2] debug 빌드에서도 applicationIdSuffix 추가 권장
-            applicationIdSuffix = ".debug"
-            versionNameSuffix   = "-debug"
+            // [수정 2] debug 빌드에서도 applicationIdSuffix 추가 권장합니다
         }
         release {
-            isMinifyEnabled  = true   // 코드 난독화 및 축소
-            isShrinkResources = true  // 미사용 리소스 제거
+            isMinifyEnabled = true  // 코드 난독화 및 축소
+            isShrinkResources = true // 미사용 리소스 제거
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -98,8 +96,8 @@ android {
 
     // ── 빌드 기능 활성화 ──
     buildFeatures {
-        compose     = true  // Jetpack Compose 활성화
-        buildConfig = true  // BuildConfig 클래스 생성 (환경 변수 접근용)
+        compose = true  // Jetpack Compose 활성화
+        buildConfig = true // BuildConfig 클래스 생성 (환경 변수 접근용)
     }
 
     // [수정 3] Packaging: 중복 라이선스 파일 충돌 방지 (Firebase/Coroutines 혼용 시 필수)
@@ -186,6 +184,9 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
 
     // ── [Test] MockK + Coroutines Test ──
-    testImplementation("io.mockk:mockk:1.13.10")
+    // app/build.gradle.kts
+    testImplementation("io.mockk:mockk:1.13.10")              // JVM 단위 테스트용
+    androidTestImplementation("io.mockk:mockk-android:1.13.10") // Instrumented 테스트용 (필요 시)
+    androidTestImplementation("io.mockk:mockk-agent:1.13.10")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 }
