@@ -1,8 +1,13 @@
 package com.loorve.di
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.loorve.data.repository.AuthRepositoryImpl
+import com.loorve.data.repository.ExamRepositoryImpl
 import com.loorve.data.repository.ProgressRepositoryImpl
+import com.loorve.domain.repository.AuthRepository
+import com.loorve.domain.repository.ExamRepository
 import com.loorve.domain.repository.ProgressRepository
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -11,13 +16,26 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object RepositoryModule {
+abstract class RepositoryModule {
 
-    @Provides
+    // ✅ @Binds 방식: Hilt가 @Singleton + @Inject constructor를 올바르게 관리
+    @Binds
     @Singleton
-    fun provideProgressRepository(
-        firestore: FirebaseFirestore
-    ): ProgressRepository = ProgressRepositoryImpl(firestore)
+    abstract fun bindProgressRepository(
+        impl: ProgressRepositoryImpl
+    ): ProgressRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAuthRepository(
+        impl: AuthRepositoryImpl
+    ): AuthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindExamRepository(
+        impl: ExamRepositoryImpl
+    ): ExamRepository
 }
 
 @Module
