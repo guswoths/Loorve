@@ -1,6 +1,8 @@
 // 경로: app/src/main/java/com/loorve/presentation/progress/ProgressDetailScreen.kt
 package com.loorve.presentation.progress
 
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -23,8 +25,6 @@ import com.loorve.domain.model.Progress
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import androidx.activity.OnBackPressedCallback
-import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 
 @Composable
 fun ProgressDetailScreen(
@@ -40,13 +40,11 @@ fun ProgressDetailScreen(
         if (uid.isNotBlank()) viewModel.loadProgress(uid, progressId)
     }
 
-    // ── 저장 결과 Snackbar ─────────────────────────────────────
     LaunchedEffect(uiState.saveResult) {
         when (uiState.saveResult) {
             true -> {
-                snackbarHostState.showSnackbar("저장되었습니다 ✅")
+                snackbarHostState.showSnackbar("저장되었습니다 ✓")
                 viewModel.consumeSaveResult()
-                // onNavigateBack() 제거 → 상세화면에서 수정 내용 바로 확인
             }
             false -> {
                 snackbarHostState.showSnackbar("저장에 실패했습니다. 다시 시도해 주세요.")
@@ -56,7 +54,6 @@ fun ProgressDetailScreen(
         }
     }
 
-    // ── 삭제 결과 Snackbar ─────────────────────────────────────
     LaunchedEffect(uiState.deleteResult) {
         when (uiState.deleteResult) {
             true -> {
@@ -80,7 +77,7 @@ fun ProgressDetailScreen(
         onExitEditMode    = { viewModel.exitEditMode() },
         onSave            = { updated -> viewModel.saveProgress(uid, updated) },
         onDelete          = { viewModel.deleteProgress(uid, progressId) },
-        onRetry           = { viewModel.loadProgress(uid, progressId) }
+        onRetry           = { viewModel.loadProgress(uid, progressId) },   // ← 쉼표 추가
         onEditChanged     = { c, cc, tc, ic -> viewModel.onEditChanged(c, cc, tc, ic) }
     )
 }
@@ -95,7 +92,7 @@ private fun ProgressDetailContent(
     onExitEditMode: () -> Unit,
     onSave: (Progress) -> Unit,
     onDelete: () -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,                                              // ← 쉼표 추가
     onEditChanged: (String, String, String, Boolean) -> Unit
 ) {
     var editContent        by remember { mutableStateOf("") }
@@ -114,29 +111,23 @@ private fun ProgressDetailContent(
         }
     }
 
-    // [추가] 미저장 경고 다이얼로그 상태
     var showExitConfirmDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog      by remember { mutableStateOf(false) }
 
-    // [추가] 시스템 뒤로가기 처리
+    // 시스템 뒤로가기 처리
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     DisposableEffect(uiState.isEditMode, uiState.isDirty) {
         val callback = object : OnBackPressedCallback(enabled = uiState.isEditMode) {
             override fun handleOnBackPressed() {
-                if (uiState.isDirty) {
-                    showExitConfirmDialog = true
-                } else {
-                    onExitEditMode()
-                }
-
+                if (uiState.isDirty) showExitConfirmDialog = true
+                else onExitEditMode()
             }
         }
         backDispatcher?.addCallback(callback)
         onDispose { callback.remove() }
     }
 
-    // ── 미저장 경고 다이얼로그 ────────────────────────────────
-    // After — 제목/내용을 사양에 맞게 수정
+    // 미저장 경고 다이얼로그
     if (showExitConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showExitConfirmDialog = false },
@@ -154,7 +145,7 @@ private fun ProgressDetailContent(
         )
     }
 
-    // ── 삭제 확인 다이얼로그 ───────────────────────────────────
+    // 삭제 확인 다이얼로그
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -184,7 +175,7 @@ private fun ProgressDetailContent(
                         onClick = {
                             if (uiState.isEditMode) {
                                 if (uiState.isDirty) showExitConfirmDialog = true
-                                else onExitEditMode()   // 변경 없으면 그냥 View 모드로
+                                else onExitEditMode()
                             } else {
                                 onNavigateBack()
                             }
@@ -215,7 +206,7 @@ private fun ProgressDetailContent(
                     if (uiState.isEditMode) {
                         TextButton(
                             onClick = {
-                                val base = uiState.progress ?: return@TextButton
+                                val base      = uiState.progress ?: return@TextButton
                                 val completed = editCompletedCount.toIntOrNull() ?: 0
                                 val total     = editTotalCount.toIntOrNull() ?: 0
                                 onSave(
@@ -428,7 +419,8 @@ private fun ProgressDetailContentViewModePreview() {
             onExitEditMode    = {},
             onSave            = {},
             onDelete          = {},
-            onRetry           = {}
+            onRetry           = {},
+            onEditChanged     = { _, _, _, _ -> }   // ← Preview용 빈 람다 추가
         )
     }
 }
@@ -458,7 +450,8 @@ private fun ProgressDetailContentEditModePreview() {
             onExitEditMode    = {},
             onSave            = {},
             onDelete          = {},
-            onRetry           = {}
+            onRetry           = {},
+            onEditChanged     = { _, _, _, _ -> }   // ← Preview용 빈 람다 추가
         )
     }
 }

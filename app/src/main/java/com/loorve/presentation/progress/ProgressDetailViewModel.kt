@@ -19,7 +19,7 @@ data class ProgressDetailUiState(
     val isEditMode: Boolean = false,
     val errorMessage: String? = null,
     val saveResult: Boolean? = null,
-    val deleteResult: Boolean? = null
+    val deleteResult: Boolean? = null,   // ← 쉼표 추가
     val isDirty: Boolean = false,
     val initialSnapshot: Progress? = null
 )
@@ -50,19 +50,23 @@ class ProgressDetailViewModel @Inject constructor(
     }
 
     fun enterEditMode() {
-        _uiState.update { it.copy(
-            isEditMode = true,
-            initialSnapshot = it.progress,   // 편집 진입 시 원본 저장
-            isDirty = false
-        )}
+        _uiState.update {
+            it.copy(
+                isEditMode      = true,
+                initialSnapshot = it.progress,
+                isDirty         = false
+            )
+        }
     }
 
     fun exitEditMode() {
-        _uiState.update { it.copy(
-            isEditMode = false,
-            isDirty = false,
-            initialSnapshot = null
-        )}
+        _uiState.update {
+            it.copy(
+                isEditMode      = false,
+                isDirty         = false,
+                initialSnapshot = null
+            )
+        }
     }
 
     fun saveProgress(uid: String, updatedProgress: Progress) {
@@ -72,14 +76,12 @@ class ProgressDetailViewModel @Inject constructor(
             return
         }
 
-        // ✅ uid 빈값 시 명시적 에러 메시지 추가
         if (uid.isBlank()) {
-            Log.e(TAG, "saveProgress 실패: uid가 비어 있습니다. 로그인 상태를 확인하세요.")
+            Log.e(TAG, "saveProgress 실패: uid가 비어 있습니다.")
             _uiState.update { it.copy(saveResult = false, errorMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요.") }
             return
         }
 
-        // ✅ content 빈값 시 명시적 에러 메시지 추가
         if (updatedProgress.content.isBlank()) {
             Log.w(TAG, "saveProgress 실패: content가 비어 있습니다.")
             _uiState.update { it.copy(saveResult = false, errorMessage = "학습 내용을 입력해주세요.") }
@@ -98,14 +100,15 @@ class ProgressDetailViewModel @Inject constructor(
             if (result.isSuccess) {
                 _uiState.update {
                     it.copy(
-                        progress   = merged,
-                        isEditMode = false,
-                        saveResult = true,
-                        errorMessage = null
+                        progress        = merged,
+                        isEditMode      = false,
+                        saveResult      = true,
+                        errorMessage    = null,
+                        isDirty         = false,
+                        initialSnapshot = null
                     )
                 }
             } else {
-                // ✅ 실제 예외 메시지를 errorMessage에 전달
                 val errMsg = result.exceptionOrNull()?.message ?: "저장 중 알 수 없는 오류가 발생했습니다."
                 Log.e(TAG, "saveProgress 실패: $errMsg")
                 _uiState.update { it.copy(saveResult = false, errorMessage = errMsg) }
@@ -132,17 +135,17 @@ class ProgressDetailViewModel @Inject constructor(
         _uiState.update { it.copy(deleteResult = null) }
     }
 
-   fun onEditChanged(
-       content: String,
-       completedCount: String,
-       totalCount: String,
-       isCompleted: Boolean
+    fun onEditChanged(
+        content: String,
+        completedCount: String,
+        totalCount: String,
+        isCompleted: Boolean
     ) {
-       val snap = _uiState.value.initialSnapshot ?: return
-       val dirty = snap.content != content ||
-                   snap.completedCount.toString() != completedCount ||
-                   snap.totalCount.toString() != totalCount ||
-                   snap.isCompleted != isCompleted
+        val snap = _uiState.value.initialSnapshot ?: return
+        val dirty = snap.content != content ||
+                    snap.completedCount.toString() != completedCount ||
+                    snap.totalCount.toString() != totalCount ||
+                    snap.isCompleted != isCompleted
         _uiState.update { it.copy(isDirty = dirty) }
     }
 
