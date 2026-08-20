@@ -1,17 +1,59 @@
 package com.loorve.domain.usecase
 
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
- * 망각곡선 기반 복습 스케줄 계산 UseCase
- * TDD: 이 파일은 테스트 컴파일을 위한 stub입니다.
- * 실제 구현은 테스트 통과 후 작성하세요.
+ * 망각곡선(Forgetting Curve) 기반 복습 일정 자동 계산 UseCase.
+ *
+ * - 시험일까지 30일 이상: 표준 간격(1, 3, 7, 14, 30일) 그대로 적용
+ * - 시험일까지 30일 미만: scaleFactor = remainingDays / 30.0 으로 비례 압축
+ * - 시험일을 초과하는 복습일은 자동 제외
+ *
+ * 외부 의존성 없음 — 순수 도메인 계산 함수.
  */
 class CalculateReviewScheduleUseCase {
+
+    private val standardIntervals = listOf(1L, 3L, 7L, 14L, 30L)
+
+    /**
+     * 복습 일정을 계산한다.
+     *
+     * @param progressDate 학습(진도) 완료일
+     * @param examDate     시험일
+     * @return 복습 예정일 목록 (시험일 미포함 가능, 오름차순)
+     * @throws InvalidScheduleException progressDate >= examDate 인 경우
+     */
     fun execute(progressDate: LocalDate, examDate: LocalDate): List<LocalDate> {
-        TODO("구현 필요: 테스트 작성 후 구현할 것")
+        if (!progressDate.isBefore(examDate)) {
+            throw InvalidScheduleException(
+                "진도 작성일($progressDate)은 시험일($examDate) 이전이어야 합니다. " +
+                    "시험일 이후 또는 같은 날은 유효하지 않습니다. (invalid)"
+            )
+        }
+
+        val remainingDays = ChronoUnit.DAYS.between(progressDate, examDate)
+
+        return if (remainingDays >= 30) {
+            // 표준 간격 그대로 적용
+            standardIntervals
+                .map { interval -> progressDate.plusDays(interval) }
+                .filter { !it.isAfter(examDate) }
+        } else {
+            // 비례 압축 적용
+            val scaleFactor = remainingDays / 30.0
+            standardIntervals
+                .map { interval ->
+                    val compressed = max(1, (interval * scaleFactor).roundToInt()).toLong()
+                    progressDate.plusDays(compressed)
+                }
+                .filter { !it.isAfter(examDate) }
+                .distinct()
+                .sorted()
+        }
     }
 }
 
-/** 커스텀 도메인 예외: 작성일이 시험일과 같거나 이후인 경우 */
 class InvalidScheduleException(message: String) : IllegalArgumentException(message)
