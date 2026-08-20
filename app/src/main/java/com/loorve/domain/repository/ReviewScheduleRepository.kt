@@ -64,20 +64,20 @@ interface ReviewScheduleRepository {
      * @return 업데이트 성공 시 [Result.success(Unit)],
      *         실패 시 [Result.failure]와 함께 예외를 반환합니다.
      */
-
     suspend fun completeReviewSchedule(uid: String, scheduleId: String): Result<Unit>
+
     /**
-    * 복습 완료 여부를 지정값으로 업데이트합니다 (토글 지원).
-    *
-    * @param uid 인증된 사용자의 고유 식별자
-    * @param scheduleId 완료 처리할 복습 일정의 고유 식별자
-    * @param isCompleted 변경할 완료 여부 (true=완료, false=미완료)
-    *
-    * ⚠️ 보안 주의사항:
-    *  - 해당 일정의 소유자만 수정 가능하도록 Firestore 보안 규칙을 적용하세요.
-    *
-    * @return 업데이트 성공 시 [Result.success(Unit)], 실패 시 [Result.failure]
-    */
+     * 복습 완료 여부를 지정값으로 업데이트합니다 (토글 지원).
+     *
+     * @param uid 인증된 사용자의 고유 식별자
+     * @param scheduleId 완료 처리할 복습 일정의 고유 식별자
+     * @param isCompleted 변경할 완료 여부 (true=완료, false=미완료)
+     *
+     * ⚠️ 보안 주의사항:
+     *  - 해당 일정의 소유자만 수정 가능하도록 Firestore 보안 규칙을 적용하세요.
+     *
+     * @return 업데이트 성공 시 [Result.success(Unit)], 실패 시 [Result.failure]
+     */
     suspend fun updateReviewCompletion(
         uid: String,
         scheduleId: String,
@@ -97,6 +97,16 @@ interface ReviewScheduleRepository {
      *         실패 시 [Result.failure]와 함께 예외를 반환합니다.
      */
     suspend fun deleteReviewSchedule(uid: String, scheduleId: String): Result<Unit>
+
+    /**
+     * 복습 스케줄 목록을 배치로 저장합니다.
+     * Firestore WriteBatch를 사용해 원자적으로 처리합니다.
+     *
+     * @param uid       인증된 사용자 UID
+     * @param schedules 저장할 ReviewSchedule 리스트
+     * @return 전체 저장 성공 시 [Result.success(Unit)], 실패 시 [Result.failure]
+     */
+    suspend fun saveReviewSchedules(uid: String, schedules: List<ReviewSchedule>): Result<Unit>
 
     /**
      * 오늘 날짜에 해당하는 복습 일정 목록을 실시간으로 관찰합니다.

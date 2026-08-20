@@ -39,5 +39,5 @@ data class ReviewSchedule(
     val createdAt: Long = 0L,
 
     /** 레코드 최종 수정 시각 (epoch ms). isCompleted 변경 시 갱신된다. */
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L)
 
