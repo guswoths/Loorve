@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.loorve.domain.model.ReviewSchedule
 import com.loorve.domain.repository.ReviewScheduleRepository
+import com.loorve.domain.usecase.UpdateReviewCompletionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,7 +30,8 @@ data class ReviewCalendarUiState(
 
 @HiltViewModel
 class ReviewCalendarViewModel @Inject constructor(
-    private val reviewScheduleRepository: ReviewScheduleRepository
+    private val reviewScheduleRepository: ReviewScheduleRepository,
+    private val updateReviewCompletionUseCase: UpdateReviewCompletionUseCase  // ✅ 추가
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewCalendarUiState())
@@ -52,6 +54,7 @@ class ReviewCalendarViewModel @Inject constructor(
         }
     }
 
+    // ✅ 기존 단방향 완료 함수 유지 (하위 호환)
     fun onCompleteSchedule(scheduleId: String) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         viewModelScope.launch {
@@ -63,6 +66,31 @@ class ReviewCalendarViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * ✅ 신규: 복습 완료 여부를 토글합니다.
+     * @param scheduleId 대상 복습 일정 ID
+     * @param currentState 현재 완료 상태 (UI에서 전달)
+     */
+    fun toggleReviewCompletion(scheduleId: String, currentState: Boolean) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        viewModelScope.launch {
+            val result = updateReviewCompletionUseCase(
+                uid = uid,
+                scheduleId = scheduleId,
+                isCompleted = !currentState  // 현재 상태를 반전
+            )
+            if (result.isFailure) {
+                _uiState.update {
+                    it.copy(
+                        errorMessage = result.exceptionOrNull()?.message ?: "복습 상태 변경에 실패했습니다."
+                    )
+                }
+            }
+            // ✅ 성공 시: Firestore Flow가 자동으로 schedulesMap을 갱신하므로
+            //    별도 UI 업데이트 불필요
         }
     }
 

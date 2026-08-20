@@ -23,6 +23,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.domain.model.ReviewSchedule
 import java.time.LocalDate
 import java.time.YearMonth
+import androidx.compose.ui.text.style.TextDecoration
 
 @Composable
 fun ReviewCalendarScreen(
@@ -97,7 +98,9 @@ fun ReviewCalendarScreen(
         SelectedDateSchedulePanel(
             selectedDate = uiState.selectedDate,
             schedules = uiState.selectedDateSchedules,
-            onCompleteSchedule = { viewModel.onCompleteSchedule(it) }
+            onCompleteSchedule = { viewModel.onCompleteSchedule(it) },
+            onToggleCompletion = { scheduleId, current ->   // ✅ 추가
+                viewModel.toggleReviewCompletion(scheduleId, current)}
         )
     }
 }
@@ -259,6 +262,7 @@ private fun SelectedDateSchedulePanel(
     selectedDate: LocalDate?,
     schedules: List<ReviewSchedule>,
     onCompleteSchedule: (String) -> Unit
+    onToggleCompletion: (String, Boolean) -> Unit
 ) {
     val title = if (selectedDate != null) {
         "${selectedDate.monthValue}월 ${selectedDate.dayOfMonth}일 복습 일정"
@@ -296,6 +300,7 @@ private fun SelectedDateSchedulePanel(
                 ReviewScheduleItem(
                     schedule = schedule,
                     onComplete = { onCompleteSchedule(schedule.reviewScheduleId) }
+                    onToggle = { onToggleCompletion(schedule.reviewScheduleId, schedule.isCompleted) }
                 )
             }
         }
@@ -305,11 +310,31 @@ private fun SelectedDateSchedulePanel(
 @Composable
 private fun ReviewScheduleItem(
     schedule: ReviewSchedule,
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    onToggle: () -> Unit  // ✅ 추가
 ) {
+    // ✅ 완료 여부에 따른 텍스트 스타일
+    val titleStyle = if (schedule.isCompleted) {
+        MaterialTheme.typography.bodyLarge.copy(
+            fontWeight = FontWeight.SemiBold,
+            textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    } else {
+        MaterialTheme.typography.bodyLarge.copy(
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(  // ✅ 완료 시 배경색 변경
+            containerColor = if (schedule.isCompleted)
+                MaterialTheme.colorScheme.surfaceVariant
+            else
+                MaterialTheme.colorScheme.surface
+        )
     ) {
         Row(
             modifier = Modifier
@@ -322,18 +347,16 @@ private fun ReviewScheduleItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
+                // ✅ Checkbox 활성화 + 토글 연결
                 Checkbox(
                     checked = schedule.isCompleted,
-                    onCheckedChange = null,
-                    enabled = false
+                    onCheckedChange = { onToggle() }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
                         text = "${schedule.reviewRound}회차 복습",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        style = titleStyle  // ✅ strikethrough 적용
                     )
                     if (schedule.isCompleted) {
                         Text(
@@ -344,6 +367,7 @@ private fun ReviewScheduleItem(
                     }
                 }
             }
+            // ✅ 미완료 시에만 "완료" 버튼 표시 (기존 유지)
             if (!schedule.isCompleted) {
                 Button(
                     onClick = onComplete,

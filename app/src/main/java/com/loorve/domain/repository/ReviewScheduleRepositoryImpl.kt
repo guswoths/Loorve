@@ -231,6 +231,47 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
     }
 
     // ──────────────────────────────────────────────
+    // UPDATE - 완료 여부 토글
+    // ──────────────────────────────────────────────
+
+    override suspend fun updateReviewCompletion(
+        uid: String,
+        scheduleId: String,
+        isCompleted: Boolean
+    ): Result<Unit> {
+        return try {
+            require(uid.isNotBlank()) { "uid는 비어 있을 수 없습니다." }
+            require(scheduleId.isNotBlank()) { "scheduleId는 비어 있을 수 없습니다." }
+
+            val now = Timestamp.now()
+            reviewScheduleDocument(uid, scheduleId)
+                .update(
+                    mapOf(
+                        "isCompleted" to isCompleted,
+                        "updatedAt" to now
+                    )
+                )
+                .await()
+
+            Log.d(TAG, "reviewSchedule 완료 토글: uid=$uid, scheduleId=$scheduleId, isCompleted=$isCompleted")
+            Result.success(Unit)
+        } catch (e: FirebaseFirestoreException) {
+            Log.e(TAG, "Firestore reviewSchedule 토글 실패: code=${e.code}", e)
+            val message = when (e.code) {
+                FirebaseFirestoreException.Code.NOT_FOUND ->
+                    "해당 복습 일정을 찾을 수 없습니다."
+                FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                    "수정 권한이 없습니다."
+                else -> "복습 일정 완료 처리에 실패했습니다: ${e.message}"
+            }
+            Result.failure(IllegalStateException(message, e))
+        } catch (e: Exception) {
+            Log.e(TAG, "reviewSchedule 토글 실패: uid=$uid, scheduleId=$scheduleId", e)
+            Result.failure(e)
+        }
+    }
+
+    // ──────────────────────────────────────────────
     // DELETE
     // ──────────────────────────────────────────────
 
@@ -267,7 +308,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
 
         return mapOf(
             "originProgressId" to schedule.originProgressId,
-            "reviewDate" to schedule.reviewDate,       // epoch ms (Long) — 날짜 범위 쿼리용
+            "reviewDate" to schedule.reviewDate, // epoch ms (Long) — 날짜 범위 쿼리용
             "reviewRound" to schedule.reviewRound,
             "isCompleted" to schedule.isCompleted,
             "createdAt" to createdAt,
