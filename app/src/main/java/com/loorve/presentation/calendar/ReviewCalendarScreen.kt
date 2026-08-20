@@ -99,8 +99,9 @@ fun ReviewCalendarScreen(
             selectedDate = uiState.selectedDate,
             schedules = uiState.selectedDateSchedules,
             onCompleteSchedule = { viewModel.onCompleteSchedule(it) },
-            onToggleCompletion = { scheduleId, current ->   // ✅ 추가
-                viewModel.toggleReviewCompletion(scheduleId, current)}
+            onToggleCompletion = { scheduleId, current -> // ✅ 추가
+                viewModel.toggleReviewCompletion(scheduleId, current)
+            }
         )
     }
 }
@@ -261,7 +262,7 @@ private fun DateCell(
 private fun SelectedDateSchedulePanel(
     selectedDate: LocalDate?,
     schedules: List<ReviewSchedule>,
-    onCompleteSchedule: (String) -> Unit
+    onCompleteSchedule: (String) -> Unit,
     onToggleCompletion: (String, Boolean) -> Unit
 ) {
     val title = if (selectedDate != null) {
@@ -299,7 +300,7 @@ private fun SelectedDateSchedulePanel(
             items(schedules) { schedule ->
                 ReviewScheduleItem(
                     schedule = schedule,
-                    onComplete = { onCompleteSchedule(schedule.reviewScheduleId) }
+                    onComplete = { onCompleteSchedule(schedule.reviewScheduleId) },
                     onToggle = { onToggleCompletion(schedule.reviewScheduleId, schedule.isCompleted) }
                 )
             }
@@ -311,7 +312,7 @@ private fun SelectedDateSchedulePanel(
 private fun ReviewScheduleItem(
     schedule: ReviewSchedule,
     onComplete: () -> Unit,
-    onToggle: () -> Unit  // ✅ 추가
+    onToggle: () -> Unit // ✅ 추가
 ) {
     // ✅ 완료 여부에 따른 텍스트 스타일
     val titleStyle = if (schedule.isCompleted) {
@@ -329,7 +330,7 @@ private fun ReviewScheduleItem(
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(  // ✅ 완료 시 배경색 변경
+        colors = CardDefaults.cardColors( // ✅ 완료 시 배경색 변경
             containerColor = if (schedule.isCompleted)
                 MaterialTheme.colorScheme.surfaceVariant
             else
@@ -356,7 +357,7 @@ private fun ReviewScheduleItem(
                 Column {
                     Text(
                         text = "${schedule.reviewRound}회차 복습",
-                        style = titleStyle  // ✅ strikethrough 적용
+                        style = titleStyle // ✅ strikethrough 적용
                     )
                     if (schedule.isCompleted) {
                         Text(
