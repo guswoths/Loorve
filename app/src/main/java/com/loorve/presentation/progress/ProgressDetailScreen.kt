@@ -23,6 +23,8 @@ import com.loorve.domain.model.Progress
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 
 @Composable
 fun ProgressDetailScreen(
@@ -79,6 +81,7 @@ fun ProgressDetailScreen(
         onSave            = { updated -> viewModel.saveProgress(uid, updated) },
         onDelete          = { viewModel.deleteProgress(uid, progressId) },
         onRetry           = { viewModel.loadProgress(uid, progressId) }
+        onEditChanged     = { c, cc, tc, ic -> viewModel.onEditChanged(c, cc, tc, ic) }
     )
 }
 
@@ -93,6 +96,7 @@ private fun ProgressDetailContent(
     onSave: (Progress) -> Unit,
     onDelete: () -> Unit,
     onRetry: () -> Unit
+    onEditChanged: (String, String, String, Boolean) -> Unit
 ) {
     var editContent        by remember { mutableStateOf("") }
     var editCompletedCount by remember { mutableStateOf("") }
@@ -114,12 +118,30 @@ private fun ProgressDetailContent(
     var showExitConfirmDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
+    // [추가] 시스템 뒤로가기 처리
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    DisposableEffect(uiState.isEditMode, uiState.isDirty) {
+        val callback = object : OnBackPressedCallback(enabled = uiState.isEditMode) {
+            override fun handleOnBackPressed() {
+                if (uiState.isDirty) {
+                    showExitConfirmDialog = true
+                } else {
+                    onExitEditMode()
+                }
+
+            }
+        }
+        backDispatcher?.addCallback(callback)
+        onDispose { callback.remove() }
+    }
+
     // ── 미저장 경고 다이얼로그 ────────────────────────────────
+    // After — 제목/내용을 사양에 맞게 수정
     if (showExitConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showExitConfirmDialog = false },
-            title   = { Text("변경사항 미저장") },
-            text    = { Text("저장하지 않은 변경사항이 있습니다.\n나가시겠습니까?") },
+            title   = { Text("저장하지 않고 나가시겠어요?") },
+            text    = { Text("변경 사항이 저장되지 않습니다.") },
             confirmButton = {
                 TextButton(onClick = {
                     showExitConfirmDialog = false
@@ -160,9 +182,12 @@ private fun ProgressDetailContent(
                 navigationIcon = {
                     IconButton(
                         onClick = {
-                            // [수정] 편집 모드 뒤로가기 → 미저장 경고 다이얼로그 표시
-                            if (uiState.isEditMode) showExitConfirmDialog = true
-                            else onNavigateBack()
+                            if (uiState.isEditMode) {
+                                if (uiState.isDirty) showExitConfirmDialog = true
+                                else onExitEditMode()   // 변경 없으면 그냥 View 모드로
+                            } else {
+                                onNavigateBack()
+                            }
                         }
                     ) {
                         Icon(
@@ -248,10 +273,10 @@ private fun ProgressDetailContent(
                             editCompletedCount = editCompletedCount,
                             editTotalCount     = editTotalCount,
                             editIsCompleted    = editIsCompleted,
-                            onContentChange        = { editContent = it },
-                            onCompletedCountChange = { editCompletedCount = it },
-                            onTotalCountChange     = { editTotalCount = it },
-                            onIsCompletedChange    = { editIsCompleted = it }
+                            onContentChange        = { editContent = it; onEditChanged(it, editCompletedCount, editTotalCount, editIsCompleted) },
+                            onCompletedCountChange = { if (it.all(Char::isDigit)) { editCompletedCount = it; onEditChanged(editContent, it, editTotalCount, editIsCompleted) } },
+                            onTotalCountChange     = { if (it.all(Char::isDigit)) { editTotalCount = it; onEditChanged(editContent, editCompletedCount, it, editIsCompleted) } },
+                            onIsCompletedChange    = { editIsCompleted = it; onEditChanged(editContent, editCompletedCount, editTotalCount, it) }
                         )
                     } else {
                         ProgressViewBody(progress = progress)

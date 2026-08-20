@@ -20,6 +20,8 @@ data class ProgressDetailUiState(
     val errorMessage: String? = null,
     val saveResult: Boolean? = null,
     val deleteResult: Boolean? = null
+    val isDirty: Boolean = false,
+    val initialSnapshot: Progress? = null
 )
 
 @HiltViewModel
@@ -48,11 +50,19 @@ class ProgressDetailViewModel @Inject constructor(
     }
 
     fun enterEditMode() {
-        _uiState.update { it.copy(isEditMode = true) }
+        _uiState.update { it.copy(
+            isEditMode = true,
+            initialSnapshot = it.progress,   // 편집 진입 시 원본 저장
+            isDirty = false
+        )}
     }
 
     fun exitEditMode() {
-        _uiState.update { it.copy(isEditMode = false) }
+        _uiState.update { it.copy(
+            isEditMode = false,
+            isDirty = false,
+            initialSnapshot = null
+        )}
     }
 
     fun saveProgress(uid: String, updatedProgress: Progress) {
@@ -120,6 +130,20 @@ class ProgressDetailViewModel @Inject constructor(
 
     fun consumeDeleteResult() {
         _uiState.update { it.copy(deleteResult = null) }
+    }
+
+   fun onEditChanged(
+       content: String,
+       completedCount: String,
+       totalCount: String,
+       isCompleted: Boolean
+    ) {
+       val snap = _uiState.value.initialSnapshot ?: return
+       val dirty = snap.content != content ||
+                   snap.completedCount.toString() != completedCount ||
+                   snap.totalCount.toString() != totalCount ||
+                   snap.isCompleted != isCompleted
+        _uiState.update { it.copy(isDirty = dirty) }
     }
 
     companion object {
