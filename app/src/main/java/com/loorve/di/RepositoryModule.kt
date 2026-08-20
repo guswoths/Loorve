@@ -3,7 +3,6 @@ package com.loorve.di
 import com.google.firebase.firestore.FirebaseFirestore
 import com.loorve.data.repository.ProgressRepositoryImpl
 import com.loorve.domain.repository.ProgressRepository
-import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -12,13 +11,13 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class RepositoryModule {
+object RepositoryModule {
 
-    @Binds
+    @Provides
     @Singleton
-    abstract fun bindProgressRepository(
-        impl: ProgressRepositoryImpl
-    ): ProgressRepository
+    fun provideProgressRepository(
+        firestore: FirebaseFirestore
+    ): ProgressRepository = ProgressRepositoryImpl(firestore)
 }
 
 @Module
