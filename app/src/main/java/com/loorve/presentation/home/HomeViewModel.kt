@@ -1,4 +1,3 @@
-// 경로: app/src/main/java/com/loorve/presentation/home/HomeViewModel.kt
 package com.loorve.presentation.home
 
 import androidx.lifecycle.ViewModel
@@ -21,14 +20,13 @@ data class HomeUiState(
     val exams: List<Exam> = emptyList(),
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
-    /** null=초기, true=저장 성공, false=저장 실패. 소비 후 null로 리셋 */
     val progressSaveResult: Boolean? = null
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val getExamsUseCase: GetExamsUseCase,
-    private val addProgressUseCase: AddProgressUseCase   // ← 추가
+    private val addProgressUseCase: AddProgressUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -41,23 +39,27 @@ class HomeViewModel @Inject constructor(
     fun loadExams() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
             getExamsUseCase()
-                .catch { e ->
+                .catch { exception ->
                     _uiState.update {
-                        it.copy(isLoading = false, errorMessage = e.message ?: "목록을 불러오지 못했습니다.")
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = exception.message ?: "목록을 불러오지 못했습니다."
+                        )
                     }
                 }
                 .collect { exams ->
-                    _uiState.update { it.copy(isLoading = false, exams = exams) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            exams = exams
+                        )
+                    }
                 }
         }
     }
 
-    /**
-     * 학습 진도를 저장합니다.
-     * uid는 현재 FirebaseAuth 로그인 사용자 기준이며,
-     * createdAt은 UseCase 내부에서 KST 당일 자정으로 자동 부여됩니다.
-     */
     fun addProgress(
         examId: String,
         content: String,
@@ -65,25 +67,60 @@ class HomeViewModel @Inject constructor(
         totalCount: Int
     ) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
-        if (uid == null) {
-            _uiState.update { it.copy(progressSaveResult = false) }
+        if (uid.isNullOrBlank()) {
+            _uiState.update {
+                it.copy(
+                    progressSaveResult = false,
+                    errorMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요."
+                )
+            }
             return
         }
+
         viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    progressSaveResult = null,
+                    errorMessage = null
+                )
+            }
+
             val progress = Progress(
-                examId         = examId,
-                content        = content,
+                examId = examId,
+                content = content.trim(),
                 completedCount = completedCount,
-                totalCount     = totalCount,
-                isCompleted    = totalCount > 0 && completedCount >= totalCount
+                totalCount = totalCount,
+                isCompleted = totalCount > 0 && completedCount >= totalCount
             )
+
             val result = addProgressUseCase(uid, progress)
-            _uiState.update { it.copy(progressSaveResult = result.isSuccess) }
+
+            _uiState.update {
+                if (result.isSuccess) {
+                    it.copy(
+                        progressSaveResult = true,
+                        errorMessage = null
+                    )
+                } else {
+                    it.copy(
+                        progressSaveResult = false,
+                        errorMessage = result.exceptionOrNull()?.message
+                            ?: "학습 진도를 저장하지 못했습니다."
+                    )
+                }
+            }
         }
     }
 
-    /** UI에서 저장 결과 이벤트를 소비한 후 상태를 초기화합니다. */
     fun consumeProgressSaveResult() {
-        _uiState.update { it.copy(progressSaveResult = null) }
+        _uiState.update {
+            it.copy(progressSaveResult = null)
+        }
+    }
+
+    fun consumeErrorMessage() {
+        _uiState.update {
+            it.copy(errorMessage = null)
+        }
     }
 }
