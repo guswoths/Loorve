@@ -40,7 +40,7 @@ content using a Gemini model:
 ```kotlin
 import com.google.firebase.ai.FirebaseAI
 import com.google.firebase.ai.ktx.ai
-import com.google.firebase.ktx.Firebase
+import com.google.firebase.Firebase
 
 class MainActivity : AppCompatActivity() {
 
@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
         val ai = Firebase.ai
         // [AGENT] Replace with the latest model from https://firebase.google.com/docs/ai-logic/models.md.txt
         val model = ai.generativeModel("<latest_supported_model>")
-        
+
         lifecycleScope.launch {
             val response = model.generateContent("Hello Gemini!")
             setContent {
