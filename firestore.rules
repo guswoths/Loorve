@@ -2,27 +2,28 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ✅ [원인 1 수정] 최상위 exams 컬렉션
-    // ExamRepositoryImpl이 firestore.collection("exams")에 직접 쓰므로
-    // 규칙도 최상위 경로로 일치시킴
+    // ✅ [기존] 최상위 exams 컬렉션
     match /exams/{examId} {
-      // create: 아직 문서가 없으므로 request.resource 사용
       allow create: if request.auth != null
         && request.resource.data.createdBy == request.auth.uid;
-      // read/update/delete: 기존 문서의 createdBy 확인
       allow read, update, delete: if request.auth != null
         && resource.data.createdBy == request.auth.uid;
     }
 
-    // ✅ [기존 유지] users/{userId}/progress 중첩 컬렉션
-    // ProgressRepositoryImpl이 중첩 경로를 사용하므로 그대로 유지
+    // ✅ [기존] users/{userId}/progress 중첩 컬렉션
     match /users/{userId}/progress/{progressId} {
       allow read, write: if request.auth != null
         && request.auth.uid == userId;
     }
 
-    // ✅ [원인 2 수정] examResults 컬렉션
-    // create 시 resource는 null → request.resource로 분리
+    // ✅ [신규 추가] users/{userId}/reviewSchedules 중첩 컬렉션
+    // ReviewCalendarScreen의 월 변경 시 이 규칙이 없어 PERMISSION_DENIED 발생
+    match /users/{userId}/reviewSchedules/{scheduleId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId;
+    }
+
+    // ✅ [기존] examResults 컬렉션
     match /examResults/{resultId} {
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid;

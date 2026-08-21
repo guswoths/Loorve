@@ -9,10 +9,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.tasks.await
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 
 class ReviewScheduleRepositoryImpl @Inject constructor(
-    private val firestore: FirebaseFirestore  // ✅ 주석 해제 및 실제 의존성 추가
+    private val firestore: FirebaseFirestore
 ) : ReviewScheduleRepository {
 
     private fun scheduleCollection(uid: String) =
@@ -30,9 +32,15 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
     override fun getReviewSchedulesByDateRange(
         uid: String, startDate: String, endDate: String
     ): Flow<List<ReviewSchedule>> = callbackFlow {
+        // ✅ 수정: "scheduledDate" 문자열 필드 → "reviewDate" epoch ms Long 필드로 통일
+        // startDate / endDate ("yyyy-MM-dd") → epoch milliseconds (Asia/Seoul 기준)
+        val zone = ZoneId.of("Asia/Seoul")
+        val startEpoch = LocalDate.parse(startDate).atStartOfDay(zone).toInstant().toEpochMilli()
+        val endEpoch = LocalDate.parse(endDate).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
+
         val listener = scheduleCollection(uid)
-            .whereGreaterThanOrEqualTo("scheduledDate", startDate)
-            .whereLessThanOrEqualTo("scheduledDate", endDate)
+            .whereGreaterThanOrEqualTo("reviewDate", startEpoch)
+            .whereLessThanOrEqualTo("reviewDate", endEpoch)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) { close(error); return@addSnapshotListener }
                 val list = snapshot?.toObjects(ReviewSchedule::class.java) ?: emptyList()
@@ -44,8 +52,8 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
     override fun getTodayReviewSchedules(uid: String): Flow<List<ReviewSchedule>> =
         getReviewSchedulesByDateRange(
             uid,
-            java.time.LocalDate.now().toString(),
-            java.time.LocalDate.now().toString()
+            LocalDate.now().toString(),
+            LocalDate.now().toString()
         )
 
     override fun getOverdueAndIncompleteSchedules(uid: String): Flow<List<ReviewSchedule>> =
