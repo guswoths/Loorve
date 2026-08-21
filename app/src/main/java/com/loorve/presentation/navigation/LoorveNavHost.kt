@@ -24,6 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.firebase.auth.FirebaseAuth
+import com.loorve.presentation.calendar.ReviewCalendarScreen   // ← 추가
 import com.loorve.presentation.exam.ExamSettingScreen
 import com.loorve.presentation.home.HomeScreen
 import com.loorve.presentation.login.LoginScreen
@@ -41,9 +42,10 @@ sealed class Screen(val route: String) {
     object ProgressDetail : Screen("progress_detail/{progressId}") {
         fun createRoute(progressId: String) = "progress_detail/$progressId"
     }
+    object Calendar       : Screen("calendar")   // ← 작업 1: 라우트 추가
 }
 
-// ─── 스플래시 Composable (NavHost 바깥에 top-level로 선언) ──────────────
+// ─── 스플래시 Composable ────────────────────────────────────────────────
 @Composable
 private fun SplashScreen(
     onSplashComplete: (isLoggedIn: Boolean) -> Unit
@@ -90,7 +92,7 @@ fun LoorveNavHost(
             SplashScreen(
                 onSplashComplete = { isLoggedIn: Boolean ->
                     val destination = if (isLoggedIn) Screen.Home.route
-                                     else Screen.Onboarding.route
+                    else Screen.Onboarding.route
                     navController.navigate(destination) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
                     }
@@ -136,6 +138,9 @@ fun LoorveNavHost(
             HomeScreen(
                 onNavigateToProgressDetail = { progressId ->
                     navController.navigate(Screen.ProgressDetail.createRoute(progressId))
+                },
+                onNavigateToCalendar = {               // ← 작업 3: 콜백 연결
+                    navController.navigate(Screen.Calendar.route)
                 }
             )
         }
@@ -147,8 +152,18 @@ fun LoorveNavHost(
         ) { backStackEntry ->
             val progressId = backStackEntry.arguments?.getString("progressId") ?: return@composable
             ProgressDetailScreen(
-                progressId     = progressId,
-                onNavigateBack = { navController.popBackStack() }
+                progressId           = progressId,
+                onNavigateBack       = { navController.popBackStack() },
+                onNavigateToCalendar = {               // ← 작업 4: 캘린더 콜백 연결
+                    navController.navigate(Screen.Calendar.route)
+                }
+            )
+        }
+
+        // ── 7. 복습 캘린더 ───────────────────────────────────────────────
+        composable(Screen.Calendar.route) {            // ← 작업 1: 캘린더 composable 등록
+            ReviewCalendarScreen(
+                onNavigateBack = { navController.popBackStack() }  // ← 작업 5: 뒤로가기 전달
             )
         }
     }

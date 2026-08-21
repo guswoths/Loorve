@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange    // ← 추가
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,9 +19,11 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalMaterial3Api::class)    // ← TopAppBar 사용을 위해 추가
 @Composable
 fun HomeScreen(
-    onNavigateToProgressDetail: (progressId: String) -> Unit = {},  // ← 추가
+    onNavigateToProgressDetail: (progressId: String) -> Unit = {},
+    onNavigateToCalendar: () -> Unit = {},               // ← 작업 2: 파라미터 추가
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -41,7 +45,20 @@ fun HomeScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        topBar = {                                       // ← 작업 2: TopAppBar 추가
+            TopAppBar(
+                title = { Text("Loorve") },
+                actions = {
+                    IconButton(onClick = onNavigateToCalendar) {
+                        Icon(
+                            imageVector        = Icons.Default.DateRange,
+                            contentDescription = "복습 캘린더"
+                        )
+                    }
+                }
+            )
+        }
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -137,7 +154,6 @@ fun HomeScreen(
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                             }
-                            // ← 클릭 시 ProgressDetailScreen으로 이동
                             items(uiState.progressList) { progress ->
                                 ProgressListItem(
                                     progress  = progress,
@@ -170,7 +186,7 @@ private fun ProgressListItem(
     Card(
         modifier  = Modifier
             .fillMaxWidth()
-            .clickable { onClick() },          // ← 클릭 이벤트 연결
+            .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(

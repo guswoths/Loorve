@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack        // ← 추가
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
@@ -25,8 +26,10 @@ import java.time.LocalDate
 import java.time.YearMonth
 import androidx.compose.ui.text.style.TextDecoration
 
+@OptIn(ExperimentalMaterial3Api::class)    // ← TopAppBar 사용을 위해 추가
 @Composable
 fun ReviewCalendarScreen(
+    onNavigateBack: () -> Unit = {},                     // ← 작업 5: 파라미터 추가
     viewModel: ReviewCalendarViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -36,7 +39,6 @@ fun ReviewCalendarScreen(
         viewModel.loadCurrentMonth()
     }
 
-    // ✅ 에러 → Snackbar로 표시
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { msg ->
             snackbarHostState.showSnackbar(
@@ -49,7 +51,20 @@ fun ReviewCalendarScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        topBar = {                                       // ← 작업 5: TopAppBar 추가
+            TopAppBar(
+                title = { Text("복습 캘린더") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "뒤로가기"
+                        )
+                    }
+                }
+            )
+        }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -57,7 +72,6 @@ fun ReviewCalendarScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
-            // ✅ 로딩 → CircularProgressIndicator (중앙 오버레이)
             if (uiState.isLoading) {
                 Box(
                     modifier = Modifier
@@ -69,7 +83,7 @@ fun ReviewCalendarScreen(
             }
 
             MonthNavigationHeader(
-                yearMonth      = uiState.displayYearMonth,
+                yearMonth       = uiState.displayYearMonth,
                 onPreviousMonth = {
                     viewModel.onMonthChanged(uiState.displayYearMonth.minusMonths(1))
                 },
@@ -91,8 +105,8 @@ fun ReviewCalendarScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             SelectedDateSchedulePanel(
-                selectedDate     = uiState.selectedDate,
-                schedules        = uiState.selectedDateSchedules,
+                selectedDate       = uiState.selectedDate,
+                schedules          = uiState.selectedDateSchedules,
                 onCompleteSchedule = { viewModel.onCompleteSchedule(it) },
                 onToggleCompletion = { scheduleId, current ->
                     viewModel.toggleReviewCompletion(scheduleId, current)
@@ -164,7 +178,6 @@ private fun CalendarGrid(
     onDateSelected: (LocalDate) -> Unit
 ) {
     val firstDayOfMonth = yearMonth.atDay(1)
-    // DayOfWeek: MON=1...SUN=7 → 일요일 시작 기준: SUN=0, MON=1...SAT=6
     val startOffset = firstDayOfMonth.dayOfWeek.value % 7
     val daysInMonth = yearMonth.lengthOfMonth()
     val totalCells = startOffset + daysInMonth
@@ -182,14 +195,14 @@ private fun CalendarGrid(
                     } else {
                         val date = yearMonth.atDay(dayNumber)
                         DateCell(
-                            day = dayNumber,
-                            isSelected = date == selectedDate,
-                            isToday = date == today,
+                            day         = dayNumber,
+                            isSelected  = date == selectedDate,
+                            isToday     = date == today,
                             hasSchedule = schedulesMap.containsKey(date),
-                            isSunday = colIndex == 0,
-                            isSaturday = colIndex == 6,
-                            onClick = { onDateSelected(date) },
-                            modifier = Modifier.weight(1f)
+                            isSunday    = colIndex == 0,
+                            isSaturday  = colIndex == 6,
+                            onClick     = { onDateSelected(date) },
+                            modifier    = Modifier.weight(1f)
                         )
                     }
                 }
@@ -211,14 +224,14 @@ private fun DateCell(
 ) {
     val bgColor = when {
         isSelected -> MaterialTheme.colorScheme.primary
-        isToday -> MaterialTheme.colorScheme.primaryContainer
-        else -> Color.Transparent
+        isToday    -> MaterialTheme.colorScheme.primaryContainer
+        else       -> Color.Transparent
     }
     val textColor = when {
-        isSelected -> MaterialTheme.colorScheme.onPrimary
-        isSunday -> MaterialTheme.colorScheme.error
-        isSaturday -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.onSurface
+        isSelected  -> MaterialTheme.colorScheme.onPrimary
+        isSunday    -> MaterialTheme.colorScheme.error
+        isSaturday  -> MaterialTheme.colorScheme.primary
+        else        -> MaterialTheme.colorScheme.onSurface
     }
 
     Column(
@@ -268,8 +281,8 @@ private fun SelectedDateSchedulePanel(
     }
 
     Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+        text     = title,
+        style    = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
         modifier = Modifier.padding(bottom = 8.dp)
     )
 
@@ -283,7 +296,7 @@ private fun SelectedDateSchedulePanel(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "이 날은 복습이 없어요 \uD83D\uDE0A",
+                text  = "이 날은 복습이 없어요 \uD83D\uDE0A",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -295,9 +308,9 @@ private fun SelectedDateSchedulePanel(
         ) {
             items(schedules) { schedule ->
                 ReviewScheduleItem(
-                    schedule = schedule,
+                    schedule   = schedule,
                     onComplete = { onCompleteSchedule(schedule.reviewScheduleId) },
-                    onToggle = { onToggleCompletion(schedule.reviewScheduleId, schedule.isCompleted) }
+                    onToggle   = { onToggleCompletion(schedule.reviewScheduleId, schedule.isCompleted) }
                 )
             }
         }
@@ -308,25 +321,22 @@ private fun SelectedDateSchedulePanel(
 private fun ReviewScheduleItem(
     schedule: ReviewSchedule,
     onComplete: () -> Unit,
-    onToggle: () -> Unit // ✅ 추가
+    onToggle: () -> Unit
 ) {
-    // ✅ 완료 여부에 따른 텍스트 스타일
     val titleStyle = if (schedule.isCompleted) {
         MaterialTheme.typography.bodyLarge.copy(
-            fontWeight = FontWeight.SemiBold,
-            textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            fontWeight      = FontWeight.SemiBold,
+            textDecoration  = TextDecoration.LineThrough,
+            color           = MaterialTheme.colorScheme.onSurfaceVariant
         )
     } else {
-        MaterialTheme.typography.bodyLarge.copy(
-            fontWeight = FontWeight.SemiBold
-        )
+        MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier  = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors( // ✅ 완료 시 배경색 변경
+        colors    = CardDefaults.cardColors(
             containerColor = if (schedule.isCompleted)
                 MaterialTheme.colorScheme.surfaceVariant
             else
@@ -338,36 +348,34 @@ private fun ReviewScheduleItem(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment     = Alignment.CenterVertically
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+                modifier          = Modifier.weight(1f)
             ) {
-                // ✅ Checkbox 활성화 + 토글 연결
                 Checkbox(
-                    checked = schedule.isCompleted,
+                    checked         = schedule.isCompleted,
                     onCheckedChange = { onToggle() }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "${schedule.reviewRound}회차 복습",
-                        style = titleStyle // ✅ strikethrough 적용
+                        text  = "${schedule.reviewRound}회차 복습",
+                        style = titleStyle
                     )
                     if (schedule.isCompleted) {
                         Text(
-                            text = "완료됨 ✅",
+                            text  = "완료됨 ✅",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
             }
-            // ✅ 미완료 시에만 "완료" 버튼 표시 (기존 유지)
             if (!schedule.isCompleted) {
                 Button(
-                    onClick = onComplete,
+                    onClick        = onComplete,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text("완료", style = MaterialTheme.typography.labelMedium)
