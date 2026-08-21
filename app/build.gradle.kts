@@ -3,7 +3,6 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    // ❌ 제거: id("org.jetbrains.kotlin.android")  ← AGP 9.0+ 에서 불필요
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
@@ -51,7 +50,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // ✅ kotlinOptions 블록 제거 후 kotlin.jvmToolchain 으로 대체
     kotlin {
         jvmToolchain(17)
     }
@@ -91,9 +89,9 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
 
-    // Hilt DI
-    implementation("com.google.dagger:hilt-android:2.51.1")
-    ksp("com.google.dagger:hilt-compiler:2.51.1")
+    // ✅ Hilt 버전을 2.51.1 → 2.59.2로 통일 (루트 build.gradle.kts와 일치)
+    implementation("com.google.dagger:hilt-android:2.59.2")
+    ksp("com.google.dagger:hilt-compiler:2.59.2")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     // Coroutines
