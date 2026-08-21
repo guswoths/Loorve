@@ -3,7 +3,7 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    // ❌ 제거: id("org.jetbrains.kotlin.android")  ← AGP 9.0+ 에서 불필요
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
@@ -51,8 +51,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    // ✅ kotlinOptions 블록 제거 후 kotlin.jvmToolchain 으로 대체
+    kotlin {
+        jvmToolchain(17)
     }
 
     buildFeatures {
@@ -65,7 +66,7 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
-}   // ← 이 닫는 중괄호가 누락되면 원인 1 에러 발생
+}
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
