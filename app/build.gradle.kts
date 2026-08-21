@@ -54,6 +54,13 @@ android {
         jvmToolchain(17)
     }
 
+    // ✅ ExperimentalFoundationApi 전역 opt-in 추가
+    kotlinOptions {
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi"
+        )
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -74,6 +81,8 @@ dependencies {
     // Core
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")
+    // ✅ collectAsStateWithLifecycle 포함
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.3")
     implementation("androidx.activity:activity-compose:1.9.0")
 
     // Compose UI
@@ -88,14 +97,24 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
+    // ✅ FCM 추가
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
-    // ✅ Hilt 버전을 2.51.1 → 2.59.2로 통일 (루트 build.gradle.kts와 일치)
+    // Hilt
     implementation("com.google.dagger:hilt-android:2.59.2")
     ksp("com.google.dagger:hilt-compiler:2.59.2")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // ✅ DataStore 추가
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // ✅ Google Credential Manager (구글 소셜 로그인)
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     // Test
     testImplementation("junit:junit:4.13.2")
