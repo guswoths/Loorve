@@ -30,79 +30,75 @@ fun ReviewCalendarScreen(
     viewModel: ReviewCalendarViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
         viewModel.loadCurrentMonth()
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp)
-    ) {
-        if (uiState.isLoading) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
-
+    // ✅ 에러 → Snackbar로 표시
+    LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { msg ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
-            ) {
-                Row(
+            snackbarHostState.showSnackbar(
+                message     = msg,
+                actionLabel = "닫기",
+                duration    = SnackbarDuration.Long
+            )
+            viewModel.onDismissError()
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp)
+        ) {
+            // ✅ 로딩 → CircularProgressIndicator (중앙 오버레이)
+            if (uiState.isLoading) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .height(4.dp)
                 ) {
-                    Text(
-                        text = msg,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = { viewModel.onDismissError() }) {
-                        Text("닫기", color = MaterialTheme.colorScheme.onErrorContainer)
-                    }
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
+
+            MonthNavigationHeader(
+                yearMonth      = uiState.displayYearMonth,
+                onPreviousMonth = {
+                    viewModel.onMonthChanged(uiState.displayYearMonth.minusMonths(1))
+                },
+                onNextMonth = {
+                    viewModel.onMonthChanged(uiState.displayYearMonth.plusMonths(1))
+                }
+            )
+
+            WeekDayHeader()
+
+            CalendarGrid(
+                yearMonth      = uiState.displayYearMonth,
+                schedulesMap   = uiState.schedulesMap,
+                selectedDate   = uiState.selectedDate,
+                today          = LocalDate.now(),
+                onDateSelected = { viewModel.onDateSelected(it) }
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            SelectedDateSchedulePanel(
+                selectedDate     = uiState.selectedDate,
+                schedules        = uiState.selectedDateSchedules,
+                onCompleteSchedule = { viewModel.onCompleteSchedule(it) },
+                onToggleCompletion = { scheduleId, current ->
+                    viewModel.toggleReviewCompletion(scheduleId, current)
+                }
+            )
         }
-
-        MonthNavigationHeader(
-            yearMonth = uiState.displayYearMonth,
-            onPreviousMonth = {
-                viewModel.onMonthChanged(uiState.displayYearMonth.minusMonths(1))
-            },
-            onNextMonth = {
-                viewModel.onMonthChanged(uiState.displayYearMonth.plusMonths(1))
-            }
-        )
-
-        WeekDayHeader()
-
-        CalendarGrid(
-            yearMonth = uiState.displayYearMonth,
-            schedulesMap = uiState.schedulesMap,
-            selectedDate = uiState.selectedDate,
-            today = LocalDate.now(),
-            onDateSelected = { viewModel.onDateSelected(it) }
-        )
-
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-        SelectedDateSchedulePanel(
-            selectedDate = uiState.selectedDate,
-            schedules = uiState.selectedDateSchedules,
-            onCompleteSchedule = { viewModel.onCompleteSchedule(it) },
-            onToggleCompletion = { scheduleId, current -> // ✅ 추가
-                viewModel.toggleReviewCompletion(scheduleId, current)
-            }
-        )
     }
 }
 
@@ -287,7 +283,7 @@ private fun SelectedDateSchedulePanel(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "이 날은 복습 일정이 없어요",
+                text = "이 날은 복습이 없어요 \uD83D\uDE0A",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

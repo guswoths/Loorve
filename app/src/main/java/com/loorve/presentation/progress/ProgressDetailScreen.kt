@@ -30,6 +30,7 @@ import java.time.format.DateTimeFormatter
 fun ProgressDetailScreen(
     progressId: String,
     onNavigateBack: () -> Unit,
+    onNavigateToCalendar: () -> Unit = {},
     viewModel: ProgressDetailViewModel = hiltViewModel()
 ) {
     val uid = remember { FirebaseAuth.getInstance().currentUser?.uid ?: "" }
@@ -44,12 +45,12 @@ fun ProgressDetailScreen(
         when (uiState.saveResult) {
             true -> {
                 val result = snackbarHostState.showSnackbar(
-                    message    = "저장되었습니다 ✓",
-                    actionLabel = "다시 수정",
-                    duration   = SnackbarDuration.Short
+                    message    = "복습 일정 5개가 생성되었습니다 📅",
+                    actionLabel = "캘린더 확인",
+                    duration   = SnackbarDuration.Long
                 )
                 if (result == SnackbarResult.ActionPerformed) {
-                    viewModel.enterEditMode()   // 다시 수정 클릭 시 편집 모드 재진입
+                    onNavigateToCalendar()   // ✅ 캘린더로 이동
                 }
                 viewModel.consumeSaveResult()
             }
@@ -86,7 +87,8 @@ fun ProgressDetailScreen(
         onSave            = { updated -> viewModel.saveProgress(uid, updated) },
         onDelete          = { viewModel.deleteProgress(uid, progressId) },
         onRetry           = { viewModel.loadProgress(uid, progressId) },   // ← 쉼표 추가
-        onEditChanged     = { c, cc, tc, ic -> viewModel.onEditChanged(c, cc, tc, ic) }
+        onEditChanged     = { c, cc, tc, ic -> viewModel.onEditChanged(c, cc, tc, ic) },
+        onNavigateToCalendar = onNavigateToCalendar
     )
 }
 
@@ -278,7 +280,11 @@ private fun ProgressDetailContent(
                             onIsCompletedChange    = { editIsCompleted = it; onEditChanged(editContent, editCompletedCount, editTotalCount, it) }
                         )
                     } else {
-                        ProgressViewBody(progress = progress)
+                        ProgressViewBody(
+                            progress = progress,
+                            reviewDates = uiState.generatedReviewDates,
+                            onNavigateToCalendar = onNavigateToCalendar
+                        )
                     }
                 }
             }
@@ -287,14 +293,100 @@ private fun ProgressDetailContent(
 }
 
 @Composable
-private fun ProgressViewBody(progress: Progress) {
+private fun ProgressViewBody(
+    progress: Progress,
+    reviewDates: List<java.time.LocalDate> = emptyList(),   // ✅ 추가
+    onNavigateToCalendar: () -> Unit = {}                    // ✅ 추가
+) {
     val formattedDate = remember(progress.createdAt) {
         if (progress.createdAt <= 0L) "날짜 미설정"
-        else Instant.ofEpochMilli(progress.createdAt)
-            .atZone(ZoneId.of("Asia/Seoul"))
+        else java.time.Instant.ofEpochMilli(progress.createdAt)
+            .atZone(java.time.ZoneId.of("Asia/Seoul"))
             .toLocalDate()
-            .format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일"))
+            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy년 MM월 dd일"))
     }
+
+    val reviewLabels = listOf("D+1", "D+3", "D+7", "D+14", "D+30")
+
+    Column(
+        modifier            = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        ProgressInfoCard {
+            DetailRow(label = "작성일", value = formattedDate)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            DetailRow(label = "학습 내용", value = progress.content)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            DetailRow(
+                label = "완료 수 / 전체 수",
+                value = "${progress.completedCount} / ${progress.totalCount}"
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            DetailRow(
+                label = "완료 여부",
+                value = if (progress.isCompleted) "✅ 완료" else "⏳ 진행 중"
+            )
+        }
+
+        // ✅ 추가: 생성된 복습일 미리보기 카드
+        if (reviewDates.isNotEmpty()) {
+            Card(
+                modifier  = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors    = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text  = "📅 생성된 복습 일정",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    reviewDates.forEachIndexed { index, date ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text  = "${index + 1}회차 (${reviewLabels.getOrElse(index) { "" }})",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text  = date.format(
+                                    java.time.format.DateTimeFormatter.ofPattern("MM월 dd일")
+                                ),
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    // ✅ 캘린더 바로가기 버튼
+                    OutlinedButton(
+                        onClick   = onNavigateToCalendar,
+                        modifier  = Modifier.fillMaxWidth()
+                    ) {
+                        Text("캘린더에서 확인하기 →")
+                    }
+                }
+            }
+        }
+    }
+}
 
     Column(
         modifier            = Modifier

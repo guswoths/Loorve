@@ -22,7 +22,8 @@ data class ProgressDetailUiState(
     val saveResult: Boolean? = null,
     val deleteResult: Boolean? = null,
     val isDirty: Boolean = false,
-    val initialSnapshot: Progress? = null
+    val initialSnapshot: Progress? = null,
+    val generatedReviewDates: List<java.time.LocalDate> = emptyList()
 )
 
 @HiltViewModel
@@ -101,6 +102,13 @@ class ProgressDetailViewModel @Inject constructor(
             // SaveProgressAndScheduleUseCase: 진도 저장 + 복습 일정 자동 등록
             val result = saveProgressAndScheduleUseCase(uid, merged)
             if (result.isSuccess) {
+                // ✅ ForgettingCurveScheduler로 미리보기 날짜 계산 (표준 간격, UI 표시용)
+                val progressDate = java.time.Instant.ofEpochMilli(
+                    if (merged.createdAt > 0L) merged.createdAt else System.currentTimeMillis()
+                ).atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate()
+                val previewDates = com.loorve.domain.usecase.ForgettingCurveScheduler
+                    .generateReviewDates(progressDate)
+
                 _uiState.update {
                     it.copy(
                         progress        = merged,
