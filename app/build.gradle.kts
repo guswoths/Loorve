@@ -1,10 +1,10 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.devtools.ksp")
-    id("com.google.dagger.hilt.android")
-    id("com.google.gms.google-services")
+    id("com.android.application") version "..." apply false
+    id("org.jetbrains.kotlin.android") version "..." apply false
+    id("com.google.dagger.hilt.android") version "..." apply false
+    id("com.google.devtools.ksp") version "..." apply false
+
+    id("com.google.gms.google-services") version "4.5.0" apply false
 }
 
 android {
