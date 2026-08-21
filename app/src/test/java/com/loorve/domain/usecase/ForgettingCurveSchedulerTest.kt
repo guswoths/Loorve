@@ -60,4 +60,26 @@ class ForgettingCurveSchedulerTest {
         assertEquals(7, ForgettingCurveScheduler.nextInterval(3, isCompleted = false))
         assertEquals(30, ForgettingCurveScheduler.nextInterval(5, isCompleted = false))
     }
+
+    @Test
+    fun `getIntervalForRound - 유효 범위(1~5) 정확히 반환`() {
+        assertEquals(1,  ForgettingCurveScheduler.getIntervalForRound(1))
+        assertEquals(3,  ForgettingCurveScheduler.getIntervalForRound(2))
+        assertEquals(7,  ForgettingCurveScheduler.getIntervalForRound(3))
+        assertEquals(14, ForgettingCurveScheduler.getIntervalForRound(4))
+        assertEquals(30, ForgettingCurveScheduler.getIntervalForRound(5))
+    }
+
+    @Test
+    fun `getIntervalForRound - 범위 초과(0, 6)는 null 반환`() {
+        assertNull(ForgettingCurveScheduler.getIntervalForRound(0))
+        assertNull(ForgettingCurveScheduler.getIntervalForRound(6))
+    }
+
+    @Test
+    fun `nextInterval - round=0 경계 입력 시 null 반환`() {
+        // round=0은 INTERVALS[-1]에 해당하므로 null이어야 한다
+        assertNull(ForgettingCurveScheduler.nextInterval(0, isCompleted = true))
+        assertNull(ForgettingCurveScheduler.nextInterval(0, isCompleted = false))
+    }
 }

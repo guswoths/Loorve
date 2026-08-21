@@ -61,4 +61,21 @@ class ReviewScheduleGeneratorTest {
     fun `빈 originProgressId 입력 시 예외 발생`() {
         generator.generate("", studyDate)
     }
+
+    @Test
+    fun `생성된 ReviewSchedule의 isCompleted 초기값은 false이다`() {
+        val schedules = generator.generate(progressId, studyDate)
+        schedules.forEach { schedule ->
+            assertFalse("초기 isCompleted는 false여야 한다", schedule.isCompleted)
+        }
+    }
+
+    @Test
+    fun `생성 직후 createdAt과 updatedAt은 동일하다`() {
+        val schedules = generator.generate(progressId, studyDate)
+        schedules.forEach { schedule ->
+            assertEquals("초기 createdAt == updatedAt이어야 한다",
+                schedule.createdAt, schedule.updatedAt)
+        }
+    }
 }
