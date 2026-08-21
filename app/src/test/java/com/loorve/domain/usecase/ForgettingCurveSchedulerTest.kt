@@ -91,4 +91,38 @@ class ForgettingCurveSchedulerTest {
         assertEquals(5, dates.size)
         assertEquals(LocalDate.of(2027, 1, 14), dates[4]) // +30일
     }
+
+    // 추가할 테스트 케이스 (기존 테스트 클래스 내부에 추가)
+    @Test
+    fun `studyEndDate가 3일 이내이면 1회차만 반환`() {
+        val studyDate    = LocalDate.of(2026, 8, 1)
+        val studyEndDate = LocalDate.of(2026, 8, 3)   // 1일(+1), 3일(+3) 중 3일은 포함, 7일(+7)은 제외
+        val result = ForgettingCurveScheduler.generateReviewDates(studyDate, studyEndDate)
+        assertEquals(2, result.size)
+        assertEquals(LocalDate.of(2026, 8, 2), result[0])  // +1일
+        assertEquals(LocalDate.of(2026, 8, 4), result[1])  // +3일
+    }
+
+    @Test
+    fun `studyEndDate가 studyDate와 같으면 빈 리스트 반환`() {
+        val studyDate    = LocalDate.of(2026, 8, 1)
+        val studyEndDate = LocalDate.of(2026, 8, 1)
+        val result = ForgettingCurveScheduler.generateReviewDates(studyDate, studyEndDate)
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `studyEndDate가 null이면 기존 5회차 모두 반환`() {
+        val studyDate = LocalDate.of(2026, 8, 1)
+        val result    = ForgettingCurveScheduler.generateReviewDates(studyDate, null)
+        assertEquals(5, result.size)
+    }
+
+    @Test
+    fun `studyEndDate가 30일 이후이면 5회차 모두 반환`() {
+        val studyDate    = LocalDate.of(2026, 8, 1)
+        val studyEndDate = LocalDate.of(2026, 9, 30)
+        val result = ForgettingCurveScheduler.generateReviewDates(studyDate, studyEndDate)
+        assertEquals(5, result.size)
+    }
 }

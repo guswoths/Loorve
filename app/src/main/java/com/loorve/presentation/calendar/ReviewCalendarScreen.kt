@@ -1,3 +1,4 @@
+// 경로: app/src/main/java/com/loorve/presentation/calendar/ReviewCalendarScreen.kt
 package com.loorve.presentation.calendar
 
 import androidx.compose.foundation.background
@@ -7,7 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack        // ← 추가
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
@@ -18,18 +19,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.domain.model.ReviewSchedule
 import java.time.LocalDate
 import java.time.YearMonth
-import androidx.compose.ui.text.style.TextDecoration
 
-@OptIn(ExperimentalMaterial3Api::class)    // ← TopAppBar 사용을 위해 추가
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewCalendarScreen(
-    onNavigateBack: () -> Unit = {},                     // ← 작업 5: 파라미터 추가
+    onNavigateBack: () -> Unit = {},
     viewModel: ReviewCalendarViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -52,7 +53,7 @@ fun ReviewCalendarScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        topBar = {                                       // ← 작업 5: TopAppBar 추가
+        topBar = {
             TopAppBar(
                 title = { Text("복습 캘린더") },
                 navigationIcon = {
@@ -116,6 +117,9 @@ fun ReviewCalendarScreen(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MonthNavigationHeader — 기존 코드 그대로 유지
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun MonthNavigationHeader(
     yearMonth: YearMonth,
@@ -131,36 +135,39 @@ private fun MonthNavigationHeader(
     ) {
         IconButton(onClick = onPreviousMonth) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                imageVector        = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                 contentDescription = "이전 달"
             )
         }
         Text(
-            text = "${yearMonth.year}년 ${yearMonth.monthValue}월",
+            text  = "${yearMonth.year}년 ${yearMonth.monthValue}월",
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
         )
         IconButton(onClick = onNextMonth) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                imageVector        = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = "다음 달"
             )
         }
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WeekDayHeader — 기존 코드 그대로 유지
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun WeekDayHeader() {
     val days = listOf("일", "월", "화", "수", "목", "금", "토")
     Row(modifier = Modifier.fillMaxWidth()) {
         days.forEach { day ->
             Text(
-                text = day,
-                modifier = Modifier.weight(1f),
+                text      = day,
+                modifier  = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = when (day) {
-                    "일" -> MaterialTheme.colorScheme.error
-                    "토" -> MaterialTheme.colorScheme.primary
+                style     = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color     = when (day) {
+                    "일"  -> MaterialTheme.colorScheme.error
+                    "토"  -> MaterialTheme.colorScheme.primary
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
             )
@@ -169,6 +176,9 @@ private fun WeekDayHeader() {
     Spacer(modifier = Modifier.height(4.dp))
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ CalendarGrid — DateCell 호출부 파라미터 변경 (hasSchedule → schedules)
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun CalendarGrid(
     yearMonth: YearMonth,
@@ -178,10 +188,10 @@ private fun CalendarGrid(
     onDateSelected: (LocalDate) -> Unit
 ) {
     val firstDayOfMonth = yearMonth.atDay(1)
-    val startOffset = firstDayOfMonth.dayOfWeek.value % 7
-    val daysInMonth = yearMonth.lengthOfMonth()
-    val totalCells = startOffset + daysInMonth
-    val rows = (totalCells + 6) / 7
+    val startOffset     = firstDayOfMonth.dayOfWeek.value % 7
+    val daysInMonth     = yearMonth.lengthOfMonth()
+    val totalCells      = startOffset + daysInMonth
+    val rows            = (totalCells + 6) / 7
 
     Column(modifier = Modifier.fillMaxWidth()) {
         repeat(rows) { rowIndex ->
@@ -195,14 +205,14 @@ private fun CalendarGrid(
                     } else {
                         val date = yearMonth.atDay(dayNumber)
                         DateCell(
-                            day         = dayNumber,
-                            isSelected  = date == selectedDate,
-                            isToday     = date == today,
-                            hasSchedule = schedulesMap.containsKey(date),
-                            isSunday    = colIndex == 0,
-                            isSaturday  = colIndex == 6,
-                            onClick     = { onDateSelected(date) },
-                            modifier    = Modifier.weight(1f)
+                            day        = dayNumber,
+                            isSelected = date == selectedDate,
+                            isToday    = date == today,
+                            schedules  = schedulesMap[date] ?: emptyList(), // ✅ 변경
+                            isSunday   = colIndex == 0,
+                            isSaturday = colIndex == 6,
+                            onClick    = { onDateSelected(date) },
+                            modifier   = Modifier.weight(1f)
                         )
                     }
                 }
@@ -211,12 +221,16 @@ private fun CalendarGrid(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ DateCell — 핵심 변경: hasSchedule:Boolean → schedules:List<ReviewSchedule>
+//              회차별 색깔 점 Row로 표시, isSelected 시 onPrimary 통일
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun DateCell(
     day: Int,
     isSelected: Boolean,
     isToday: Boolean,
-    hasSchedule: Boolean,
+    schedules: List<ReviewSchedule>,   // ✅ Boolean → List<ReviewSchedule>
     isSunday: Boolean,
     isSaturday: Boolean,
     onClick: () -> Unit,
@@ -228,10 +242,24 @@ private fun DateCell(
         else       -> Color.Transparent
     }
     val textColor = when {
-        isSelected  -> MaterialTheme.colorScheme.onPrimary
-        isSunday    -> MaterialTheme.colorScheme.error
-        isSaturday  -> MaterialTheme.colorScheme.primary
-        else        -> MaterialTheme.colorScheme.onSurface
+        isSelected -> MaterialTheme.colorScheme.onPrimary
+        isSunday   -> MaterialTheme.colorScheme.error
+        isSaturday -> MaterialTheme.colorScheme.primary
+        else       -> MaterialTheme.colorScheme.onSurface
+    }
+
+    // ✅ 회차별 색상 정의 (index 0~4 = 1~5회차)
+    // isSelected=true 이면 모든 점을 onPrimary로 통일
+    @Composable
+    fun roundColor(roundIndex: Int): Color {
+        if (isSelected) return MaterialTheme.colorScheme.onPrimary
+        return when (roundIndex) {
+            0    -> MaterialTheme.colorScheme.error      // 1회차: 빨강
+            1    -> MaterialTheme.colorScheme.tertiary   // 2회차: 초록/청록
+            2    -> MaterialTheme.colorScheme.primary    // 3회차: 파랑
+            3    -> Color(0xFFFF9800)                    // 4회차: 주황
+            else -> MaterialTheme.colorScheme.secondary  // 5회차+: 보라 계열
+        }
     }
 
     Column(
@@ -244,29 +272,56 @@ private fun DateCell(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        // ── 날짜 숫자 ──
         Text(
-            text = day.toString(),
+            text  = day.toString(),
             style = MaterialTheme.typography.bodySmall.copy(
                 fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 13.sp
+                fontSize   = 13.sp
             ),
             color = textColor
         )
-        if (hasSchedule) {
+
+        // ── 색깔 점 표시 ──
+        if (schedules.isNotEmpty()) {
             Spacer(modifier = Modifier.height(2.dp))
-            Box(
-                modifier = Modifier
-                    .size(4.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.tertiary
+
+            // reviewRound 오름차순 정렬 → 최대 3개만 표시
+            val sortedSchedules  = schedules.sortedBy { it.reviewRound }
+            val displaySchedules = sortedSchedules.take(3)
+            val hasMore          = sortedSchedules.size > 3
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                displaySchedules.forEach { schedule ->
+                    // reviewRound는 1-based → 색상 배열 index로 변환
+                    val roundIndex = (schedule.reviewRound - 1).coerceIn(0, 4)
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp)
+                            .clip(CircleShape)
+                            .background(roundColor(roundIndex))
                     )
-            )
+                }
+                // ✅ 3개 초과 시 추가 점 1개 더 표시 (5회차 색상 사용)
+                if (hasMore) {
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp)
+                            .clip(CircleShape)
+                            .background(roundColor(4))
+                    )
+                }
+            }
         }
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SelectedDateSchedulePanel — 기존 코드 그대로 유지
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun SelectedDateSchedulePanel(
     selectedDate: LocalDate?,
@@ -290,7 +345,7 @@ private fun SelectedDateSchedulePanel(
 
     if (schedules.isEmpty()) {
         Box(
-            modifier = Modifier
+            modifier         = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 24.dp),
             contentAlignment = Alignment.Center
@@ -304,7 +359,7 @@ private fun SelectedDateSchedulePanel(
     } else {
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(bottom = 16.dp)
+            contentPadding      = PaddingValues(bottom = 16.dp)
         ) {
             items(schedules) { schedule ->
                 ReviewScheduleItem(
@@ -317,6 +372,9 @@ private fun SelectedDateSchedulePanel(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ReviewScheduleItem — 기존 코드 그대로 유지
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun ReviewScheduleItem(
     schedule: ReviewSchedule,
@@ -325,9 +383,9 @@ private fun ReviewScheduleItem(
 ) {
     val titleStyle = if (schedule.isCompleted) {
         MaterialTheme.typography.bodyLarge.copy(
-            fontWeight      = FontWeight.SemiBold,
-            textDecoration  = TextDecoration.LineThrough,
-            color           = MaterialTheme.colorScheme.onSurfaceVariant
+            fontWeight     = FontWeight.SemiBold,
+            textDecoration = TextDecoration.LineThrough,
+            color          = MaterialTheme.colorScheme.onSurfaceVariant
         )
     } else {
         MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)

@@ -4,5 +4,6 @@ data class Exam(
     val id: String = "",
     val subjectName: String = "",
     val examDate: Long = 0L,
-    val createdBy: String = ""   // Firestore 보안 규칙용 소유자 uid
+    val studyEndDate: Long = 0L,   // 학습 종료일 (epoch ms, KST 자정 기준). 0이면 미설정
+    val createdBy: String = ""
 )

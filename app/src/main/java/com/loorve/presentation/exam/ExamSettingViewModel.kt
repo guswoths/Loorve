@@ -1,4 +1,3 @@
-// 경로: app/src/main/java/com/loorve/presentation/exam/ExamSettingViewModel.kt
 package com.loorve.presentation.exam
 
 import androidx.lifecycle.ViewModel
@@ -23,12 +22,13 @@ import javax.inject.Inject
 data class ExamSettingUiState(
     val subjectName: String = "",
     val examDate: Long = 0L,
+    val studyEndDate: Long = 0L,          // 추가: 학습 종료일
     val dDayText: String = "",
+    val studyEndDateError: String? = null, // 추가: 유효성 오류 메시지
     val isLoading: Boolean = false,
     val errorMessage: String? = null
 )
 
-// 저장 완료 이벤트는 SharedFlow로 분리 (ONE-SHOT 보장)
 sealed class ExamSettingEvent {
     object SaveSuccess : ExamSettingEvent()
 }
@@ -41,7 +41,6 @@ class ExamSettingViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ExamSettingUiState())
     val uiState: StateFlow<ExamSettingUiState> = _uiState.asStateFlow()
 
-    // replay=0 → 한 번만 소비, 재구독 시 재전달 없음
     private val _events = MutableSharedFlow<ExamSettingEvent>(replay = 0)
     val events: SharedFlow<ExamSettingEvent> = _events.asSharedFlow()
 
@@ -50,26 +49,43 @@ class ExamSettingViewModel @Inject constructor(
     }
 
     fun onExamDateSelected(epochMillis: Long) {
-        _uiState.update {
-            it.copy(
-                examDate  = epochMillis,
-                dDayText  = calculateDDay(epochMillis)
+        _uiState.update { current ->
+            val newStudyEndDateError = validateStudyEndDate(current.studyEndDate, epochMillis)
+            current.copy(
+                examDate          = epochMillis,
+                dDayText          = calculateDDay(epochMillis),
+                studyEndDateError = newStudyEndDateError
+            )
+        }
+    }
+
+    fun onStudyEndDateSelected(epochMs: Long) {
+        _uiState.update { current ->
+            val error = validateStudyEndDate(epochMs, current.examDate)
+            current.copy(
+                studyEndDate      = epochMs,
+                studyEndDateError = error
             )
         }
     }
 
     fun saveExam() {
         val state = _uiState.value
-        if (state.isLoading) return          // 중복 클릭 방지
+        if (state.isLoading) return
+
+        // 학습 종료일이 설정됐는데 오류가 있으면 저장 차단
+        if (state.studyEndDate != 0L && state.studyEndDateError != null) return
+
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
         viewModelScope.launch {
             try {
                 val result = addExamUseCase(
                     Exam(
-                        id          = "",   // ✅ 신규 생성이므로 빈 문자열 (Firestore가 ID 부여)
-                        subjectName = state.subjectName,
-                        examDate    = state.examDate
+                        id           = "",
+                        subjectName  = state.subjectName,
+                        examDate     = state.examDate,
+                        studyEndDate = state.studyEndDate   // 추가
                     )
                 )
                 result.fold(
@@ -99,6 +115,15 @@ class ExamSettingViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    /**
+     * 학습 종료일 유효성 검사: studyEndDate < examDate 조건
+     * @return 오류 메시지(null이면 유효)
+     */
+    private fun validateStudyEndDate(studyEndDate: Long, examDate: Long): String? {
+        if (studyEndDate <= 0L || examDate <= 0L) return null
+        return if (studyEndDate >= examDate) "학습 종료일은 시험일보다 이전이어야 합니다." else null
     }
 
     private fun calculateDDay(epochMillis: Long): String {
