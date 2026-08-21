@@ -1,3 +1,4 @@
+// app/src/test/java/com/loorve/domain/usecase/ForgettingCurveSchedulerTest.kt
 package com.loorve.domain.usecase
 
 import org.junit.Assert.*
@@ -42,9 +43,8 @@ class ForgettingCurveSchedulerTest {
 
     @Test
     fun `복습 완료 시 다음 단계 intervalDays 반환`() {
-        // round=1 완료 → 2회차 간격(3) 반환
-        assertEquals(3, ForgettingCurveScheduler.nextInterval(1, isCompleted = true))
-        assertEquals(7, ForgettingCurveScheduler.nextInterval(2, isCompleted = true))
+        assertEquals(3,  ForgettingCurveScheduler.nextInterval(1, isCompleted = true))
+        assertEquals(7,  ForgettingCurveScheduler.nextInterval(2, isCompleted = true))
         assertEquals(14, ForgettingCurveScheduler.nextInterval(3, isCompleted = true))
         assertEquals(30, ForgettingCurveScheduler.nextInterval(4, isCompleted = true))
     }
@@ -56,8 +56,8 @@ class ForgettingCurveSchedulerTest {
 
     @Test
     fun `복습 미완료 시 동일 intervalDays 재반환`() {
-        assertEquals(1, ForgettingCurveScheduler.nextInterval(1, isCompleted = false))
-        assertEquals(7, ForgettingCurveScheduler.nextInterval(3, isCompleted = false))
+        assertEquals(1,  ForgettingCurveScheduler.nextInterval(1, isCompleted = false))
+        assertEquals(7,  ForgettingCurveScheduler.nextInterval(3, isCompleted = false))
         assertEquals(30, ForgettingCurveScheduler.nextInterval(5, isCompleted = false))
     }
 
@@ -76,10 +76,19 @@ class ForgettingCurveSchedulerTest {
         assertNull(ForgettingCurveScheduler.getIntervalForRound(6))
     }
 
+    // ✅ 수정: round=0 isCompleted=true는 round=1을 다음으로 보므로 1 반환
     @Test
-    fun `nextInterval - round=0 경계 입력 시 null 반환`() {
-        // round=0은 INTERVALS[-1]에 해당하므로 null이어야 한다
-        assertNull(ForgettingCurveScheduler.nextInterval(0, isCompleted = true))
+    fun `nextInterval - round=0 경계 입력 시 isCompleted=true는 1 반환, false는 null 반환`() {
+        assertEquals(1,  ForgettingCurveScheduler.nextInterval(0, isCompleted = true))
         assertNull(ForgettingCurveScheduler.nextInterval(0, isCompleted = false))
+    }
+
+    // ✅ 추가: 연말 경계 테스트
+    @Test
+    fun `연말 경계에서 studyDate가 12월이면 다음해 날짜를 올바르게 반환한다`() {
+        val yearEndDate = LocalDate.of(2026, 12, 15)
+        val dates = ForgettingCurveScheduler.generateReviewDates(yearEndDate)
+        assertEquals(5, dates.size)
+        assertEquals(LocalDate.of(2027, 1, 14), dates[4]) // +30일
     }
 }

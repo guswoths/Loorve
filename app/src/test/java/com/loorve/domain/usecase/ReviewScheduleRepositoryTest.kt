@@ -188,4 +188,32 @@ class ReviewScheduleRepositoryTest {
             result.exceptionOrNull() is NoSuchElementException
         )
     }
+
+
+    // ─────────────────────────────────────────────────────────
+    // createReviewSchedule() — SaveProgressAndScheduleUseCase가 실제로 호출하는 단건 저장
+    // ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `createReviewSchedule() - 단건 저장 성공`() = runTest {
+        val schedule = makeSchedules().first()
+        coEvery { repository.createReviewSchedule(uid, schedule) } returns Result.success(Unit)
+
+        val result = repository.createReviewSchedule(uid, schedule)
+
+        assertTrue("단건 저장 성공 시 Result.success여야 한다", result.isSuccess)
+        coVerify(exactly = 1) { repository.createReviewSchedule(uid, schedule) }
+    }
+
+    @Test
+    fun `createReviewSchedule() - Firestore 오류 시 Result_failure 반환`() = runTest {
+        val schedule = makeSchedules().first()
+        val exception = RuntimeException("Firestore 단건 저장 실패")
+        coEvery { repository.createReviewSchedule(uid, schedule) } returns Result.failure(exception)
+
+        val result = repository.createReviewSchedule(uid, schedule)
+
+        assertTrue("단건 저장 실패 시 Result.failure여야 한다", result.isFailure)
+        assertEquals("Firestore 단건 저장 실패", result.exceptionOrNull()?.message)
+    }
 }

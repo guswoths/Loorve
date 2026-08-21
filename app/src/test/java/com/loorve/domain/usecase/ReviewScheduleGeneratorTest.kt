@@ -71,9 +71,10 @@ class ReviewScheduleGeneratorTest {
     }
 
     @Test
-    fun `생성 직후 createdAt과 updatedAt은 동일하다`() {
+    fun `생성 직후 createdAt과 updatedAt은 동일하고 양수이다`() {
         val schedules = generator.generate(progressId, studyDate)
         schedules.forEach { schedule ->
+            assertTrue("createdAt은 양수여야 한다", schedule.createdAt > 0L)
             assertEquals("초기 createdAt == updatedAt이어야 한다",
                 schedule.createdAt, schedule.updatedAt)
         }
