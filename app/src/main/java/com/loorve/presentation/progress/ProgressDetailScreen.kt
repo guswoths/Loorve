@@ -50,11 +50,10 @@ fun ProgressDetailScreen(
                     duration   = SnackbarDuration.Long
                 )
                 if (result == SnackbarResult.ActionPerformed) {
-                    onNavigateToCalendar()   // ✅ 캘린더로 이동
+                    onNavigateToCalendar()
                 }
                 viewModel.consumeSaveResult()
             }
-
             false -> {
                 snackbarHostState.showSnackbar("저장에 실패했습니다. 다시 시도해 주세요.")
                 viewModel.consumeSaveResult()
@@ -79,15 +78,15 @@ fun ProgressDetailScreen(
     }
 
     ProgressDetailContent(
-        uiState           = uiState,
-        snackbarHostState = snackbarHostState,
-        onNavigateBack    = onNavigateBack,
-        onEnterEditMode   = { viewModel.enterEditMode() },
-        onExitEditMode    = { viewModel.exitEditMode() },
-        onSave            = { updated -> viewModel.saveProgress(uid, updated) },
-        onDelete          = { viewModel.deleteProgress(uid, progressId) },
-        onRetry           = { viewModel.loadProgress(uid, progressId) },   // ← 쉼표 추가
-        onEditChanged     = { c, cc, tc, ic -> viewModel.onEditChanged(c, cc, tc, ic) },
+        uiState              = uiState,
+        snackbarHostState    = snackbarHostState,
+        onNavigateBack       = onNavigateBack,
+        onEnterEditMode      = { viewModel.enterEditMode() },
+        onExitEditMode       = { viewModel.exitEditMode() },
+        onSave               = { updated -> viewModel.saveProgress(uid, updated) },
+        onDelete             = { viewModel.deleteProgress(uid, progressId) },
+        onRetry              = { viewModel.loadProgress(uid, progressId) },
+        onEditChanged        = { c, cc, tc, ic -> viewModel.onEditChanged(c, cc, tc, ic) },
         onNavigateToCalendar = onNavigateToCalendar
     )
 }
@@ -102,8 +101,9 @@ private fun ProgressDetailContent(
     onExitEditMode: () -> Unit,
     onSave: (Progress) -> Unit,
     onDelete: () -> Unit,
-    onRetry: () -> Unit,                                              // ← 쉼표 추가
-    onEditChanged: (String, String, String, Boolean) -> Unit
+    onRetry: () -> Unit,
+    onEditChanged: (String, String, String, Boolean) -> Unit,
+    onNavigateToCalendar: () -> Unit = {}   // ✅ 원인2 수정: 파라미터 추가
 ) {
     var editContent        by remember { mutableStateOf("") }
     var editCompletedCount by remember { mutableStateOf("") }
@@ -124,7 +124,6 @@ private fun ProgressDetailContent(
     var showExitConfirmDialog by remember { mutableStateOf(false) }
     var showDeleteDialog      by remember { mutableStateOf(false) }
 
-    // 시스템 뒤로가기 처리
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     DisposableEffect(uiState.isEditMode, uiState.isDirty) {
         val callback = object : OnBackPressedCallback(enabled = uiState.isEditMode) {
@@ -137,7 +136,6 @@ private fun ProgressDetailContent(
         onDispose { callback.remove() }
     }
 
-    // 미저장 경고 다이얼로그
     if (showExitConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showExitConfirmDialog = false },
@@ -155,7 +153,6 @@ private fun ProgressDetailContent(
         )
     }
 
-    // 삭제 확인 다이얼로그
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -281,8 +278,8 @@ private fun ProgressDetailContent(
                         )
                     } else {
                         ProgressViewBody(
-                            progress = progress,
-                            reviewDates = uiState.generatedReviewDates,
+                            progress             = progress,
+                            reviewDates          = uiState.generatedReviewDates,
                             onNavigateToCalendar = onNavigateToCalendar
                         )
                     }
@@ -292,11 +289,12 @@ private fun ProgressDetailContent(
     }
 }
 
+// ✅ 원인1 수정: 이중 삽입된 Column 블록 제거 후 올바른 단일 함수 본문 유지
 @Composable
 private fun ProgressViewBody(
     progress: Progress,
-    reviewDates: List<java.time.LocalDate> = emptyList(),   // ✅ 추가
-    onNavigateToCalendar: () -> Unit = {}                    // ✅ 추가
+    reviewDates: List<java.time.LocalDate> = emptyList(),
+    onNavigateToCalendar: () -> Unit = {}
 ) {
     val formattedDate = remember(progress.createdAt) {
         if (progress.createdAt <= 0L) "날짜 미설정"
@@ -331,7 +329,6 @@ private fun ProgressViewBody(
             )
         }
 
-        // ✅ 추가: 생성된 복습일 미리보기 카드
         if (reviewDates.isNotEmpty()) {
             Card(
                 modifier  = Modifier.fillMaxWidth(),
@@ -375,7 +372,6 @@ private fun ProgressViewBody(
                         }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    // ✅ 캘린더 바로가기 버튼
                     OutlinedButton(
                         onClick   = onNavigateToCalendar,
                         modifier  = Modifier.fillMaxWidth()
@@ -386,31 +382,7 @@ private fun ProgressViewBody(
             }
         }
     }
-}
-
-    Column(
-        modifier            = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        ProgressInfoCard {
-            DetailRow(label = "작성일", value = formattedDate)
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            DetailRow(label = "학습 내용", value = progress.content)
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            DetailRow(
-                label = "완료 수 / 전체 수",
-                value = "${progress.completedCount} / ${progress.totalCount}"
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            DetailRow(
-                label = "완료 여부",
-                value = if (progress.isCompleted) "✅ 완료" else "⏳ 진행 중"
-            )
-        }
-    }
+    // ✅ ProgressViewBody 닫는 괄호 (중복 Column 블록 완전 삭제)
 }
 
 @Composable
@@ -494,6 +466,7 @@ private fun ProgressEditBody(
     }
 }
 
+// ✅ 원인3 수정: Preview에 onNavigateToCalendar 인자 추가
 @Preview(showBackground = true, name = "뷰 모드 Preview")
 @Composable
 private fun ProgressDetailContentViewModePreview() {
@@ -513,14 +486,15 @@ private fun ProgressDetailContentViewModePreview() {
                 isLoading = false,
                 isEditMode = false
             ),
-            snackbarHostState = SnackbarHostState(),
-            onNavigateBack    = {},
-            onEnterEditMode   = {},
-            onExitEditMode    = {},
-            onSave            = {},
-            onDelete          = {},
-            onRetry           = {},
-            onEditChanged     = { _, _, _, _ -> }   // ← Preview용 빈 람다 추가
+            snackbarHostState    = SnackbarHostState(),
+            onNavigateBack       = {},
+            onEnterEditMode      = {},
+            onExitEditMode       = {},
+            onSave               = {},
+            onDelete             = {},
+            onRetry              = {},
+            onEditChanged        = { _, _, _, _ -> },
+            onNavigateToCalendar = {}
         )
     }
 }
@@ -544,14 +518,15 @@ private fun ProgressDetailContentEditModePreview() {
                 isLoading  = false,
                 isEditMode = true
             ),
-            snackbarHostState = SnackbarHostState(),
-            onNavigateBack    = {},
-            onEnterEditMode   = {},
-            onExitEditMode    = {},
-            onSave            = {},
-            onDelete          = {},
-            onRetry           = {},
-            onEditChanged     = { _, _, _, _ -> }   // ← Preview용 빈 람다 추가
+            snackbarHostState    = SnackbarHostState(),
+            onNavigateBack       = {},
+            onEnterEditMode      = {},
+            onExitEditMode       = {},
+            onSave               = {},
+            onDelete             = {},
+            onRetry              = {},
+            onEditChanged        = { _, _, _, _ -> },
+            onNavigateToCalendar = {}
         )
     }
 }
