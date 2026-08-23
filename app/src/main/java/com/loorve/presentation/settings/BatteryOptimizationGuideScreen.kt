@@ -12,7 +12,7 @@ import android.provider.Settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.Warning  // ← BatteryAlert 대체
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -119,14 +119,6 @@ private fun getBatteryGuideInfo(manufacturer: Manufacturer): BatteryGuideInfo {
 
 // ─── Intent 처리 (3단계 폴백) ─────────────────────────────────────────────────
 
-/**
- * 배터리 최적화 예외 등록 시스템 설정으로 이동.
- *
- * 시도 순서:
- * 1. ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS — 직접 예외 요청
- * 2. ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS — 배터리 최적화 목록
- * 3. ACTION_APPLICATION_DETAILS_SETTINGS         — 앱 정보 화면 (최후 폴백)
- */
 fun launchBatteryOptimizationSettings(context: Context) {
     val packageUri = Uri.parse("package:${context.packageName}")
 
@@ -135,13 +127,9 @@ fun launchBatteryOptimizationSettings(context: Context) {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
             true
-        } catch (e: ActivityNotFoundException) {
-            false
-        } catch (e: SecurityException) {
-            false
-        } catch (e: Exception) {
-            false
-        }
+        } catch (e: ActivityNotFoundException) { false
+        } catch (e: SecurityException) { false
+        } catch (e: Exception) { false }
     }
 
     val direct = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
@@ -160,16 +148,6 @@ fun launchBatteryOptimizationSettings(context: Context) {
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-/**
- * 배터리 최적화 예외 등록 가이드 화면.
- *
- * [변경점]
- * - isIgnoring: derivedStateOf → LaunchedEffect(lifecycleState == RESUMED) 로 교체.
- *   사용자가 시스템 설정 후 돌아오면 즉시 재확인하여 UI 갱신.
- *
- * @param onNavigateBack 상단 뒤로가기 버튼 클릭 콜백
- * @param onSkip         [나중에] 버튼 클릭 콜백
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BatteryOptimizationGuideScreen(
@@ -178,9 +156,6 @@ fun BatteryOptimizationGuideScreen(
 ) {
     val context = LocalContext.current
 
-    // ── onResume 재확인 로직 ───────────────────────────────────────────────
-    // lifecycleState가 RESUMED로 전환될 때마다 PowerManager를 재조회하여
-    // 시스템 설정 복귀 후에도 즉시 최신 상태를 반영합니다.
     val lifecycleOwner = LocalLifecycleOwner.current
     val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow
         .collectAsStateWithLifecycle()
@@ -193,11 +168,10 @@ fun BatteryOptimizationGuideScreen(
                 val pm = context.getSystemService<PowerManager>()
                 pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false
             } else {
-                true // M 미만은 배터리 최적화 개념 없음 → 항상 허용 상태로 간주
+                true
             }
         }
     }
-    // ─────────────────────────────────────────────────────────────────────
 
     val manufacturer = remember { detectManufacturer() }
     val guideInfo = remember(manufacturer) { getBatteryGuideInfo(manufacturer) }
@@ -226,7 +200,7 @@ fun BatteryOptimizationGuideScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.BatteryAlert,
+                imageVector = Icons.Default.Warning,  // ← BatteryAlert → Warning 교체
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(64.dp)
@@ -247,7 +221,6 @@ fun BatteryOptimizationGuideScreen(
 
 // ─── 내부 서브 Composable ────────────────────────────────────────────────────
 
-/** 이미 배터리 최적화 예외로 등록된 경우 표시되는 카드 */
 @Composable
 private fun AlreadyExemptCard(onNavigateBack: () -> Unit) {
     Card(
@@ -275,7 +248,6 @@ private fun AlreadyExemptCard(onNavigateBack: () -> Unit) {
         }
     }
     Spacer(modifier = Modifier.height(16.dp))
-    // 완료 상태에서 자동으로 뒤로 이동하는 버튼 제공
     Button(
         onClick = onNavigateBack,
         modifier = Modifier.fillMaxWidth()
@@ -284,58 +256,65 @@ private fun AlreadyExemptCard(onNavigateBack: () -> Unit) {
     }
 }
 
-/** 안내 문구 + 설정 이동 버튼 조합 */
 @Composable
 private fun GuideContent(
     guideInfo: BatteryGuideInfo,
     onLaunchSettings: () -> Unit,
     onSkip: () -> Unit
 ) {
-    Text(
-        text = "배터리 최적화가 활성화되어 있으면\n" +
-                "복습 알림이 차단될 수 있습니다.\n" +
-                "아래 경로를 따라 예외로 등록해 주세요.",
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+    // ── weight() 오류 수정: Column 스코프 내부로 이동 ──────────────────────
+    Column(
+        modifier = Modifier.fillMaxHeight(),  // ← fillMaxHeight로 공간 확보
+        verticalArrangement = Arrangement.SpaceBetween  // ← weight 대신 SpaceBetween 사용
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(
-                text = guideInfo.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
+                text = "배터리 최적화가 활성화되어 있으면\n" +
+                        "복습 알림이 차단될 수 있습니다.\n" +
+                        "아래 경로를 따라 예외로 등록해 주세요.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            guideInfo.steps.forEachIndexed { index, step ->
-                Text(
-                    text = "${index + 1}. $step",
-                    style = MaterialTheme.typography.bodyMedium
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = guideInfo.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    guideInfo.steps.forEachIndexed { index, step ->
+                        Text(
+                            text = "${index + 1}. $step",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
             }
         }
-    }
 
-    Spacer(modifier = Modifier.weight(1f))
-
-    Button(
-        onClick = onLaunchSettings,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text("지금 설정하기")
-    }
-
-    TextButton(
-        onClick = onSkip,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text("나중에")
+        // ── 버튼 영역 (하단 고정) ─────────────────────────────────────────
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Button(
+                onClick = onLaunchSettings,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("지금 설정하기")
+            }
+            TextButton(
+                onClick = onSkip,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("나중에")
+            }
+        }
     }
 }
