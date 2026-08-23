@@ -123,6 +123,19 @@ class ReviewAlarmScheduler @Inject constructor(
         Log.d(TAG, "[CANCEL] Alarm cancelled: id=$reviewScheduleId")
     }
 
+    /**
+     * 로그아웃 시 호출 — 전달받은 ID 목록의 알람 전체 취소.
+     * UseCase에서 Firestore/로컬 캐시의 미완료 일정 ID를 수집하여 전달.
+     *
+     * @param reviewScheduleIds 취소할 복습 일정 ID 목록
+     */
+    fun cancelAll(reviewScheduleIds: List<String>) {
+        reviewScheduleIds.forEach { id ->
+            cancelReviewAlarm(id)
+        }
+        Log.d(TAG, "[CANCEL_ALL] ${reviewScheduleIds.size}개 알람 취소 완료")
+    }
+
     private fun buildPendingIntent(reviewScheduleId: String): PendingIntent? {
         val intent = try {
             Intent().apply {
