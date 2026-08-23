@@ -96,4 +96,26 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override suspend fun getReviewScheduleById(
+        uid: String,
+        scheduleId: String
+    ): Result<ReviewSchedule> = runCatching {
+        firestore.collection("users").document(uid)
+            .collection("reviewSchedules").document(scheduleId)
+            .get().await()
+            .toObject(ReviewSchedule::class.java)
+            ?: error("ReviewSchedule not found: $scheduleId")
+    }
+
+    override suspend fun getReviewSchedulesByProgressId(
+        uid: String,
+        progressId: String
+    ): Result<List<ReviewSchedule>> = runCatching {
+        firestore.collection("users").document(uid)
+            .collection("reviewSchedules")
+            .whereEqualTo("originProgressId", progressId)
+            .get().await()
+            .toObjects(ReviewSchedule::class.java)
+    }
 }

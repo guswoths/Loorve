@@ -1,0 +1,75 @@
+// 신규 생성
+package com.loorve.receiver
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.loorve.MainActivity
+import com.loorve.R
+import com.loorve.data.notification.EXTRA_REVIEW_SCHEDULE_ID
+
+private const val CHANNEL_ID = "review_alarm_channel"
+private const val CHANNEL_NAME = "복습 알림"
+private const val CHANNEL_DESC = "복습 예정일에 알려드립니다."
+private const val TAG = "AlarmBroadcastReceiver"
+
+class AlarmBroadcastReceiver : BroadcastReceiver() {
+
+    override fun onReceive(context: Context, intent: Intent) {
+        val scheduleId = intent.getStringExtra(EXTRA_REVIEW_SCHEDULE_ID) ?: run {
+            Log.e(TAG, "EXTRA_REVIEW_SCHEDULE_ID가 없습니다.")
+            return
+        }
+        Log.d(TAG, "복습 알람 수신: scheduleId=$scheduleId")
+
+        ensureNotificationChannel(context)
+        showNotification(context, scheduleId)
+    }
+
+    private fun ensureNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = CHANNEL_DESC
+                enableVibration(true)
+            }
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.createNotificationChannel(channel)
+        }
+    }
+
+    private fun showNotification(context: Context, scheduleId: String) {
+        // 탭 시 MainActivity로 이동
+        val tapIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_REVIEW_SCHEDULE_ID, scheduleId)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            scheduleId.hashCode(),
+            tapIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)   // 앱 아이콘 사용 (확인 필요: 전용 알림 아이콘 권장)
+            .setContentTitle("오늘의 복습 일정이 있습니다 📚")
+            .setContentText("지금 앱을 열어 복습을 완료해 보세요!")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(scheduleId.hashCode(), notification)
+    }
+}

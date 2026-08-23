@@ -5,7 +5,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    // ❌ 아래 줄 삭제 (AGP 9.0+ 내장)
+    // id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")

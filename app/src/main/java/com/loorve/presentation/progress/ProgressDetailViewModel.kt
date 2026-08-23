@@ -1,10 +1,14 @@
+// AFTER — 전체 코드
 package com.loorve.presentation.progress
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.domain.model.Progress
 import com.loorve.domain.repository.ProgressRepository
+import com.loorve.domain.repository.ReviewScheduleRepository
+import com.loorve.domain.usecase.ForgettingCurveScheduler
 import com.loorve.domain.usecase.SaveProgressAndScheduleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +33,9 @@ data class ProgressDetailUiState(
 @HiltViewModel
 class ProgressDetailViewModel @Inject constructor(
     private val progressRepository: ProgressRepository,
-    private val saveProgressAndScheduleUseCase: SaveProgressAndScheduleUseCase
+    private val saveProgressAndScheduleUseCase: SaveProgressAndScheduleUseCase,
+    private val reviewScheduleRepository: ReviewScheduleRepository,  // ← 추가
+    private val alarmScheduler: ReviewAlarmScheduler                 // ← 추가
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProgressDetailUiState())
@@ -99,15 +105,12 @@ class ProgressDetailViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
-            // SaveProgressAndScheduleUseCase: 진도 저장 + 복습 일정 자동 등록
             val result = saveProgressAndScheduleUseCase(uid, merged)
             if (result.isSuccess) {
-                // ✅ ForgettingCurveScheduler로 미리보기 날짜 계산 (표준 간격, UI 표시용)
                 val progressDate = java.time.Instant.ofEpochMilli(
                     if (merged.createdAt > 0L) merged.createdAt else System.currentTimeMillis()
                 ).atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate()
-                val previewDates = com.loorve.domain.usecase.ForgettingCurveScheduler
-                    .generateReviewDates(progressDate)
+                ForgettingCurveScheduler.generateReviewDates(progressDate) // UI 미리보기용
 
                 _uiState.update {
                     it.copy(
@@ -140,6 +143,19 @@ class ProgressDetailViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
+            // ✅ 연결된 복습 알람 일괄 취소 (UI 응답성을 위해 비동기 처리)
+            val schedulesResult = reviewScheduleRepository
+                .getReviewSchedulesByProgressId(uid, progressId)
+            if (schedulesResult.isSuccess) {
+                schedulesResult.getOrNull()?.forEach { schedule ->
+                    alarmScheduler.cancelReviewAlarm(schedule.reviewScheduleId)
+                }
+            } else {
+                Log.w(TAG, "deleteProgress 알람 취소 실패 — 스케줄 조회 오류: " +
+                        "${schedulesResult.exceptionOrNull()?.message}")
+            }
+
+            // Progress 삭제
             val result = progressRepository.deleteProgress(uid, progressId)
             _uiState.update { it.copy(deleteResult = result.isSuccess) }
         }
@@ -161,9 +177,9 @@ class ProgressDetailViewModel @Inject constructor(
     ) {
         val snap = _uiState.value.initialSnapshot ?: return
         val dirty = snap.content != content ||
-                    snap.completedCount.toString() != completedCount ||
-                    snap.totalCount.toString() != totalCount ||
-                    snap.isCompleted != isCompleted
+                snap.completedCount.toString() != completedCount ||
+                snap.totalCount.toString() != totalCount ||
+                snap.isCompleted != isCompleted
         _uiState.update { it.copy(isDirty = dirty) }
     }
 

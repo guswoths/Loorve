@@ -1,6 +1,8 @@
+// AFTER
 package com.loorve.domain.usecase
 
 import android.util.Log
+import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.domain.model.Progress
 import com.loorve.domain.model.ReviewSchedule
 import com.loorve.domain.repository.ExamRepository
@@ -20,7 +22,8 @@ class SaveProgressAndScheduleUseCase @Inject constructor(
     private val addProgressUseCase: AddProgressUseCase,
     private val calculateReviewScheduleUseCase: CalculateReviewScheduleUseCase,
     private val reviewScheduleRepository: ReviewScheduleRepository,
-    private val examRepository: ExamRepository
+    private val examRepository: ExamRepository,
+    private val alarmScheduler: ReviewAlarmScheduler          // ← 추가
 ) {
 
     companion object {
@@ -45,23 +48,16 @@ class SaveProgressAndScheduleUseCase @Inject constructor(
                 .atZone(KST)
                 .toLocalDate()
 
-            // studyEndDate: 0L이면 null 처리 (기존 동작 유지)
             val studyEndDate: LocalDate? = if (exam.studyEndDate > 0L) {
-                Instant.ofEpochMilli(exam.studyEndDate)
-                    .atZone(KST)
-                    .toLocalDate()
-            } else {
-                null
-            }
+                Instant.ofEpochMilli(exam.studyEndDate).atZone(KST).toLocalDate()
+            } else null
 
-            // 3. 복습 예정일 계산 (studyEndDate 전달)
             val reviewDates = calculateReviewScheduleUseCase.execute(
                 progressDate = progressDate,
                 examDate     = examDate,
-                studyEndDate = studyEndDate   // 추가
+                studyEndDate = studyEndDate
             )
 
-            // 4. 각 날짜를 ReviewSchedule로 생성 후 Firestore 저장
             val now = System.currentTimeMillis()
             reviewDates.forEachIndexed { index, localDate ->
                 val reviewDateMs = localDate
@@ -83,6 +79,21 @@ class SaveProgressAndScheduleUseCase @Inject constructor(
                 if (scheduleResult.isFailure) {
                     Log.w(TAG, "복습 일정 저장 실패 (round=${index + 1}): " +
                             "${scheduleResult.exceptionOrNull()?.message}")
+                    return@forEachIndexed  // 알람 예약 없이 다음 회차로
+                }
+
+                // ✅ 알람 예약 (자정 기준 triggerAtMillis = reviewDateMs)
+                val alarmResult = alarmScheduler.scheduleReviewAlarm(
+                    reviewScheduleId = schedule.reviewScheduleId,
+                    triggerAtMillis  = reviewDateMs
+                )
+                when (alarmResult) {
+                    ReviewAlarmScheduler.ScheduleResult.FAILED ->
+                        Log.w(TAG, "알람 예약 실패 (FAILED): id=${schedule.reviewScheduleId}")
+                    ReviewAlarmScheduler.ScheduleResult.FALLBACK_INEXACT ->
+                        Log.w(TAG, "알람 비정확 폴백 (FALLBACK_INEXACT): id=${schedule.reviewScheduleId}")
+                    ReviewAlarmScheduler.ScheduleResult.EXACT ->
+                        Unit // 정상
                 }
             }
 

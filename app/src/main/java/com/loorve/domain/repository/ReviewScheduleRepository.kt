@@ -143,4 +143,26 @@ interface ReviewScheduleRepository {
      * @return 미완료 및 기한 초과 복습 일정 목록을 방출하는 [Flow]
      */
     fun getOverdueAndIncompleteSchedules(uid: String): Flow<List<ReviewSchedule>>
+
+    /**
+     * 복습 일정 단건 조회 (알람 재예약 시 reviewDate 참조용).
+     *
+     * @param uid        인증된 사용자 UID
+     * @param scheduleId 조회할 복습 일정 ID
+     * @return 성공 시 [Result.success(ReviewSchedule)], 미존재/실패 시 [Result.failure]
+     */
+    suspend fun getReviewScheduleById(uid: String, scheduleId: String): Result<ReviewSchedule>
+
+    /**
+     * 특정 진도(Progress)에 연결된 복습 일정 전체 조회.
+     * 진도 삭제 시 연결된 알람을 일괄 취소하는 데 사용.
+     *
+     * @param uid        인증된 사용자 UID
+     * @param progressId 조회 기준 originProgressId
+     * @return 성공 시 [Result.success(List<ReviewSchedule>)], 실패 시 [Result.failure]
+     */
+    suspend fun getReviewSchedulesByProgressId(
+        uid: String,
+        progressId: String
+    ): Result<List<ReviewSchedule>>
 }
