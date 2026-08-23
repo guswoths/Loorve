@@ -165,4 +165,16 @@ interface ReviewScheduleRepository {
         uid: String,
         progressId: String
     ): Result<List<ReviewSchedule>>
+
+    /**
+     * 현재 시각 이후의 미완료 복습 일정 목록을 반환합니다.
+     * 재부팅 후 알람 재등록 시 사용됩니다.
+     *
+     * @param uid 현재 로그인된 사용자 uid
+     * @param fromMillis 이 시각 이후의 일정만 조회 (Unix epoch ms)
+     */
+    suspend fun getUpcomingIncompleteSchedules(
+        uid: String,
+        fromMillis: Long
+    ): Result<List<ReviewSchedule>>
 }

@@ -118,4 +118,22 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
             .get().await()
             .toObjects(ReviewSchedule::class.java)
     }
+
+    override suspend fun getUpcomingIncompleteSchedules(
+        uid: String,
+        fromMillis: Long
+    ): Result<List<ReviewSchedule>> = runCatching {
+        val snapshot = firestore
+            .collection("users")
+            .document(uid)
+            .collection("reviewSchedules")
+            .whereEqualTo("isCompleted", false)
+            .whereGreaterThan("reviewDate", fromMillis)
+            .get()
+            .await()
+
+        snapshot.documents.mapNotNull { doc ->
+            doc.toObject(ReviewSchedule::class.java)
+        }
+    }
 }

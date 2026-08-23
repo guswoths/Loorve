@@ -8,46 +8,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- ── 필수 권한 ── -->
-    <!-- 네트워크 통신: Firebase, AdMob 등 필수 -->
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!--
-        광고 식별자 권한: AdMob 사용 시 Android 13+ 타겟에서 필수
-    -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
-
-    <!--
-        정확한 알람 예약 권한
-
-        API 31 (Android 12) ~ 32:
-        - SCHEDULE_EXACT_ALARM: 사용자가 시스템 설정에서 권한 허용 필요
-        - canScheduleExactAlarms()로 런타임 확인 후 분기 처리됨 (ReviewAlarmScheduler 참조)
-    -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-
-    <!--
-        [주의] USE_EXACT_ALARM (API 33+):
-        본래 캘린더/알람 앱 전용 권한으로, Google Play 심사 시
-        "앱이 알람/캘린더 앱임"을 증명해야 승인됩니다.
-        복습 알림 앱(Loorve)은 심사 거절 위험이 있으므로,
-        SCHEDULE_EXACT_ALARM + 사용자 권한 요청 UI 흐름(ExactAlarmPermissionScreen) 권장.
-        Play 스토어 출시 전 필요 여부를 재검토할 것.
-    -->
     <!-- <uses-permission android:name="android.permission.USE_EXACT_ALARM" /> -->
-
-    <!--
-        푸시 알림 권한 (Android 13+, API 33+)
-        targetSdk=35이므로 반드시 선언 필요.
-        런타임 요청은 MainActivity 또는 AlarmPermissionViewModel에서 처리.
-    -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- AndroidManifest.xml -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!--
-        BootReceiver 및 RECEIVE_BOOT_COMPLETED 권한은 3~4단계에서 추가 예정
-    -->
+    <!-- 재부팅 후 알람 재등록을 위한 권한 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".LoorveApplication"
@@ -62,7 +31,6 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3940256099942544~3347511713" />
 
-        <!-- ── MainActivity: 앱 진입점 ── -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -73,7 +41,6 @@
             </intent-filter>
         </activity>
 
-        <!-- ── Firebase Cloud Messaging (FCM) 서비스 ── -->
         <service
             android:name=".service.LoorveFcmService"
             android:exported="false">
@@ -82,27 +49,22 @@
             </intent-filter>
         </service>
 
-        <!--
-            AlarmBroadcastReceiver: AlarmManager 브로드캐스트 수신
-            android:exported="false": 외부 앱이 직접 트리거 불가 (보안)
-            2단계에서 실제 Receiver 클래스 생성 후 활성화.
-        -->
         <receiver
             android:name=".receiver.AlarmBroadcastReceiver"
             android:exported="false" />
 
         <!--
-            BootReceiver: 재부팅 후 알람 재등록
-            3~4단계에서 추가 예정:
-            <receiver
-                android:name=".receiver.BootReceiver"
-                android:exported="false">
-                <intent-filter>
-                    <action android:name="android.intent.action.BOOT_COMPLETED" />
-                    <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-                </intent-filter>
-            </receiver>
+            BootCompletedReceiver: 재부팅 후 AlarmManager 알람 재등록
+            android:exported="false": 외부 앱 직접 트리거 차단 (보안)
         -->
+        <receiver
+            android:name=".receiver.BootCompletedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 
