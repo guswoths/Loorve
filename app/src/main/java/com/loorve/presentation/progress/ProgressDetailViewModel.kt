@@ -1,4 +1,3 @@
-// AFTER — 전체 코드
 package com.loorve.presentation.progress
 
 import android.util.Log
@@ -6,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.domain.model.Progress
+import com.loorve.domain.model.ReviewSchedule
 import com.loorve.domain.repository.ProgressRepository
 import com.loorve.domain.repository.ReviewScheduleRepository
 import com.loorve.domain.usecase.ForgettingCurveScheduler
@@ -16,7 +16,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.UUID
 import javax.inject.Inject
+
+// ✅ 신규 추가: 복습 스케줄 설정 모드
+enum class ReviewScheduleMode {
+    FORGETTING_CURVE,  // 망각곡선 자동 설정 (D+1, D+3, D+7, D+14, D+30)
+    MANUAL             // 직접 입력
+}
 
 data class ProgressDetailUiState(
     val progress: Progress? = null,
@@ -27,15 +37,19 @@ data class ProgressDetailUiState(
     val deleteResult: Boolean? = null,
     val isDirty: Boolean = false,
     val initialSnapshot: Progress? = null,
-    val generatedReviewDates: List<java.time.LocalDate> = emptyList()
+    val generatedReviewDates: List<java.time.LocalDate> = emptyList(),
+    // ✅ 신규 추가
+    val reviewScheduleMode: ReviewScheduleMode = ReviewScheduleMode.FORGETTING_CURVE,
+    val manualReviewDateTime: Long? = null,   // epoch ms, 직접 입력 시 사용
+    val successMessage: String? = null        // Snackbar 메시지 분기용
 )
 
 @HiltViewModel
 class ProgressDetailViewModel @Inject constructor(
     private val progressRepository: ProgressRepository,
     private val saveProgressAndScheduleUseCase: SaveProgressAndScheduleUseCase,
-    private val reviewScheduleRepository: ReviewScheduleRepository,  // ← 추가
-    private val alarmScheduler: ReviewAlarmScheduler                 // ← 추가
+    private val reviewScheduleRepository: ReviewScheduleRepository,
+    private val alarmScheduler: ReviewAlarmScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProgressDetailUiState())
@@ -71,11 +85,23 @@ class ProgressDetailViewModel @Inject constructor(
     fun exitEditMode() {
         _uiState.update {
             it.copy(
-                isEditMode      = false,
-                isDirty         = false,
-                initialSnapshot = null
+                isEditMode           = false,
+                isDirty              = false,
+                initialSnapshot      = null,
+                reviewScheduleMode   = ReviewScheduleMode.FORGETTING_CURVE,
+                manualReviewDateTime = null
             )
         }
+    }
+
+    // ✅ 신규 추가: 복습 스케줄 모드 변경
+    fun onReviewScheduleModeChanged(mode: ReviewScheduleMode) {
+        _uiState.update { it.copy(reviewScheduleMode = mode, manualReviewDateTime = null) }
+    }
+
+    // ✅ 신규 추가: 직접 입력 일시 변경
+    fun onManualReviewDateTimeChanged(epochMs: Long) {
+        _uiState.update { it.copy(manualReviewDateTime = epochMs) }
     }
 
     fun saveProgress(uid: String, updatedProgress: Progress) {
@@ -97,6 +123,21 @@ class ProgressDetailViewModel @Inject constructor(
             return
         }
 
+        val mode = _uiState.value.reviewScheduleMode
+
+        // ✅ 보안: MANUAL 모드일 때 과거 시각 차단
+        if (mode == ReviewScheduleMode.MANUAL) {
+            val manualMs = _uiState.value.manualReviewDateTime
+            if (manualMs == null) {
+                _uiState.update { it.copy(saveResult = false, errorMessage = "복습 예정 일시를 선택해주세요.") }
+                return
+            }
+            if (manualMs <= System.currentTimeMillis()) {
+                _uiState.update { it.copy(saveResult = false, errorMessage = "복습 예정 시각은 현재 시각 이후여야 합니다.") }
+                return
+            }
+        }
+
         val merged = current.copy(
             content        = updatedProgress.content,
             completedCount = updatedProgress.completedCount,
@@ -105,33 +146,97 @@ class ProgressDetailViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
-            val result = saveProgressAndScheduleUseCase(uid, merged)
-            if (result.isSuccess) {
-                val progressDate = java.time.Instant.ofEpochMilli(
-                    if (merged.createdAt > 0L) merged.createdAt else System.currentTimeMillis()
-                ).atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate()
-                ForgettingCurveScheduler.generateReviewDates(progressDate) // UI 미리보기용
+            when (mode) {
+                // ─── 기존 로직 유지 ───
+                ReviewScheduleMode.FORGETTING_CURVE -> {
+                    val result = saveProgressAndScheduleUseCase(uid, merged)
+                    if (result.isSuccess) {
+                        val progressDate = Instant.ofEpochMilli(
+                            if (merged.createdAt > 0L) merged.createdAt else System.currentTimeMillis()
+                        ).atZone(ZoneId.of("Asia/Seoul")).toLocalDate()
+                        ForgettingCurveScheduler.generateReviewDates(progressDate)
 
-                _uiState.update {
-                    it.copy(
-                        progress        = merged,
-                        isLoading       = false,
-                        isEditMode      = false,
-                        saveResult      = true,
-                        errorMessage    = null,
-                        isDirty         = false,
-                        initialSnapshot = null
-                    )
+                        _uiState.update {
+                            it.copy(
+                                progress        = merged,
+                                isLoading       = false,
+                                isEditMode      = false,
+                                saveResult      = true,
+                                successMessage  = "복습 일정 5개가 생성되었습니다 📅",
+                                errorMessage    = null,
+                                isDirty         = false,
+                                initialSnapshot = null
+                            )
+                        }
+                    } else {
+                        val errMsg = result.exceptionOrNull()?.message ?: "저장 중 알 수 없는 오류가 발생했습니다."
+                        Log.e(TAG, "saveProgress 실패: $errMsg")
+                        _uiState.update {
+                            it.copy(
+                                isLoading    = false,
+                                saveResult   = false,
+                                errorMessage = errMsg
+                            )
+                        }
+                    }
                 }
-            } else {
-                val errMsg = result.exceptionOrNull()?.message ?: "저장 중 알 수 없는 오류가 발생했습니다."
-                Log.e(TAG, "saveProgress 실패: $errMsg")
-                _uiState.update {
-                    it.copy(
-                        isLoading    = false,
-                        saveResult   = false,
-                        errorMessage = errMsg
-                    )
+
+                // ─── 신규: 직접 입력 모드 ───
+                ReviewScheduleMode.MANUAL -> {
+                    val manualMs = _uiState.value.manualReviewDateTime!!
+                    runCatching {
+                        // ① Progress 저장
+                        val progressResult = progressRepository.saveProgress(uid, merged)
+                        if (progressResult.isFailure) throw progressResult.exceptionOrNull()!!
+
+                        // ② ReviewSchedule 1개 생성 및 저장
+                        val scheduleId = UUID.randomUUID().toString()
+                        val now = System.currentTimeMillis()
+                        val schedule = ReviewSchedule(
+                            reviewScheduleId = scheduleId,
+                            originProgressId = merged.progressId,  // ✅ 실제 필드명 사용
+                            reviewDate       = manualMs,
+                            reviewRound      = 1,
+                            isCompleted      = false,
+                            createdAt        = now,
+                            updatedAt        = now,
+                            scheduleType     = "MANUAL"
+                        )
+                        val scheduleResult = reviewScheduleRepository.saveReviewSchedule(uid, schedule)
+                        if (scheduleResult.isFailure) throw scheduleResult.exceptionOrNull()!!
+
+                        // ③ 알람 등록
+                        alarmScheduler.scheduleReviewAlarm(scheduleId, manualMs)
+                    }.onSuccess {
+                        val displayTime = Instant.ofEpochMilli(manualMs)
+                            .atZone(ZoneId.of("Asia/Seoul"))
+                            .format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 HH:mm"))
+                        val msg = "복습 알람이 설정되었습니다 ⏰ ($displayTime)"
+
+                        _uiState.update {
+                            it.copy(
+                                progress             = merged,
+                                isLoading            = false,
+                                isEditMode           = false,
+                                saveResult           = true,
+                                successMessage       = msg,
+                                errorMessage         = null,
+                                isDirty              = false,
+                                initialSnapshot      = null,
+                                reviewScheduleMode   = ReviewScheduleMode.FORGETTING_CURVE,
+                                manualReviewDateTime = null
+                            )
+                        }
+                    }.onFailure { e ->
+                        Log.e(TAG, "saveProgress(MANUAL) 실패: ${e.message}")
+                        _uiState.update {
+                            it.copy(
+                                isLoading    = false,
+                                saveResult   = false,
+                                errorMessage = e.message ?: "저장 중 오류가 발생했습니다."
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -143,7 +248,6 @@ class ProgressDetailViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            // ✅ 연결된 복습 알람 일괄 취소 (UI 응답성을 위해 비동기 처리)
             val schedulesResult = reviewScheduleRepository
                 .getReviewSchedulesByProgressId(uid, progressId)
             if (schedulesResult.isSuccess) {
@@ -155,14 +259,13 @@ class ProgressDetailViewModel @Inject constructor(
                         "${schedulesResult.exceptionOrNull()?.message}")
             }
 
-            // Progress 삭제
             val result = progressRepository.deleteProgress(uid, progressId)
             _uiState.update { it.copy(deleteResult = result.isSuccess) }
         }
     }
 
     fun consumeSaveResult() {
-        _uiState.update { it.copy(saveResult = null) }
+        _uiState.update { it.copy(saveResult = null, successMessage = null) }
     }
 
     fun consumeDeleteResult() {
