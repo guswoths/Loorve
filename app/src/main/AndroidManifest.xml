@@ -42,6 +42,9 @@
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- AndroidManifest.xml -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <!--
         BootReceiver 및 RECEIVE_BOOT_COMPLETED 권한은 3~4단계에서 추가 예정
     -->
