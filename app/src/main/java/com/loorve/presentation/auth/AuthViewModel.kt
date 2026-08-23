@@ -26,23 +26,22 @@ sealed interface AuthUiState {
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val signOutUseCase: SignOutUseCase  // ← UseCase 주입
 ) : ViewModel() {
-
-    private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
-    val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
-
-    /** 현재 로그인 사용자 Flow — MyPageScreen에서 계정 정보 표시용 */
-    val currentUser = authRepository.getCurrentUser()
-
-    fun signInWithGoogle(idToken: String) {
+    fun signOut() {
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            authRepository.signInWithGoogle(idToken)
-                .onSuccess { user -> _uiState.value = AuthUiState.Success(user) }
-                .onFailure { e -> _uiState.value = classifyError(e) }
+            signOutUseCase()
+                .onSuccess { _uiState.value = AuthUiState.LogoutComplete }
+                .onFailure { e ->
+                    _uiState.value = AuthUiState.Error(
+                        e.message ?: "로그아웃에 실패했습니다. 다시 시도해주세요."
+                    )
+                }
         }
     }
+
 
     fun launchGoogleSignIn(context: Context) {
         viewModelScope.launch {
