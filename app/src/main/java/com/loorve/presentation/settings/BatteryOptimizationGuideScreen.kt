@@ -12,7 +12,7 @@ import android.provider.Settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Warning  // ← BatteryAlert 대체
+import androidx.compose.material.icons.filled.Warning  // ✅ BatteryAlert → Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -200,7 +200,7 @@ fun BatteryOptimizationGuideScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Warning,  // ← BatteryAlert → Warning 교체
+                imageVector = Icons.Default.Warning,  // ✅ BatteryAlert → Warning
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(64.dp)
@@ -262,10 +262,10 @@ private fun GuideContent(
     onLaunchSettings: () -> Unit,
     onSkip: () -> Unit
 ) {
-    // ── weight() 오류 수정: Column 스코프 내부로 이동 ──────────────────────
+    // ✅ weight() 제거 → fillMaxHeight + SpaceBetween으로 대체
     Column(
-        modifier = Modifier.fillMaxHeight(),  // ← fillMaxHeight로 공간 확보
-        verticalArrangement = Arrangement.SpaceBetween  // ← weight 대신 SpaceBetween 사용
+        modifier = Modifier.fillMaxHeight(),
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(
@@ -301,7 +301,6 @@ private fun GuideContent(
             }
         }
 
-        // ── 버튼 영역 (하단 고정) ─────────────────────────────────────────
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Button(
                 onClick = onLaunchSettings,
