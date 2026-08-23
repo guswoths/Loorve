@@ -136,4 +136,17 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
             doc.toObject(ReviewSchedule::class.java)
         }
     }
+
+    override suspend fun saveReviewSchedule(
+        uid: String,
+        schedule: ReviewSchedule
+    ): Result<Unit> = runCatching {
+        firestore
+            .collection("users")
+            .document(uid)
+            .collection("reviewSchedules")
+            .document(schedule.reviewScheduleId)
+            .set(schedule)
+            .await()
+    }
 }

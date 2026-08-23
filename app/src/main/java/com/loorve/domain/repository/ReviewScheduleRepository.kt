@@ -3,6 +3,7 @@ package com.loorve.domain.repository
 import com.loorve.domain.model.ReviewSchedule
 import kotlinx.coroutines.flow.Flow
 
+
 /**
  * Domain Layer - 복습 일정(ReviewSchedule) Repository 인터페이스
  *
@@ -177,4 +178,9 @@ interface ReviewScheduleRepository {
         uid: String,
         fromMillis: Long
     ): Result<List<ReviewSchedule>>
+
+    suspend fun saveReviewSchedule(
+        uid: String,
+        schedule: ReviewSchedule
+    ): Result<Unit>
 }
