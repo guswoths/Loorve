@@ -37,6 +37,8 @@ import com.loorve.presentation.progress.ProgressDetailScreen
 import com.loorve.presentation.settings.BatteryOptimizationGuideScreen
 import kotlinx.coroutines.delay
 import com.loorve.presentation.notification.NotificationPermissionRoute
+import com.loorve.presentation.mypage.MyPageScreen
+import com.loorve.presentation.mypage.NotificationTimeSettingScreen
 
 // ─── 타입 안전 라우트 정의 ───────────────────────────────────────────────
 sealed class Screen(val route: String) {
@@ -50,6 +52,7 @@ sealed class Screen(val route: String) {
     }
     object Calendar                 : Screen("calendar")
     object NotificationTimeSetting  : Screen("notification_time_setting")
+    object MyPage                   : Screen("my_page")
     // ── 신규 추가 ──────────────────────────────────────────────────────────
     object BatteryOptimizationGuide : Screen("battery_optimization_guide")
     object NotificationPermission : Screen("notification_permission")
@@ -177,6 +180,9 @@ fun LoorveNavHost(
                 },
                 onNavigateToCalendar = {
                     navController.navigate(Screen.Calendar.route)
+                },
+                onNavigateToMyPage = {
+                    navController.navigate(Screen.MyPage.route)
                 }
             )
         }
@@ -213,6 +219,27 @@ fun LoorveNavHost(
 
         composable(Screen.NotificationPermission.route) {
             NotificationPermissionRoute(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        // ── 9. 마이페이지 (신규) ─────────────────────────────────────
+        composable(Screen.MyPage.route) {
+            MyPageScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToNotificationTimeSetting = {
+                    navController.navigate(Screen.NotificationTimeSetting.route)
+                },
+                onLogoutComplete = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // ── 10. 알림 시간 설정 (누락 → 등록) ────────────────────────
+        composable(Screen.NotificationTimeSetting.route) {
+            NotificationTimeSettingScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
+import androidx.credentials.ClearCredentialStateRequest
 
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
@@ -60,6 +61,34 @@ class AuthRepositoryImpl @Inject constructor(
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    override suspend fun signOut(): Result<Unit> {
+        return try {
+            // Google 로그인 사용자인 경우 Google credential 도 revoke
+            val currentUser = firebaseAuth.currentUser
+            val isGoogleProvider = currentUser?.providerData
+                ?.any { it.providerId == "google.com" } == true
+
+            if (isGoogleProvider) {
+                try {
+                    val credentialManager = CredentialManager.create(context)
+                    // Google credential revoke — 실패해도 Firebase signOut은 진행
+                    credentialManager.clearCredentialState(
+                        androidx.credentials.ClearCredentialStateRequest()
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "Google credential revoke 실패 (계속 진행): ${e.message}")
+                }
+            }
+
+            firebaseAuth.signOut()
+            Log.d(TAG, "signOut 완료 (uid=${currentUser?.uid})")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "signOut 실패", e)
+            Result.failure(Exception("로그아웃에 실패했습니다. 다시 시도해주세요.", e))
         }
     }
 
