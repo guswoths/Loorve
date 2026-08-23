@@ -18,6 +18,21 @@
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
     <!--
+    정확한 알람 예약 권한 (AlarmManager.setExactAndAllowWhileIdle 사용 시 필요)
+
+    API 31 (Android 12) ~ 32:
+    - SCHEDULE_EXACT_ALARM: 사용자가 시스템 설정에서 권한 허용 필요
+    - canScheduleExactAlarms()로 런타임 확인 후 분기 처리됨 (ReviewAlarmScheduler 참조)
+
+    API 33 (Android 13)+:
+    - USE_EXACT_ALARM: 캘린더/알람 앱 전용 (Google Play 심사 대상)
+    - 복습 알림 용도라면 SCHEDULE_EXACT_ALARM만 선언하고 권한 요청 UI 구현 권장
+
+    BootReceiver 및 RECEIVE_BOOT_COMPLETED 권한은 3~4단계에서 추가 예정
+-->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!--
         android:name: Hilt DI 필수 - @HiltAndroidApp 어노테이션 적용 Application 클래스
         android:supportsRtl: RTL 레이아웃 지원
         android:allowBackup: 자동 백업 활성화
