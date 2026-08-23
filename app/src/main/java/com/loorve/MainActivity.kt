@@ -18,4 +18,10 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        // NotificationPermissionRoute 내부에서 LaunchedEffect + lifecycle 기반으로
+        // 재확인하므로 여기서는 Activity 재생성 없이도 안전합니다.
+    }
 }

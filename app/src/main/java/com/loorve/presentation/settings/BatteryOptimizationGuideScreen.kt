@@ -21,29 +21,25 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 네비게이션 연동 준비 (LoorveNavHost.kt → Screen sealed class에 아래 추가)
-// object BatteryOptimizationGuide : Screen("battery_optimization_guide")
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── 제조사 분류 ─────────────────────────────────────────────────────────────
 
-// ─── 제조사 분류 ────────────────────────────────────────────────────────────
-
-/**
- * [Build.MANUFACTURER]를 소문자로 정규화하여 지원 제조사로 분류.
- * 감지 불가 기기는 [Manufacturer.GENERIC]으로 폴백.
- */
-private enum class Manufacturer { SAMSUNG, XIAOMI, LG, GENERIC }
+private enum class Manufacturer { SAMSUNG, XIAOMI, LG, HUAWEI, OPPO, GENERIC }
 
 private fun detectManufacturer(): Manufacturer {
+    val m = Build.MANUFACTURER.lowercase()
     return when {
-        Build.MANUFACTURER.lowercase().contains("samsung") -> Manufacturer.SAMSUNG
-        Build.MANUFACTURER.lowercase().contains("xiaomi") ||
-                Build.MANUFACTURER.lowercase().contains("redmi") ||
-                Build.MANUFACTURER.lowercase().contains("poco")   -> Manufacturer.XIAOMI
-        Build.MANUFACTURER.lowercase().contains("lge") ||
-                Build.MANUFACTURER.lowercase().contains("lg")     -> Manufacturer.LG
-        else -> Manufacturer.GENERIC
+        m.contains("samsung")                                    -> Manufacturer.SAMSUNG
+        m.contains("xiaomi") || m.contains("redmi")
+                || m.contains("poco")                           -> Manufacturer.XIAOMI
+        m.contains("lge") || m.contains("lg")                   -> Manufacturer.LG
+        m.contains("huawei") || m.contains("honor")             -> Manufacturer.HUAWEI
+        m.contains("oppo") || m.contains("oneplus")
+                || m.contains("vivo")                           -> Manufacturer.OPPO
+        else                                                     -> Manufacturer.GENERIC
     }
 }
 
@@ -87,6 +83,26 @@ private fun getBatteryGuideInfo(manufacturer: Manufacturer): BatteryGuideInfo {
                 "배터리 최적화 비활성화"
             )
         )
+        Manufacturer.HUAWEI -> BatteryGuideInfo(
+            title = "Huawei 배터리 설정 경로",
+            steps = listOf(
+                "설정 앱 열기",
+                "배터리 선택",
+                "앱 시작 관리 선택",
+                "Loorve 앱 찾기",
+                "수동 관리로 전환",
+                "'자동 실행', '백그라운드 실행', '알림' 모두 허용"
+            )
+        )
+        Manufacturer.OPPO -> BatteryGuideInfo(
+            title = "OPPO/OnePlus/Vivo 배터리 설정 경로",
+            steps = listOf(
+                "설정 앱 열기",
+                "배터리 > 배터리 최적화 선택",
+                "Loorve 앱 찾기",
+                "'최적화 안 함' 선택"
+            )
+        )
         Manufacturer.GENERIC -> BatteryGuideInfo(
             title = "배터리 최적화 설정 경로",
             steps = listOf(
@@ -107,13 +123,9 @@ private fun getBatteryGuideInfo(manufacturer: Manufacturer): BatteryGuideInfo {
  * 배터리 최적화 예외 등록 시스템 설정으로 이동.
  *
  * 시도 순서:
- * 1. [Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS] — 직접 예외 요청
- *    ※ AndroidManifest.xml에 REQUEST_IGNORE_BATTERY_OPTIMIZATIONS 권한 선언 필요
- * 2. [Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS] — 배터리 최적화 목록
- * 3. [Settings.ACTION_APPLICATION_DETAILS_SETTINGS] — 앱 정보 화면 (최후 폴백)
- *
- * ActivityNotFoundException 및 SecurityException을 모두 포착하여
- * 제조사별 미지원 케이스에 안전하게 대응합니다.
+ * 1. ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS — 직접 예외 요청
+ * 2. ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS — 배터리 최적화 목록
+ * 3. ACTION_APPLICATION_DETAILS_SETTINGS         — 앱 정보 화면 (최후 폴백)
  */
 fun launchBatteryOptimizationSettings(context: Context) {
     val packageUri = Uri.parse("package:${context.packageName}")
@@ -126,24 +138,20 @@ fun launchBatteryOptimizationSettings(context: Context) {
         } catch (e: ActivityNotFoundException) {
             false
         } catch (e: SecurityException) {
-            // REQUEST_IGNORE_BATTERY_OPTIMIZATIONS 권한 미선언 시 발생 가능
             false
         } catch (e: Exception) {
             false
         }
     }
 
-    // 1순위: 직접 예외 요청 (패키지 URI 필수)
     val direct = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
         data = packageUri
     }
     if (tryStart(direct)) return
 
-    // 2순위: 배터리 최적화 목록
     val list = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
     if (tryStart(list)) return
 
-    // 3순위: 앱 정보 화면
     val appDetails = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
         data = packageUri
     }
@@ -154,6 +162,10 @@ fun launchBatteryOptimizationSettings(context: Context) {
 
 /**
  * 배터리 최적화 예외 등록 가이드 화면.
+ *
+ * [변경점]
+ * - isIgnoring: derivedStateOf → LaunchedEffect(lifecycleState == RESUMED) 로 교체.
+ *   사용자가 시스템 설정 후 돌아오면 즉시 재확인하여 UI 갱신.
  *
  * @param onNavigateBack 상단 뒤로가기 버튼 클릭 콜백
  * @param onSkip         [나중에] 버튼 클릭 콜백
@@ -166,17 +178,26 @@ fun BatteryOptimizationGuideScreen(
 ) {
     val context = LocalContext.current
 
-    // 현재 배터리 최적화 예외 등록 여부 감지
-    val isIgnoring by remember {
-        derivedStateOf {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+    // ── onResume 재확인 로직 ───────────────────────────────────────────────
+    // lifecycleState가 RESUMED로 전환될 때마다 PowerManager를 재조회하여
+    // 시스템 설정 복귀 후에도 즉시 최신 상태를 반영합니다.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow
+        .collectAsStateWithLifecycle()
+
+    var isIgnoring by remember { mutableStateOf(false) }
+
+    LaunchedEffect(lifecycleState) {
+        if (lifecycleState == Lifecycle.State.RESUMED) {
+            isIgnoring = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val pm = context.getSystemService<PowerManager>()
                 pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false
             } else {
-                true // M 미만은 최적화 예외 개념 없음 → 항상 허용 상태로 간주
+                true // M 미만은 배터리 최적화 개념 없음 → 항상 허용 상태로 간주
             }
         }
     }
+    // ─────────────────────────────────────────────────────────────────────
 
     val manufacturer = remember { detectManufacturer() }
     val guideInfo = remember(manufacturer) { getBatteryGuideInfo(manufacturer) }
@@ -204,7 +225,6 @@ fun BatteryOptimizationGuideScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 아이콘
             Icon(
                 imageVector = Icons.Default.BatteryAlert,
                 contentDescription = null,
@@ -212,9 +232,8 @@ fun BatteryOptimizationGuideScreen(
                 modifier = Modifier.size(64.dp)
             )
 
-            // 이미 예외 등록된 경우 완료 상태 표시
             if (isIgnoring) {
-                AlreadyExemptCard()
+                AlreadyExemptCard(onNavigateBack = onNavigateBack)
             } else {
                 GuideContent(
                     guideInfo = guideInfo,
@@ -230,7 +249,7 @@ fun BatteryOptimizationGuideScreen(
 
 /** 이미 배터리 최적화 예외로 등록된 경우 표시되는 카드 */
 @Composable
-private fun AlreadyExemptCard() {
+private fun AlreadyExemptCard(onNavigateBack: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -255,6 +274,14 @@ private fun AlreadyExemptCard() {
             )
         }
     }
+    Spacer(modifier = Modifier.height(16.dp))
+    // 완료 상태에서 자동으로 뒤로 이동하는 버튼 제공
+    Button(
+        onClick = onNavigateBack,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text("확인")
+    }
 }
 
 /** 안내 문구 + 설정 이동 버튼 조합 */
@@ -264,7 +291,6 @@ private fun GuideContent(
     onLaunchSettings: () -> Unit,
     onSkip: () -> Unit
 ) {
-    // 안내 설명
     Text(
         text = "배터리 최적화가 활성화되어 있으면\n" +
                 "복습 알림이 차단될 수 있습니다.\n" +
@@ -273,7 +299,6 @@ private fun GuideContent(
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 
-    // 제조사별 경로 카드
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -300,7 +325,6 @@ private fun GuideContent(
 
     Spacer(modifier = Modifier.weight(1f))
 
-    // [지금 설정하기] 버튼 (Primary)
     Button(
         onClick = onLaunchSettings,
         modifier = Modifier.fillMaxWidth()
@@ -308,7 +332,6 @@ private fun GuideContent(
         Text("지금 설정하기")
     }
 
-    // [나중에] 버튼 (Text/Secondary)
     TextButton(
         onClick = onSkip,
         modifier = Modifier.fillMaxWidth()
