@@ -25,6 +25,17 @@ import com.loorve.domain.model.Progress
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerState
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import java.util.Calendar
 
 @Composable
 fun ProgressDetailScreen(
@@ -44,12 +55,13 @@ fun ProgressDetailScreen(
     LaunchedEffect(uiState.saveResult) {
         when (uiState.saveResult) {
             true -> {
+                val isForgettingCurve = uiState.successMessage?.contains("5개") == true
                 val result = snackbarHostState.showSnackbar(
-                    message    = "복습 일정 5개가 생성되었습니다 📅",
-                    actionLabel = "캘린더 확인",
-                    duration   = SnackbarDuration.Long
+                    message     = uiState.successMessage ?: "저장되었습니다.",
+                    actionLabel = if (isForgettingCurve) "캘린더 확인" else null,
+                    duration    = SnackbarDuration.Long
                 )
-                if (result == SnackbarResult.ActionPerformed) {
+                if (isForgettingCurve && result == SnackbarResult.ActionPerformed) {
                     onNavigateToCalendar()
                 }
                 viewModel.consumeSaveResult()
@@ -87,6 +99,8 @@ fun ProgressDetailScreen(
         onDelete             = { viewModel.deleteProgress(uid, progressId) },
         onRetry              = { viewModel.loadProgress(uid, progressId) },
         onEditChanged        = { c, cc, tc, ic -> viewModel.onEditChanged(c, cc, tc, ic) },
+        onReviewScheduleModeChanged   = { viewModel.onReviewScheduleModeChanged(it) },  // ✅ 추가
+        onManualReviewDateTimeChanged = { viewModel.onManualReviewDateTimeChanged(it) }, // ✅ 추가
         onNavigateToCalendar = onNavigateToCalendar
     )
 }
@@ -103,6 +117,8 @@ private fun ProgressDetailContent(
     onDelete: () -> Unit,
     onRetry: () -> Unit,
     onEditChanged: (String, String, String, Boolean) -> Unit,
+    onReviewScheduleModeChanged: (ReviewScheduleMode) -> Unit = {},  // ✅ 추가
+    onManualReviewDateTimeChanged: (Long) -> Unit = {},
     onNavigateToCalendar: () -> Unit = {}   // ✅ 원인2 수정: 파라미터 추가
 ) {
     var editContent        by remember { mutableStateOf("") }
@@ -271,10 +287,14 @@ private fun ProgressDetailContent(
                             editCompletedCount = editCompletedCount,
                             editTotalCount     = editTotalCount,
                             editIsCompleted    = editIsCompleted,
-                            onContentChange        = { editContent = it; onEditChanged(it, editCompletedCount, editTotalCount, editIsCompleted) },
-                            onCompletedCountChange = { if (it.all(Char::isDigit)) { editCompletedCount = it; onEditChanged(editContent, it, editTotalCount, editIsCompleted) } },
-                            onTotalCountChange     = { if (it.all(Char::isDigit)) { editTotalCount = it; onEditChanged(editContent, editCompletedCount, it, editIsCompleted) } },
-                            onIsCompletedChange    = { editIsCompleted = it; onEditChanged(editContent, editCompletedCount, editTotalCount, it) }
+                            reviewScheduleMode       = uiState.reviewScheduleMode,
+                            manualReviewDateTime     = uiState.manualReviewDateTime,
+                            onContentChange          = { editContent = it; onEditChanged(it, editCompletedCount, editTotalCount, editIsCompleted) },
+                            onCompletedCountChange   = { if (it.all(Char::isDigit)) { editCompletedCount = it; onEditChanged(editContent, it, editTotalCount, editIsCompleted) } },
+                            onTotalCountChange       = { if (it.all(Char::isDigit)) { editTotalCount = it; onEditChanged(editContent, editCompletedCount, it, editIsCompleted) } },
+                            onIsCompletedChange      = { editIsCompleted = it; onEditChanged(editContent, editCompletedCount, editTotalCount, it) },
+                            onReviewScheduleModeChanged   = onReviewScheduleModeChanged,
+                            onManualReviewDateTimeChanged = onManualReviewDateTimeChanged
                         )
                     } else {
                         ProgressViewBody(
@@ -415,17 +435,99 @@ private fun DetailRow(label: String, value: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProgressEditBody(
     editContent: String,
     editCompletedCount: String,
     editTotalCount: String,
     editIsCompleted: Boolean,
+    reviewScheduleMode: ReviewScheduleMode,
+    manualReviewDateTime: Long?,
     onContentChange: (String) -> Unit,
     onCompletedCountChange: (String) -> Unit,
     onTotalCountChange: (String) -> Unit,
-    onIsCompletedChange: (Boolean) -> Unit
+    onIsCompletedChange: (Boolean) -> Unit,
+    onReviewScheduleModeChanged: (ReviewScheduleMode) -> Unit,
+    onManualReviewDateTimeChanged: (Long) -> Unit
 ) {
+    // DatePickerDialog 상태
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    // 선택된 날짜를 임시 보관 (타임피커로 넘기기 위해)
+    var tempSelectedDateMs by remember { mutableStateOf<Long?>(null) }
+
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = manualReviewDateTime
+            ?: System.currentTimeMillis()
+    )
+
+    // 기존 선택값에서 시/분 초기화
+    val initialHour: Int
+    val initialMinute: Int
+    if (manualReviewDateTime != null) {
+        val cal = Calendar.getInstance().apply { timeInMillis = manualReviewDateTime }
+        initialHour   = cal.get(Calendar.HOUR_OF_DAY)
+        initialMinute = cal.get(Calendar.MINUTE)
+    } else {
+        val cal = Calendar.getInstance()
+        initialHour   = cal.get(Calendar.HOUR_OF_DAY)
+        initialMinute = cal.get(Calendar.MINUTE)
+    }
+    val timePickerState = rememberTimePickerState(
+        initialHour   = initialHour,
+        initialMinute = initialMinute,
+        is24Hour      = true
+    )
+
+    // DatePickerDialog
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    tempSelectedDateMs = datePickerState.selectedDateMillis
+                    showDatePicker = false
+                    showTimePicker = true
+                }) { Text("다음") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("취소") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // TimePickerDialog (커스텀 AlertDialog 활용)
+    if (showTimePicker) {
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("복습 시각 선택") },
+            text = {
+                TimePicker(state = timePickerState)
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val dateMs = tempSelectedDateMs ?: System.currentTimeMillis()
+                    val cal = Calendar.getInstance().apply {
+                        timeInMillis = dateMs
+                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                        set(Calendar.MINUTE, timePickerState.minute)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
+                    onManualReviewDateTimeChanged(cal.timeInMillis)
+                    showTimePicker = false
+                }) { Text("확인") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text("취소") }
+            }
+        )
+    }
+
     Column(
         modifier            = Modifier
             .fillMaxSize()
@@ -462,6 +564,104 @@ private fun ProgressEditBody(
         ) {
             Text(text = "완료 여부", style = MaterialTheme.typography.bodyLarge)
             Switch(checked = editIsCompleted, onCheckedChange = onIsCompletedChange)
+        }
+
+        // ✅ 복습 스케줄 설정 섹션 (신규 추가)
+        HorizontalDivider()
+        Text(
+            text  = "복습 스케줄 설정",
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        // 망각곡선 자동 설정 RadioButton
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) {
+            RadioButton(
+                selected = reviewScheduleMode == ReviewScheduleMode.FORGETTING_CURVE,
+                onClick  = { onReviewScheduleModeChanged(ReviewScheduleMode.FORGETTING_CURVE) }
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(
+                    text  = "망각곡선 자동 설정",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text  = "D+1, D+3, D+7, D+14, D+30 — 5개 알람",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // 직접 입력 RadioButton
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) {
+            RadioButton(
+                selected = reviewScheduleMode == ReviewScheduleMode.MANUAL,
+                onClick  = { onReviewScheduleModeChanged(ReviewScheduleMode.MANUAL) }
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(
+                    text  = "직접 입력",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text  = "복습 예정 일시를 직접 지정 — 1개 알람",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // 직접 입력 모드일 때 일시 선택 버튼 + 표시
+        if (reviewScheduleMode == ReviewScheduleMode.MANUAL) {
+            Card(
+                modifier  = Modifier.fillMaxWidth(),
+                colors    = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    val displayText = if (manualReviewDateTime != null) {
+                        java.time.Instant.ofEpochMilli(manualReviewDateTime)
+                            .atZone(java.time.ZoneId.of("Asia/Seoul"))
+                            .format(
+                                java.time.format.DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 HH:mm")
+                            )
+                    } else {
+                        "날짜·시간을 선택하세요"
+                    }
+                    Text(
+                        text  = "📅 복습 예정: $displayText",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    OutlinedButton(
+                        onClick  = { showDatePicker = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("날짜 / 시간 선택")
+                    }
+                }
+            }
         }
     }
 }
