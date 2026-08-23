@@ -66,4 +66,12 @@ class NotificationTimePreferences @Inject constructor(
             preferences[Keys.NOTIFICATION_MINUTE] = minute
         }
     }
+
+    /** 로그아웃 시 호출 — 알림 시간 설정 전체 삭제 (기본값 9:00으로 자동 fallback) */
+    suspend fun clearAll() {
+        context.notificationTimeDataStore.edit { preferences ->
+            preferences.remove(Keys.NOTIFICATION_HOUR)
+            preferences.remove(Keys.NOTIFICATION_MINUTE)
+        }
+    }
 }
