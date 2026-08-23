@@ -43,6 +43,7 @@ sealed class Screen(val route: String) {
         fun createRoute(progressId: String) = "progress_detail/$progressId"
     }
     object Calendar       : Screen("calendar")   // ← 작업 1: 라우트 추가
+    object NotificationTimeSetting : Screen("notification_time_setting")
 }
 
 // ─── 스플래시 Composable ────────────────────────────────────────────────

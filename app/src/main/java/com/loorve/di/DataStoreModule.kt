@@ -1,6 +1,7 @@
 package com.loorve.di
 
 import android.content.Context
+import com.loorve.data.local.NotificationTimePreferences
 import com.loorve.data.local.OnboardingPreferences
 import dagger.Module
 import dagger.Provides
@@ -22,4 +23,10 @@ object DataStoreModule {
     fun provideOnboardingPreferences(
         @ApplicationContext context: Context
     ): OnboardingPreferences = OnboardingPreferences(context)
+
+    @Provides
+    @Singleton
+    fun provideNotificationTimePreferences(
+        @ApplicationContext context: Context
+    ): NotificationTimePreferences = NotificationTimePreferences(context)
 }
