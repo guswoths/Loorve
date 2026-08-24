@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.domain.model.ReviewSchedule
+import com.loorve.ui.component.BannerAdView  // ← [추가] AdMob 배너 컴포넌트
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -105,14 +106,21 @@ fun ReviewCalendarScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+            // ▼ [변경] weight(1f) 추가 — LazyColumn이 내부에 있으므로 남은 공간을 여기서 소화
             SelectedDateSchedulePanel(
                 selectedDate       = uiState.selectedDate,
                 schedules          = uiState.selectedDateSchedules,
                 onCompleteSchedule = { viewModel.onCompleteSchedule(it) },
                 onToggleCompletion = { scheduleId, current ->
                     viewModel.toggleReviewCompletion(scheduleId, current)
-                }
+                },
+                modifier           = Modifier.weight(1f)  // ← 추가
             )
+
+            // ▼ [추가] AdMob 배너 광고 — Column 최하단 고정
+            // 광고 로드 실패 시 BannerAdView 내부의 adFailed 로직이 View를 자동 제거하므로
+            // 이 화면에서 별도 예외 처리 불필요
+            BannerAdView(modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -177,7 +185,7 @@ private fun WeekDayHeader() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ✅ CalendarGrid — DateCell 호출부 파라미터 변경 (hasSchedule → schedules)
+// CalendarGrid — 기존 코드 그대로 유지
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun CalendarGrid(
@@ -208,7 +216,7 @@ private fun CalendarGrid(
                             day        = dayNumber,
                             isSelected = date == selectedDate,
                             isToday    = date == today,
-                            schedules  = schedulesMap[date] ?: emptyList(), // ✅ 변경
+                            schedules  = schedulesMap[date] ?: emptyList(),
                             isSunday   = colIndex == 0,
                             isSaturday = colIndex == 6,
                             onClick    = { onDateSelected(date) },
@@ -222,15 +230,14 @@ private fun CalendarGrid(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ✅ DateCell — 핵심 변경: hasSchedule:Boolean → schedules:List<ReviewSchedule>
-//              회차별 색깔 점 Row로 표시, isSelected 시 onPrimary 통일
+// DateCell — 기존 코드 그대로 유지
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun DateCell(
     day: Int,
     isSelected: Boolean,
     isToday: Boolean,
-    schedules: List<ReviewSchedule>,   // ✅ Boolean → List<ReviewSchedule>
+    schedules: List<ReviewSchedule>,
     isSunday: Boolean,
     isSaturday: Boolean,
     onClick: () -> Unit,
@@ -248,17 +255,15 @@ private fun DateCell(
         else       -> MaterialTheme.colorScheme.onSurface
     }
 
-    // ✅ 회차별 색상 정의 (index 0~4 = 1~5회차)
-    // isSelected=true 이면 모든 점을 onPrimary로 통일
     @Composable
     fun roundColor(roundIndex: Int): Color {
         if (isSelected) return MaterialTheme.colorScheme.onPrimary
         return when (roundIndex) {
-            0    -> MaterialTheme.colorScheme.error      // 1회차: 빨강
-            1    -> MaterialTheme.colorScheme.tertiary   // 2회차: 초록/청록
-            2    -> MaterialTheme.colorScheme.primary    // 3회차: 파랑
-            3    -> Color(0xFFFF9800)                    // 4회차: 주황
-            else -> MaterialTheme.colorScheme.secondary  // 5회차+: 보라 계열
+            0    -> MaterialTheme.colorScheme.error
+            1    -> MaterialTheme.colorScheme.tertiary
+            2    -> MaterialTheme.colorScheme.primary
+            3    -> Color(0xFFFF9800)
+            else -> MaterialTheme.colorScheme.secondary
         }
     }
 
@@ -272,7 +277,6 @@ private fun DateCell(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // ── 날짜 숫자 ──
         Text(
             text  = day.toString(),
             style = MaterialTheme.typography.bodySmall.copy(
@@ -282,11 +286,9 @@ private fun DateCell(
             color = textColor
         )
 
-        // ── 색깔 점 표시 ──
         if (schedules.isNotEmpty()) {
             Spacer(modifier = Modifier.height(2.dp))
 
-            // reviewRound 오름차순 정렬 → 최대 3개만 표시
             val sortedSchedules  = schedules.sortedBy { it.reviewRound }
             val displaySchedules = sortedSchedules.take(3)
             val hasMore          = sortedSchedules.size > 3
@@ -296,7 +298,6 @@ private fun DateCell(
                 verticalAlignment     = Alignment.CenterVertically
             ) {
                 displaySchedules.forEach { schedule ->
-                    // reviewRound는 1-based → 색상 배열 index로 변환
                     val roundIndex = (schedule.reviewRound - 1).coerceIn(0, 4)
                     Box(
                         modifier = Modifier
@@ -305,7 +306,6 @@ private fun DateCell(
                             .background(roundColor(roundIndex))
                     )
                 }
-                // ✅ 3개 초과 시 추가 점 1개 더 표시 (5회차 색상 사용)
                 if (hasMore) {
                     Box(
                         modifier = Modifier
@@ -320,14 +320,15 @@ private fun DateCell(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SelectedDateSchedulePanel — 기존 코드 그대로 유지
+// SelectedDateSchedulePanel — [변경] modifier 파라미터 추가 (weight(1f) 수신용)
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun SelectedDateSchedulePanel(
     selectedDate: LocalDate?,
     schedules: List<ReviewSchedule>,
     onCompleteSchedule: (String) -> Unit,
-    onToggleCompletion: (String, Boolean) -> Unit
+    onToggleCompletion: (String, Boolean) -> Unit,
+    modifier: Modifier = Modifier  // ← [추가] 외부에서 weight(1f) 전달 가능하도록
 ) {
     val title = if (selectedDate != null) {
         "${selectedDate.monthValue}월 ${selectedDate.dayOfMonth}일 복습 일정"
@@ -335,38 +336,42 @@ private fun SelectedDateSchedulePanel(
         "날짜를 선택하세요"
     }
 
-    Text(
-        text     = title,
-        style    = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        modifier = Modifier.padding(bottom = 8.dp)
-    )
+    // ▼ modifier를 Column 대신 최상단 래퍼에 적용 — weight(1f)가 올바르게 작동하려면
+    //   Column으로 감싸야 합니다 (기존에는 Text + LazyColumn이 바로 나열됨)
+    Column(modifier = modifier) {
+        Text(
+            text     = title,
+            style    = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
-    if (selectedDate == null) return
+        if (selectedDate == null) return@Column
 
-    if (schedules.isEmpty()) {
-        Box(
-            modifier         = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text  = "이 날은 복습이 없어요 \uD83D\uDE0A",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    } else {
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding      = PaddingValues(bottom = 16.dp)
-        ) {
-            items(schedules) { schedule ->
-                ReviewScheduleItem(
-                    schedule   = schedule,
-                    onComplete = { onCompleteSchedule(schedule.reviewScheduleId) },
-                    onToggle   = { onToggleCompletion(schedule.reviewScheduleId, schedule.isCompleted) }
+        if (schedules.isEmpty()) {
+            Box(
+                modifier         = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text  = "이 날은 복습이 없어요 \uD83D\uDE0A",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding      = PaddingValues(bottom = 16.dp)
+            ) {
+                items(schedules) { schedule ->
+                    ReviewScheduleItem(
+                        schedule   = schedule,
+                        onComplete = { onCompleteSchedule(schedule.reviewScheduleId) },
+                        onToggle   = { onToggleCompletion(schedule.reviewScheduleId, schedule.isCompleted) }
+                    )
+                }
             }
         }
     }
