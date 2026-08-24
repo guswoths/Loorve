@@ -5,8 +5,6 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     id("com.android.application")
-    // ❌ 아래 줄 삭제 (AGP 9.0+ 내장)
-    // id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
@@ -19,6 +17,15 @@ val keystorePropertiesFile = rootProject.file("keystore.properties")
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { input ->
         keystoreProperties.load(input)
+    }
+}
+
+// ✅ local.properties 로드 (WEB_CLIENT_ID 등 민감 정보 관리)
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use { input ->
+        localProperties.load(input)
     }
 }
 
@@ -37,6 +44,13 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // ✅ BuildConfig 필드 추가 — local.properties에서 읽어옴
+        buildConfigField(
+            "String",
+            "GOOGLE_WEB_CLIENT_ID",
+            "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\""
+        )
     }
 
     buildTypes {

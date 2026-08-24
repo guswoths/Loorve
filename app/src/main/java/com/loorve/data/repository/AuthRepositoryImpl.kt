@@ -13,6 +13,7 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.loorve.BuildConfig
 import com.loorve.domain.model.User
 import com.loorve.domain.repository.AuthRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,14 +28,9 @@ import androidx.credentials.ClearCredentialStateRequest
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
-    // ✅ 수정 A: @param: 타겟 명시로 KT-73255 컴파일러 경고 제거
     @param:ApplicationContext private val context: Context,
     private val firestore: FirebaseFirestore
 ) : AuthRepository {
-
-    // ──────────────────────────────────────────────
-    // 인터페이스 구현
-    // ──────────────────────────────────────────────
 
     override suspend fun login(email: String, password: String): Result<User> {
         return try {
@@ -66,7 +62,6 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun signOut(): Result<Unit> {
         return try {
-            // Google 로그인 사용자인 경우 Google credential 도 revoke
             val currentUser = firebaseAuth.currentUser
             val isGoogleProvider = currentUser?.providerData
                 ?.any { it.providerId == "google.com" } == true
@@ -74,9 +69,8 @@ class AuthRepositoryImpl @Inject constructor(
             if (isGoogleProvider) {
                 try {
                     val credentialManager = CredentialManager.create(context)
-                    // Google credential revoke — 실패해도 Firebase signOut은 진행
                     credentialManager.clearCredentialState(
-                        androidx.credentials.ClearCredentialStateRequest()
+                        ClearCredentialStateRequest()
                     )
                 } catch (e: Exception) {
                     Log.w(TAG, "Google credential revoke 실패 (계속 진행): ${e.message}")
@@ -100,17 +94,13 @@ class AuthRepositoryImpl @Inject constructor(
         awaitClose { firebaseAuth.removeAuthStateListener(listener) }
     }
 
-    // ──────────────────────────────────────────────
-    // Google 로그인 진입점: Credential Manager로 계정 선택 팝업 실행
-    // ──────────────────────────────────────────────
-
     override suspend fun launchGoogleSignIn(activityContext: Context): Result<User> {
         return try {
             val credentialManager = CredentialManager.create(activityContext)
 
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(WEB_CLIENT_ID)
+                .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID) // ✅ BuildConfig 참조
                 .setAutoSelectEnabled(false)
                 .build()
 
@@ -138,10 +128,6 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    // ──────────────────────────────────────────────
-    // Google 로그인 (Credential Manager API)
-    // ──────────────────────────────────────────────
-
     override suspend fun signInWithGoogle(idToken: String): Result<User> {
         return try {
             val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
@@ -159,10 +145,6 @@ class AuthRepositoryImpl @Inject constructor(
             Result.failure(Exception("인증 처리 중 오류가 발생했습니다.", e))
         }
     }
-
-    // ──────────────────────────────────────────────
-    // Firestore 사용자 문서 최초 생성 / 갱신
-    // ──────────────────────────────────────────────
 
     private suspend fun createOrUpdateUserDocument(user: User) {
         try {
@@ -193,10 +175,6 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    // ──────────────────────────────────────────────
-    // 내부 매핑
-    // ──────────────────────────────────────────────
-
     private fun FirebaseUser.toDomainUser(): User {
         val now = System.currentTimeMillis()
         return User(
@@ -224,7 +202,6 @@ class AuthRepositoryImpl @Inject constructor(
 
     companion object {
         private const val TAG = "AuthRepository"
-        private const val WEB_CLIENT_ID =
-            "711486350418-plbdidlveqnocbqngk3324grffaf9aj8.apps.googleusercontent.com"
+        // ✅ WEB_CLIENT_ID는 BuildConfig로 이동 — 이 상수 삭제
     }
 }
