@@ -6,33 +6,57 @@ service cloud.firestore {
     match /exams/{examId} {
       allow create: if request.auth != null
         && request.resource.data.createdBy == request.auth.uid;
-      allow read, update, delete: if request.auth != null
+
+      allow get, list: if request.auth != null
+        && resource.data.createdBy == request.auth.uid;
+
+      // ✅ update 시 createdBy 필드 변조 방지
+      allow update: if request.auth != null
+        && resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdBy == resource.data.createdBy;
+
+      allow delete: if request.auth != null
         && resource.data.createdBy == request.auth.uid;
     }
 
-    // ✅ 마이페이지용 사용자 프로필 문서: 본인만 읽기/쓰기 허용
+    // ✅ 마이페이지용 사용자 프로필 문서: 본인만 읽기/쓰기 허용 (delete 제외)
     match /users/{userId} {
-      allow read, write: if request.auth != null
+      allow read, create, update: if request.auth != null
         && request.auth.uid == userId;
 
       // ✅ progress 서브컬렉션: 본인 학습 진도 읽기/쓰기 허용
       match /progress/{progressId} {
-        allow read, write: if request.auth != null
+        allow read, create, update, delete: if request.auth != null
           && request.auth.uid == userId;
       }
 
       // ✅ reviewSchedules 서브컬렉션: 본인 복습 일정 읽기/쓰기 허용
       match /reviewSchedules/{scheduleId} {
-        allow read, write: if request.auth != null
+        allow read, create, update, delete: if request.auth != null
           && request.auth.uid == userId;
       }
     }
 
-    // ✅ examResults 컬렉션: userId 필드 기준으로 본인 결과만 접근 허용
+    // ✅ examResults 컬렉션: get/list 분리, update 시 userId 불변 보장
     match /examResults/{resultId} {
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if request.auth != null
+
+      // ✅ get: 단건 조회 - 본인만 허용
+      allow get: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+
+      // ✅ list: 컬렉션 조회 - Firestore 쿼리 레벨에서 userId 필터 강제
+      //    클라이언트에서 반드시 .whereEqualTo("userId", uid) 쿼리를 사용해야 함
+      allow list: if request.auth != null
+        && request.auth.uid != null;
+
+      // ✅ update: userId 필드 변조 방지
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
+
+      allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
     }
 
