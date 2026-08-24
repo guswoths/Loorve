@@ -1,4 +1,3 @@
-// 경로: app/src/main/java/com/loorve/presentation/home/HomeScreen.kt
 package com.loorve.presentation.home
 
 import androidx.compose.foundation.clickable
@@ -6,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,14 +25,13 @@ import java.time.format.DateTimeFormatter
 fun HomeScreen(
     onNavigateToProgressDetail: (progressId: String) -> Unit = {},
     onNavigateToCalendar: () -> Unit = {},
+    onNavigateToMyPage: () -> Unit = {},          // ← 추가된 파라미터
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy년 MM월 dd일") }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // [추가] 배너 광고 표시 여부 상태 — BannerAdView의 onAdFailed 콜백으로 갱신
-    // 광고 실패 시 false → LazyColumn contentPadding bottom을 16dp로 전환
     var isBannerVisible by remember { mutableStateOf(true) }
 
     LaunchedEffect(uiState.progressSaveResult) {
@@ -55,10 +54,18 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("Loorve") },
                 actions = {
+                    // 캘린더 버튼
                     IconButton(onClick = onNavigateToCalendar) {
                         Icon(
                             imageVector        = Icons.Default.DateRange,
                             contentDescription = "복습 캘린더"
+                        )
+                    }
+                    // ← 마이페이지 버튼 추가
+                    IconButton(onClick = onNavigateToMyPage) {
+                        Icon(
+                            imageVector        = Icons.Default.AccountCircle,
+                            contentDescription = "마이페이지"
                         )
                     }
                 }
@@ -94,18 +101,12 @@ fun HomeScreen(
                 else -> {
                     LazyColumn(
                         modifier            = Modifier.fillMaxSize(),
-                        // [수정] 광고 표시 여부에 따라 bottom padding 동적 적용
-                        // isBannerVisible = true  → 66dp (배너 높이 ~50dp + 여백 16dp)
-                        // isBannerVisible = false → 16dp (광고 실패 시 불필요한 공백 제거)
                         contentPadding      = PaddingValues(
                             top    = 16.dp,
                             bottom = if (isBannerVisible) 66.dp else 16.dp
                         ),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // ── 진도 입력 섹션
-                        // [검증] ProgressInputSection은 adFailed 상태와 완전히 독립적으로 동작.
-                        // isSaveEnabled = selectedExam != null && content.isNotBlank() 로만 제어됨.
                         item {
                             ProgressInputSection(
                                 exams  = uiState.exams,
@@ -115,10 +116,6 @@ fun HomeScreen(
                             )
                         }
 
-                        // ── AdMob 배너 광고
-                        // [수정] onAdFailed 콜백으로 isBannerVisible 상태 갱신
-                        // 광고 실패 시 BannerAdView가 Compose tree에서 제거되고,
-                        // LazyColumn의 contentPadding bottom이 66dp → 16dp로 전환됨.
                         item {
                             BannerAdView(
                                 modifier   = Modifier.fillMaxWidth(),
@@ -126,7 +123,6 @@ fun HomeScreen(
                             )
                         }
 
-                        // ── 시험 목록 헤더
                         if (uiState.exams.isNotEmpty()) {
                             item {
                                 Text(
@@ -166,7 +162,6 @@ fun HomeScreen(
                             }
                         }
 
-                        // ── 학습 진도 목록 헤더
                         if (uiState.progressList.isNotEmpty()) {
                             item {
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -189,13 +184,6 @@ fun HomeScreen(
                     }
                 }
             }
-
-            // ── AdMob 배너 광고 — Box 최하단 고정 오버레이
-            // [수정] onAdFailed 콜백으로 isBannerVisible 상태 갱신
-            // LazyColumn item의 BannerAdView와 역할 분리:
-            // → LazyColumn item: 스크롤 영역 내 배너 삽입 (콘텐츠 흐름에 자연스럽게 포함)
-            // → 아래 주석처리: HomeScreen 구조상 LazyColumn item 배너만 사용
-            // (필요 시 Box 하단 고정 배너로 교체 가능)
         }
     }
 }
