@@ -37,6 +37,10 @@ fun ReviewCalendarScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // [추가] 배너 광고 표시 여부 상태 — BannerAdView의 onAdFailed 콜백으로 갱신
+    // 광고 실패 시 false로 전환 → SelectedDateSchedulePanel의 contentPadding 동적 조정
+    var isBannerVisible by remember { mutableStateOf(true) }
+
     LaunchedEffect(Unit) {
         viewModel.loadCurrentMonth()
     }
@@ -106,6 +110,7 @@ fun ReviewCalendarScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+            // [수정] isBannerVisible 전달 → contentPadding 동적 조정
             SelectedDateSchedulePanel(
                 selectedDate       = uiState.selectedDate,
                 schedules          = uiState.selectedDateSchedules,
@@ -113,12 +118,18 @@ fun ReviewCalendarScreen(
                 onToggleCompletion = { scheduleId, current ->
                     viewModel.toggleReviewCompletion(scheduleId, current)
                 },
-                modifier = Modifier.weight(1f)
+                isBannerVisible = isBannerVisible,
+                modifier        = Modifier.weight(1f)
             )
 
             // AdMob 배너 광고 — Column 최하단 고정
-            // 광고 로드 실패 시 BannerAdView 내부의 adFailed 로직이 View를 자동 제거
-            BannerAdView(modifier = Modifier.fillMaxWidth())
+            // [수정] onAdFailed 콜백으로 isBannerVisible 상태 갱신
+            // 광고 실패 시 BannerAdView가 Compose tree에서 제거되고,
+            // SelectedDateSchedulePanel의 contentPadding이 16dp로 축소됨
+            BannerAdView(
+                modifier   = Modifier.fillMaxWidth(),
+                onAdFailed = { isBannerVisible = false }
+            )
         }
     }
 }
@@ -207,7 +218,9 @@ private fun CalendarGrid(
                     val dayNumber = cellIndex - startOffset + 1
 
                     if (dayNumber < 1 || dayNumber > daysInMonth) {
-                        Box(modifier = Modifier.weight(1f).aspectRatio(1f))
+                        Box(modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f))
                     } else {
                         val date = yearMonth.atDay(dayNumber)
                         DateCell(
@@ -326,6 +339,7 @@ private fun SelectedDateSchedulePanel(
     schedules: List<ReviewSchedule>,
     onCompleteSchedule: (String) -> Unit,
     onToggleCompletion: (String, Boolean) -> Unit,
+    isBannerVisible: Boolean,   // [추가] 광고 표시 여부 → contentPadding 동적 결정
     modifier: Modifier = Modifier
 ) {
     val title = if (selectedDate != null) {
@@ -359,10 +373,12 @@ private fun SelectedDateSchedulePanel(
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                // [수정] bottom: 16dp → 66dp
-                // 배너 높이(~50dp) + 기존 여백(16dp) 합산
-                // 광고 로드 성공 시 마지막 스케줄 아이템이 배너에 가려지지 않도록 보정
-                contentPadding = PaddingValues(bottom = 66.dp)
+                // [수정] 광고 표시 여부에 따라 bottom padding 동적 적용
+                // isBannerVisible = true  → 66dp (배너 높이 ~50dp + 여백 16dp)
+                // isBannerVisible = false → 16dp (광고 실패 시 불필요한 공백 제거)
+                contentPadding = PaddingValues(
+                    bottom = if (isBannerVisible) 66.dp else 16.dp
+                )
             ) {
                 items(schedules) { schedule ->
                     ReviewScheduleItem(

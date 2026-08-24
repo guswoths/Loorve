@@ -20,7 +20,7 @@ if (keystorePropertiesFile.exists()) {
     }
 }
 
-// ✅ local.properties 로드 (WEB_CLIENT_ID 등 민감 정보 관리)
+// ✅ local.properties 로드 (WEB_CLIENT_ID, ADMOB_BANNER_UNIT_ID 등 민감 정보 관리)
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
@@ -45,15 +45,16 @@ android {
             useSupportLibrary = true
         }
 
-        // ✅ BuildConfig 필드 추가 — local.properties에서 읽어옴
+        // ✅ BuildConfig 필드 — local.properties에서 읽어옴
         buildConfigField(
             "String",
             "GOOGLE_WEB_CLIENT_ID",
             "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\""
         )
 
-        // ✅ AdMob 배너 광고 단위 ID — local.properties에서 읽어옴
-        // local.properties에 없으면 테스트 ID를 폴백으로 사용
+        // ✅ AdMob 배너 광고 단위 ID
+        // local.properties에 ADMOB_BANNER_UNIT_ID 미설정 시 → 테스트 ID 자동 폴백
+        // local.properties에 실제 ID 설정 시 → 실제 ID 사용 (배포 직전 교체)
         buildConfigField(
             "String",
             "ADMOB_BANNER_UNIT_ID",
@@ -62,12 +63,31 @@ android {
     }
 
     buildTypes {
+        debug {
+            // debug 빌드는 defaultConfig의 테스트 ID 폴백을 그대로 사용
+            // 별도 buildConfigField 불필요 (defaultConfig 상속)
+        }
         release {
+            // [추가] local.properties에 실제 ID 미설정 시 Gradle 빌드 경고 출력
+            // 실수로 테스트 ID가 배포되는 것을 사전에 감지
+            val releaseAdUnitId = localProperties.getProperty("ADMOB_BANNER_UNIT_ID", "")
+            if (releaseAdUnitId.isEmpty()) {
+                logger.warn(
+                    "⚠️ WARNING: ADMOB_BANNER_UNIT_ID is not set in local.properties. " +
+                            "Test ID will be used in release build! " +
+                            "Set the real Ad Unit ID before publishing to the Play Store."
+                )
+            }
+
+            // [권장] 배포 전 isMinifyEnabled = true 로 변경 후 하단 ProGuard 규칙 확인
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // ProGuard 활성화 시 proguard-rules.pro에 아래 규칙 추가 필요:
+            // -keep class com.google.android.gms.ads.** { *; }
+            // -dontwarn com.google.android.gms.ads.**
         }
     }
 

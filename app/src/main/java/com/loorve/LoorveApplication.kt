@@ -4,6 +4,7 @@ package com.loorve
 import android.app.Application
 import android.util.Log
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.RequestConfiguration
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestoreSettings
 import com.google.firebase.firestore.persistentCacheSettings
@@ -46,17 +47,33 @@ class LoorveApplication : Application() {
     /**
      * Google AdMob 초기화.
      * - 초기화 실패(네트워크 불가, SDK 오류 등)가 발생해도 앱 크래시 없이 계속 실행됨.
-     * - 초기화 콜백 내부에서만 광고 요청을 시작하는 것이 Google 권장 사항.
-     *   (BannerAdView에서 loadAd() 직접 호출하므로 여기선 initialize만 수행)
+     * - DEBUG 빌드에서만 테스트 장치를 등록하여 실제 광고 정책 위반을 방지.
+     * - setRequestConfiguration은 반드시 initialize() 호출 전에 실행해야 함.
      */
     private fun initAdMob() {
         try {
+            // [추가] DEBUG 빌드 전용 테스트 장치 등록
+            // release 빌드에서는 이 블록이 컴파일되지 않으므로 정책 위반 없음
+            if (BuildConfig.DEBUG) {
+                val testDeviceIds = mutableListOf(
+                    com.google.android.gms.ads.AdRequest.DEVICE_ID_EMULATOR // 에뮬레이터 자동 등록
+                    // 실기기 테스트 시 아래 주석 해제 후 Logcat에서 확인한 해시 ID 입력:
+                    // "YOUR_REAL_DEVICE_HASH_ID"
+                )
+                val configuration = RequestConfiguration.Builder()
+                    .setTestDeviceIds(testDeviceIds)
+                    .build()
+                MobileAds.setRequestConfiguration(configuration)
+                Log.d("LoorveApp", "AdMob test device configuration applied (DEBUG only).")
+            }
+
             MobileAds.initialize(this) { initializationStatus ->
                 val statusMap = initializationStatus.adapterStatusMap
                 Log.d("LoorveApp", "AdMob initialized. Adapter status: $statusMap")
             }
         } catch (e: Exception) {
             // AdMob 초기화 실패는 광고 미노출로만 처리 — 앱 크래시 금지
+            // 알림(receiver/service) 및 핵심 기능은 이 예외와 독립적으로 동작함
             Log.e("LoorveApp", "AdMob initialization failed (non-fatal): ${e.message}")
         }
     }
