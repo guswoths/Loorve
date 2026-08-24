@@ -124,7 +124,7 @@ val LoorveTypography = Typography(
     labelSmall = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
+        fontSize = 12.sp,   // 한국어 가독성: 12sp 절대 최솟값 준수
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp,
     ),

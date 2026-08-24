@@ -1,3 +1,4 @@
+// app/src/main/java/com/loorve/presentation/home/HomeScreen.kt
 package com.loorve.presentation.home
 
 import androidx.compose.foundation.clickable
@@ -11,27 +12,35 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.domain.model.Progress
 import com.loorve.ui.component.BannerAdView
+import com.loorve.ui.component.DdayCard
+import com.loorve.ui.component.EmptyStateView
+import com.loorve.ui.component.LoorveCard
+import com.loorve.ui.component.SectionLabel
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateToProgressDetail: (progressId: String) -> Unit = {},
     onNavigateToCalendar: () -> Unit = {},
-    onNavigateToMyPage: () -> Unit = {},          // ← 추가된 파라미터
+    onNavigateToMyPage: () -> Unit = {},
+    onNavigateToExamSetting: () -> Unit = {},   // 빈 상태 CTA용 — 확인 필요: NavHost에 파라미터 추가 필요
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy년 MM월 dd일") }
     val snackbarHostState = remember { SnackbarHostState() }
-
     var isBannerVisible by remember { mutableStateOf(true) }
 
     LaunchedEffect(uiState.progressSaveResult) {
@@ -50,44 +59,78 @@ fun HomeScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Loorve") },
+                title = {
+                    Text(
+                        "Loorve",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor        = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                ),
                 actions = {
-                    // 캘린더 버튼
-                    IconButton(onClick = onNavigateToCalendar) {
+                    IconButton(
+                        onClick = onNavigateToCalendar,
+                        modifier = Modifier.semantics { contentDescription = "복습 캘린더" }
+                    ) {
                         Icon(
                             imageVector        = Icons.Default.DateRange,
-                            contentDescription = "복습 캘린더"
+                            contentDescription = null,
+                            tint               = MaterialTheme.colorScheme.onBackground
                         )
                     }
-                    // ← 마이페이지 버튼 추가
-                    IconButton(onClick = onNavigateToMyPage) {
+                    IconButton(
+                        onClick = onNavigateToMyPage,
+                        modifier = Modifier.semantics { contentDescription = "마이페이지" }
+                    ) {
                         Icon(
                             imageVector        = Icons.Default.AccountCircle,
-                            contentDescription = "마이페이지"
+                            contentDescription = null,
+                            tint               = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 }
             )
+        },
+        // ✅ 광고 배너: 학습 흐름을 방해하지 않도록 하단 고정
+        bottomBar = {
+            if (isBannerVisible) {
+                Surface(
+                    color     = MaterialTheme.colorScheme.background,
+                    tonalElevation = 0.dp
+                ) {
+                    BannerAdView(
+                        modifier   = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding(),
+                        onAdFailed = { isBannerVisible = false }
+                    )
+                }
+            }
         }
     ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 24.dp)
-        ) {
-            when {
-                uiState.isLoading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
 
-                uiState.errorMessage != null -> {
-                    Column(
-                        modifier            = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+        when {
+            uiState.isLoading -> {
+                Box(
+                    modifier         = Modifier.fillMaxSize().padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            }
+
+            uiState.errorMessage != null -> {
+                Box(
+                    modifier         = Modifier.fillMaxSize().padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text  = uiState.errorMessage ?: "오류가 발생했습니다.",
                             style = MaterialTheme.typography.bodyLarge,
@@ -97,89 +140,83 @@ fun HomeScreen(
                         Button(onClick = { viewModel.loadExams() }) { Text("다시 시도") }
                     }
                 }
+            }
 
-                else -> {
-                    LazyColumn(
-                        modifier            = Modifier.fillMaxSize(),
-                        contentPadding      = PaddingValues(
-                            top    = 16.dp,
-                            bottom = if (isBannerVisible) 66.dp else 16.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        item {
-                            ProgressInputSection(
-                                exams  = uiState.exams,
-                                onSave = { id, content, completed, total ->
-                                    viewModel.addProgress(id, content, completed, total)
-                                }
+            else -> {
+                LazyColumn(
+                    modifier       = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // ── D-Day 요약 카드 (최근 시험 1개) ──────────────────
+                    val nearestExam = uiState.exams.minByOrNull { it.examDate }
+                    if (nearestExam != null && nearestExam.examDate > 0L) {
+                        val today = LocalDate.now()
+                        val examLocalDate = Instant.ofEpochMilli(nearestExam.examDate)
+                            .atZone(ZoneId.systemDefault()).toLocalDate()
+                        val daysLeft = ChronoUnit.DAYS.between(today, examLocalDate)
+                        if (daysLeft >= 0) {
+                            item(key = "dday_card") {
+                                DdayCard(
+                                    subjectName = nearestExam.subjectName,
+                                    daysLeft    = daysLeft
+                                )
+                            }
+                        }
+                    }
+
+                    // ── 오늘의 진도 입력 ──────────────────────────────────
+                    item(key = "progress_input") {
+                        ProgressInputSection(
+                            exams  = uiState.exams,
+                            onSave = { id, content, completed, total ->
+                                viewModel.addProgress(id, content, completed, total)
+                            }
+                        )
+                    }
+
+                    // ── 내 시험 목록 ──────────────────────────────────────
+                    if (uiState.exams.isNotEmpty()) {
+                        item(key = "exam_section_label") {
+                            SectionLabel(text = "내 시험")
+                        }
+                        items(
+                            items = uiState.exams,
+                            key   = { it.examId }
+                        ) { exam ->
+                            ExamListItem(
+                                subjectName = exam.subjectName,
+                                examDate    = exam.examDate,
+                                formatter   = dateFormatter
                             )
                         }
-
-                        item {
-                            BannerAdView(
-                                modifier   = Modifier.fillMaxWidth(),
-                                onAdFailed = { isBannerVisible = false }
+                    } else {
+                        item(key = "exam_empty") {
+                            EmptyStateView(
+                                message     = "등록된 시험이 없습니다.",
+                                subMessage  = "시험을 추가하면 복습 일정이 자동으로 생성됩니다.",
+                                actionLabel = "시험 추가하기",
+                                onAction    = onNavigateToExamSetting
                             )
                         }
+                    }
 
-                        if (uiState.exams.isNotEmpty()) {
-                            item {
-                                Text(
-                                    text     = "내 시험 목록",
-                                    style    = MaterialTheme.typography.headlineSmall.copy(
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                            }
-                            items(uiState.exams) { exam ->
-                                ExamListItem(
-                                    subjectName = exam.subjectName,
-                                    examDate    = exam.examDate,
-                                    formatter   = dateFormatter
-                                )
-                            }
-                        } else {
-                            item {
-                                Column(
-                                    modifier            = Modifier.fillMaxWidth(),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Spacer(modifier = Modifier.height(24.dp))
-                                    Text(
-                                        text  = "등록된 시험이 없습니다.",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text  = "시험을 추가해 보세요!",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                    )
-                                }
-                            }
+                    // ── 학습 진도 기록 ────────────────────────────────────
+                    if (uiState.progressList.isNotEmpty()) {
+                        item(key = "progress_section_label") {
+                            SectionLabel(text = "학습 진도 기록")
                         }
-
-                        if (uiState.progressList.isNotEmpty()) {
-                            item {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text  = "학습 진도 기록",
-                                    style = MaterialTheme.typography.headlineSmall.copy(
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                            }
-                            items(uiState.progressList) { progress ->
-                                ProgressListItem(
-                                    progress  = progress,
-                                    formatter = dateFormatter,
-                                    onClick   = { onNavigateToProgressDetail(progress.progressId) }
-                                )
-                            }
+                        items(
+                            items = uiState.progressList,
+                            key   = { it.progressId }
+                        ) { progress ->
+                            ProgressListItem(
+                                progress  = progress,
+                                formatter = dateFormatter,
+                                onClick   = { onNavigateToProgressDetail(progress.progressId) }
+                            )
                         }
                     }
                 }
@@ -188,6 +225,7 @@ fun HomeScreen(
     }
 }
 
+// ── 진도 목록 아이템 ──────────────────────────────────────────────────────
 @Composable
 private fun ProgressListItem(
     progress: Progress,
@@ -202,16 +240,15 @@ private fun ProgressListItem(
             .format(formatter)
     }
 
-    Card(
-        modifier  = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    LoorveCard(
+        modifier  = Modifier.fillMaxWidth(),
+        onClick   = onClick,
+        elevation = 0.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 18.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Row(
@@ -222,24 +259,29 @@ private fun ProgressListItem(
                 Text(
                     text  = progress.content.take(30) + if (progress.content.length > 30) "…" else "",
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
                     text  = formattedDate,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
                 text  = "${progress.completedCount} / ${progress.totalCount}  " +
-                        if (progress.isCompleted) "✅ 완료" else "⏳ 진행 중",
+                        if (progress.isCompleted) "완료" else "진행 중",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (progress.isCompleted)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
 
+// ── 시험 목록 아이템 ──────────────────────────────────────────────────────
 @Composable
 private fun ExamListItem(
     subjectName: String,
@@ -254,20 +296,21 @@ private fun ExamListItem(
             .format(formatter)
     }
 
-    Card(
+    LoorveCard(
         modifier  = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = 0.dp
     ) {
         Row(
             modifier              = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 18.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment     = Alignment.CenterVertically
         ) {
             Text(
                 text  = subjectName,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onBackground
             )
             Text(
                 text  = formattedDate,

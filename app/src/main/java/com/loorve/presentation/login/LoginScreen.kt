@@ -1,3 +1,4 @@
+// app/src/main/java/com/loorve/presentation/login/LoginScreen.kt
 package com.loorve.presentation.login
 
 import android.app.Activity
@@ -7,20 +8,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.loorve.presentation.auth.AuthUiState
 import com.loorve.presentation.auth.AuthViewModel
+import com.loorve.ui.component.LoorveOutlineButton
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
-    viewModel: AuthViewModel = hiltViewModel()          // ✅ AuthViewModel 하나만 사용
+    viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    // ✅ CredentialManager는 Activity Context 필요 → 안전하게 캐스팅
+    val context  = LocalContext.current
     val activity = context as? Activity ?: return
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -37,13 +40,14 @@ fun LoginScreen(
                 snackbarHostState.showSnackbar(state.message)
                 viewModel.resetState()
             }
-            is AuthUiState.Cancelled -> viewModel.resetState() // 취소는 조용히 처리
+            is AuthUiState.Cancelled -> viewModel.resetState()
             else -> Unit
         }
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost    = { SnackbarHost(snackbarHostState) },
+        containerColor  = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -53,46 +57,54 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // ── 앱 타이틀 ──
+            // ── 앱 로고 텍스트 ──
             Text(
-                text = "Loorve",
-                style = MaterialTheme.typography.displayMedium,
+                text  = "Loorve",
+                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.height(8.dp))
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ── USP 핵심 문구 (분리된 2줄로 시각적 강조) ──
             Text(
-                text = "시험일까지 가장 효율적인 복습 루프를 설계하는 학습 플래너",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text      = "시험일까지 복습 일정을\n자동으로 배치해 드립니다",
+                style     = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Normal,
+                    lineHeight = MaterialTheme.typography.titleMedium.lineHeight
+                ),
+                color     = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text      = "에빙하우스 망각곡선 기반 자동 복습 스케줄러",
+                style     = MaterialTheme.typography.bodySmall,
+                color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
             Spacer(modifier = Modifier.height(56.dp))
 
-            // ── Google 로그인 버튼 (유일한 버튼) ──
-            OutlinedButton(
-                onClick = {
-                    // ✅ Activity Context를 직접 전달 → CredentialManager 팝업 정상 동작
-                    viewModel.launchGoogleSignIn(activity)
-                },
-                enabled = !isLoading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("Google로 계속하기")   // 로그인/회원가입 통합 문구
-                }
-            }
+            // ── Google 로그인 버튼 ──
+            // Google 브랜드 가이드라인 준수 (텍스트 유지), 전체 톤에 맞게 outline 스타일
+            LoorveOutlineButton(
+                text      = "Google로 계속하기",
+                onClick   = { viewModel.launchGoogleSignIn(activity) },
+                enabled   = !isLoading,
+                isLoading = isLoading,
+                modifier  = Modifier.fillMaxWidth()
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
+
             Text(
-                text = "Google 계정으로 로그인하거나 자동으로 가입됩니다.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text      = "Google 계정으로 로그인하거나 자동으로 가입됩니다.",
+                style     = MaterialTheme.typography.labelMedium,
+                color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
         }
     }
