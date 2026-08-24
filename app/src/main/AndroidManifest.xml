@@ -27,9 +27,14 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Loorve">
 
+        <!--
+            AdMob App ID — strings.xml에서 관리 (하드코딩 금지)
+            테스트 ID: ca-app-pub-3940256099942544~3347511713
+            배포 시 실제 ID로 strings.xml 값만 교체할 것
+        -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="@string/admob_app_id" />
 
         <activity
             android:name=".MainActivity"

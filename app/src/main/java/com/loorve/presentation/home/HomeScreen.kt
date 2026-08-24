@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange    // ← 추가
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,15 +15,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.domain.model.Progress
+import com.loorve.ui.component.BannerAdView   // ← 추가
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)    // ← TopAppBar 사용을 위해 추가
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateToProgressDetail: (progressId: String) -> Unit = {},
-    onNavigateToCalendar: () -> Unit = {},               // ← 작업 2: 파라미터 추가
+    onNavigateToCalendar: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -46,7 +47,7 @@ fun HomeScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        topBar = {                                       // ← 작업 2: TopAppBar 추가
+        topBar = {
             TopAppBar(
                 title = { Text("Loorve") },
                 actions = {
@@ -99,6 +100,15 @@ fun HomeScreen(
                                 onSave = { id, content, completed, total ->
                                     viewModel.addProgress(id, content, completed, total)
                                 }
+                            )
+                        }
+
+                        // ── AdMob 배너 광고
+                        // [방어 설계] BannerAdView 내부에서 로드 실패 시 자기 자신을 숨김.
+                        // LazyColumn item이 0 높이가 되어 핵심 UI 배치에 영향 없음.
+                        item {
+                            BannerAdView(
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
 

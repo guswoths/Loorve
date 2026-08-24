@@ -51,6 +51,14 @@ android {
             "GOOGLE_WEB_CLIENT_ID",
             "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\""
         )
+
+        // ✅ AdMob 배너 광고 단위 ID — local.properties에서 읽어옴
+        // local.properties에 없으면 테스트 ID를 폴백으로 사용
+        buildConfigField(
+            "String",
+            "ADMOB_BANNER_UNIT_ID",
+            "\"${localProperties.getProperty("ADMOB_BANNER_UNIT_ID", "ca-app-pub-3940256099942544/6300978111")}\""
+        )
     }
 
     buildTypes {
@@ -112,6 +120,9 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
     implementation("com.google.firebase:firebase-messaging-ktx")
+
+    // ✅ Google AdMob — 배너 광고 SDK
+    implementation("com.google.android.gms:play-services-ads:23.6.0")
 
     implementation("com.google.dagger:hilt-android:2.59.2")
     ksp("com.google.dagger:hilt-compiler:2.59.2")
