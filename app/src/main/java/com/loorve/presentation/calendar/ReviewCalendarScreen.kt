@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.domain.model.ReviewSchedule
-import com.loorve.ui.component.BannerAdView  // ← [추가] AdMob 배너 컴포넌트
+import com.loorve.ui.component.BannerAdView
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -106,7 +106,6 @@ fun ReviewCalendarScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-            // ▼ [변경] weight(1f) 추가 — LazyColumn이 내부에 있으므로 남은 공간을 여기서 소화
             SelectedDateSchedulePanel(
                 selectedDate       = uiState.selectedDate,
                 schedules          = uiState.selectedDateSchedules,
@@ -114,19 +113,18 @@ fun ReviewCalendarScreen(
                 onToggleCompletion = { scheduleId, current ->
                     viewModel.toggleReviewCompletion(scheduleId, current)
                 },
-                modifier           = Modifier.weight(1f)  // ← 추가
+                modifier = Modifier.weight(1f)
             )
 
-            // ▼ [추가] AdMob 배너 광고 — Column 최하단 고정
-            // 광고 로드 실패 시 BannerAdView 내부의 adFailed 로직이 View를 자동 제거하므로
-            // 이 화면에서 별도 예외 처리 불필요
+            // AdMob 배너 광고 — Column 최하단 고정
+            // 광고 로드 실패 시 BannerAdView 내부의 adFailed 로직이 View를 자동 제거
             BannerAdView(modifier = Modifier.fillMaxWidth())
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MonthNavigationHeader — 기존 코드 그대로 유지
+// MonthNavigationHeader
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun MonthNavigationHeader(
@@ -161,7 +159,7 @@ private fun MonthNavigationHeader(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WeekDayHeader — 기존 코드 그대로 유지
+// WeekDayHeader
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun WeekDayHeader() {
@@ -185,7 +183,7 @@ private fun WeekDayHeader() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CalendarGrid — 기존 코드 그대로 유지
+// CalendarGrid
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun CalendarGrid(
@@ -230,7 +228,7 @@ private fun CalendarGrid(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DateCell — 기존 코드 그대로 유지
+// DateCell
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun DateCell(
@@ -320,7 +318,7 @@ private fun DateCell(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SelectedDateSchedulePanel — [변경] modifier 파라미터 추가 (weight(1f) 수신용)
+// SelectedDateSchedulePanel
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun SelectedDateSchedulePanel(
@@ -328,7 +326,7 @@ private fun SelectedDateSchedulePanel(
     schedules: List<ReviewSchedule>,
     onCompleteSchedule: (String) -> Unit,
     onToggleCompletion: (String, Boolean) -> Unit,
-    modifier: Modifier = Modifier  // ← [추가] 외부에서 weight(1f) 전달 가능하도록
+    modifier: Modifier = Modifier
 ) {
     val title = if (selectedDate != null) {
         "${selectedDate.monthValue}월 ${selectedDate.dayOfMonth}일 복습 일정"
@@ -336,8 +334,6 @@ private fun SelectedDateSchedulePanel(
         "날짜를 선택하세요"
     }
 
-    // ▼ modifier를 Column 대신 최상단 래퍼에 적용 — weight(1f)가 올바르게 작동하려면
-    //   Column으로 감싸야 합니다 (기존에는 Text + LazyColumn이 바로 나열됨)
     Column(modifier = modifier) {
         Text(
             text     = title,
@@ -363,7 +359,10 @@ private fun SelectedDateSchedulePanel(
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding      = PaddingValues(bottom = 16.dp)
+                // [수정] bottom: 16dp → 66dp
+                // 배너 높이(~50dp) + 기존 여백(16dp) 합산
+                // 광고 로드 성공 시 마지막 스케줄 아이템이 배너에 가려지지 않도록 보정
+                contentPadding = PaddingValues(bottom = 66.dp)
             ) {
                 items(schedules) { schedule ->
                     ReviewScheduleItem(
@@ -378,7 +377,7 @@ private fun SelectedDateSchedulePanel(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ReviewScheduleItem — 기존 코드 그대로 유지
+// ReviewScheduleItem
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun ReviewScheduleItem(
