@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ✅ [기존] 최상위 exams 컬렉션
+    // ✅ 최상위 exams 컬렉션: 본인이 생성한 시험만 접근 허용
     match /exams/{examId} {
       allow create: if request.auth != null
         && request.resource.data.createdBy == request.auth.uid;
@@ -10,57 +10,31 @@ service cloud.firestore {
         && resource.data.createdBy == request.auth.uid;
     }
 
-    // ✅ [기존] users/{userId}/progress 중첩 컬렉션
-    match /users/{userId}/progress/{progressId} {
-      allow read, write: if request.auth != null
-        && request.auth.uid == userId;
-    }
-
-    // ✅ [신규 추가] users/{userId}/reviewSchedules 중첩 컬렉션
-    // ReviewCalendarScreen의 월 변경 시 이 규칙이 없어 PERMISSION_DENIED 발생
-    match /users/{userId}/reviewSchedules/{scheduleId} {
-      allow read, write: if request.auth != null
-        && request.auth.uid == userId;
-    }
-
-    // ✅ [기존] examResults 컬렉션
-    match /examResults/{resultId} {
-      allow create: if request.auth != null
-        && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if request.auth != null
-        && resource.data.userId == request.auth.uid;
-
+    // ✅ 마이페이지용 사용자 프로필 문서: 본인만 읽기/쓰기 허용
     match /users/{userId} {
       allow read, write: if request.auth != null
         && request.auth.uid == userId;
+
+      // ✅ progress 서브컬렉션: 본인 학습 진도 읽기/쓰기 허용
+      match /progress/{progressId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+      // ✅ reviewSchedules 서브컬렉션: 본인 복습 일정 읽기/쓰기 허용
+      match /reviewSchedules/{scheduleId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == userId;
+      }
     }
 
-    // ✅ [기존] 최상위 exams 컬렉션
-    match /exams/{examId} {
-      allow create: if request.auth != null
-        && request.resource.data.createdBy == request.auth.uid;
-      allow read, update, delete: if request.auth != null
-        && resource.data.createdBy == request.auth.uid;
-    }
-
-    // ✅ [기존] users/{userId}/progress 중첩 컬렉션
-    match /users/{userId}/progress/{progressId} {
-      allow read, write: if request.auth != null
-        && request.auth.uid == userId;
-    }
-
-    // ✅ [기존] users/{userId}/reviewSchedules 중첩 컬렉션
-    match /users/{userId}/reviewSchedules/{scheduleId} {
-      allow read, write: if request.auth != null
-        && request.auth.uid == userId;
-    }
-
-    // ✅ [기존] examResults 컬렉션
+    // ✅ examResults 컬렉션: userId 필드 기준으로 본인 결과만 접근 허용
     match /examResults/{resultId} {
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid;
       allow read, update, delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
     }
+
   }
 }
