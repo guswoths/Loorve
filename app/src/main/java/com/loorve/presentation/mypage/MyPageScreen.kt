@@ -23,6 +23,8 @@ import com.loorve.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyPageScreen(
+    onBack: () -> Unit,                               // ✅ 추가
+    onNavigateToNotificationTimeSetting: () -> Unit,  // ✅ 추가
     onSignOut: () -> Unit,
     viewModel: MyPageViewModel = hiltViewModel()
 ) {
@@ -35,6 +37,15 @@ fun MyPageScreen(
             TopAppBar(
                 title = {
                     Text("MY", style = LoorveTypography.titleLarge, color = OnBackground)
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {           // ✅ 추가
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "뒤로가기",
+                            tint = OnBackground
+                        )
+                    }
                 },
                 actions = {
                     IconButton(onClick = { /* settings */ }) {
@@ -52,7 +63,7 @@ fun MyPageScreen(
                 .padding(padding)
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(vertical = 20.dp, bottom = 88.dp)
+            contentPadding = PaddingValues(top = 20.dp, bottom = 88.dp)  // ✅ 수정
         ) {
             // 프로필 섹션
             item {
@@ -128,19 +139,25 @@ fun MyPageScreen(
                 LoorveCard(modifier = Modifier.fillMaxWidth()) {
                     Column {
                         val menuItems = listOf(
-                            Triple(Icons.Default.Notifications, "알림 설정", { }),
+                            Triple(Icons.Default.Notifications, "알림 설정", onNavigateToNotificationTimeSetting), // ✅ 수정
                             Triple(Icons.Default.Tune, "복습 설정", { }),
                         )
                         menuItems.forEachIndexed { index, (icon, label, action) ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(56.dp),
+                                    .height(56.dp)
+                                    .clickable { action() },           // ✅ 클릭 연결
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(icon, null, tint = OnSurface, modifier = Modifier.size(22.dp))
                                 Spacer(Modifier.width(12.dp))
-                                Text(label, style = LoorveTypography.bodyLarge, color = OnBackground, modifier = Modifier.weight(1f))
+                                Text(
+                                    label,
+                                    style = LoorveTypography.bodyLarge,
+                                    color = OnBackground,
+                                    modifier = Modifier.weight(1f)
+                                )
                                 Icon(Icons.Default.ChevronRight, null, tint = OnSurfaceVariant)
                             }
                             if (index < menuItems.lastIndex) {

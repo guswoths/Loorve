@@ -20,36 +20,30 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
-// ── UI 표시용 중간 모델 ─────────────────────────────────────────────────────
-
 data class NearestExamUiModel(
-    val subjectName: String,         // HomeScreen: exam.subjectName
-    val daysLeft: Int,               // HomeScreen: daysLeft
-    val examDateFormatted: String    // HomeScreen: examDateFormatted
+    val subjectName: String,
+    val daysLeft: Int,
+    val examDateFormatted: String
 )
 
 data class ProgressUiModel(
-    val id: String,                  // HomeScreen: progress.id
+    val id: String,
     val examId: String,
     val content: String,
-    val completed: Int,              // HomeScreen: completed
-    val total: Int,                  // HomeScreen: total
-    val dateFormatted: String        // HomeScreen: dateFormatted
+    val completed: Int,
+    val total: Int,
+    val dateFormatted: String
 )
-
-// ── UiState ────────────────────────────────────────────────────────────────
 
 data class HomeUiState(
     val exams: List<Exam> = emptyList(),
     val progressList: List<ProgressUiModel> = emptyList(),
-    val nearestExam: NearestExamUiModel? = null,  // HomeScreen: nearestExam
+    val nearestExam: NearestExamUiModel? = null,
     val isLoading: Boolean = true,
-    val isSaving: Boolean = false,                // HomeScreen: isSaving
-    val saveMessage: String? = null,              // HomeScreen: saveMessage
+    val isSaving: Boolean = false,
+    val saveMessage: String? = null,
     val errorMessage: String? = null
 )
-
-// ── ViewModel ─────────────────────────────────────────────────────────────
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -68,7 +62,6 @@ class HomeViewModel @Inject constructor(
         loadProgressList()
     }
 
-    // ── 시험 목록 로드 + nearestExam 계산 ──────────────────────────────────
     fun loadExams() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
@@ -87,11 +80,13 @@ class HomeViewModel @Inject constructor(
                             runCatching {
                                 val examDate = LocalDate.parse(exam.examDate)
                                 val today    = LocalDate.now()
+                                // ✅ Long → Int 변환: toInt() 명시
                                 val days     = ChronoUnit.DAYS.between(today, examDate).toInt()
                                 if (days >= 0) {
                                     NearestExamUiModel(
                                         subjectName       = exam.subjectName,
                                         daysLeft          = days,
+                                        // ✅ Int를 String으로 변환
                                         examDateFormatted = examDate.format(displayFormatter)
                                     )
                                 } else null
@@ -101,16 +96,15 @@ class HomeViewModel @Inject constructor(
 
                     _uiState.update {
                         it.copy(
-                            isLoading    = false,
-                            exams        = exams,
-                            nearestExam  = nearest
+                            isLoading   = false,
+                            exams       = exams,
+                            nearestExam = nearest
                         )
                     }
                 }
         }
     }
 
-    // ── 진도 목록 로드 ──────────────────────────────────────────────────────
     fun loadProgressList() {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         viewModelScope.launch {
@@ -119,6 +113,7 @@ class HomeViewModel @Inject constructor(
                 .collect { list ->
                     val uiList = list.map { p ->
                         ProgressUiModel(
+                            // ✅ p.id, p.date 필드명 정확히 매핑
                             id            = p.id,
                             examId        = p.examId,
                             content       = p.content,
@@ -134,7 +129,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // ── 진도 저장 ───────────────────────────────────────────────────────────
     fun addProgress(
         examId: String,
         content: String,
@@ -178,7 +172,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // ── 메시지 소비 (HomeScreen에서 LaunchedEffect 후 호출) ──────────────────
     fun clearSaveMessage() {
         _uiState.update { it.copy(saveMessage = null) }
     }
