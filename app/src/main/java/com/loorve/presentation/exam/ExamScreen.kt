@@ -22,6 +22,8 @@ import com.loorve.ui.component.*
 import com.loorve.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,9 +38,21 @@ fun ExamScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("시험 관리",
-                        style = LoorveTypography.titleLarge,
-                        color = OnBackground)
+                    Column {
+                        Text(
+                            text = "REVIEW",
+                            style = LoorveTypography.labelSmall.copy(
+                                letterSpacing = 2.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = Primary
+                        )
+                        Text(
+                            text = "복습 블록",
+                            style = LoorveTypography.titleLarge,
+                            color = OnBackground
+                        )
+                    }
                 },
                 actions = {
                     IconButton(onClick = {
