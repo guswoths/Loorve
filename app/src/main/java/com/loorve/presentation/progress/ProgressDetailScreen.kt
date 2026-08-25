@@ -1,732 +1,128 @@
-// 경로: app/src/main/java/com/loorve/presentation/progress/ProgressDetailScreen.kt
 package com.loorve.presentation.progress
 
-import androidx.activity.OnBackPressedCallback
-import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.google.firebase.auth.FirebaseAuth
-import com.loorve.domain.model.Progress
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TimePickerState
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import java.util.Calendar
-
-@Composable
-fun ProgressDetailScreen(
-    progressId: String,
-    onNavigateBack: () -> Unit,
-    onNavigateToCalendar: () -> Unit = {},
-    viewModel: ProgressDetailViewModel = hiltViewModel()
-) {
-    val uid = remember { FirebaseAuth.getInstance().currentUser?.uid ?: "" }
-    val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(progressId) {
-        if (uid.isNotBlank()) viewModel.loadProgress(uid, progressId)
-    }
-
-    LaunchedEffect(uiState.saveResult) {
-        when (uiState.saveResult) {
-            true -> {
-                val isForgettingCurve = uiState.successMessage?.contains("5개") == true
-                val result = snackbarHostState.showSnackbar(
-                    message     = uiState.successMessage ?: "저장되었습니다.",
-                    actionLabel = if (isForgettingCurve) "캘린더 확인" else null,
-                    duration    = SnackbarDuration.Long
-                )
-                if (isForgettingCurve && result == SnackbarResult.ActionPerformed) {
-                    onNavigateToCalendar()
-                }
-                viewModel.consumeSaveResult()
-            }
-            false -> {
-                snackbarHostState.showSnackbar("저장에 실패했습니다. 다시 시도해 주세요.")
-                viewModel.consumeSaveResult()
-            }
-            null -> Unit
-        }
-    }
-
-    LaunchedEffect(uiState.deleteResult) {
-        when (uiState.deleteResult) {
-            true -> {
-                snackbarHostState.showSnackbar("삭제되었습니다.")
-                viewModel.consumeDeleteResult()
-                onNavigateBack()
-            }
-            false -> {
-                snackbarHostState.showSnackbar("삭제에 실패했습니다. 다시 시도해 주세요.")
-                viewModel.consumeDeleteResult()
-            }
-            null -> Unit
-        }
-    }
-
-    ProgressDetailContent(
-        uiState              = uiState,
-        snackbarHostState    = snackbarHostState,
-        onNavigateBack       = onNavigateBack,
-        onEnterEditMode      = { viewModel.enterEditMode() },
-        onExitEditMode       = { viewModel.exitEditMode() },
-        onSave               = { updated -> viewModel.saveProgress(uid, updated) },
-        onDelete             = { viewModel.deleteProgress(uid, progressId) },
-        onRetry              = { viewModel.loadProgress(uid, progressId) },
-        onEditChanged        = { c, cc, tc, ic -> viewModel.onEditChanged(c, cc, tc, ic) },
-        onReviewScheduleModeChanged   = { viewModel.onReviewScheduleModeChanged(it) },  // ✅ 추가
-        onManualReviewDateTimeChanged = { viewModel.onManualReviewDateTimeChanged(it) }, // ✅ 추가
-        onNavigateToCalendar = onNavigateToCalendar
-    )
-}
+import com.loorve.ui.component.*
+import com.loorve.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProgressDetailContent(
-    uiState: ProgressDetailUiState,
-    snackbarHostState: SnackbarHostState,
-    onNavigateBack: () -> Unit,
-    onEnterEditMode: () -> Unit,
-    onExitEditMode: () -> Unit,
-    onSave: (Progress) -> Unit,
-    onDelete: () -> Unit,
-    onRetry: () -> Unit,
-    onEditChanged: (String, String, String, Boolean) -> Unit,
-    onReviewScheduleModeChanged: (ReviewScheduleMode) -> Unit = {},  // ✅ 추가
-    onManualReviewDateTimeChanged: (Long) -> Unit = {},
-    onNavigateToCalendar: () -> Unit = {}   // ✅ 원인2 수정: 파라미터 추가
+fun ProgressDetailScreen(
+    progressId: String,
+    onBack: () -> Unit,
+    viewModel: ProgressDetailViewModel = hiltViewModel()
 ) {
-    var editContent        by remember { mutableStateOf("") }
-    var editCompletedCount by remember { mutableStateOf("") }
-    var editTotalCount     by remember { mutableStateOf("") }
-    var editIsCompleted    by remember { mutableStateOf(false) }
+    LaunchedEffect(progressId) { viewModel.load(progressId) }
+    val uiState by viewModel.uiState.collectAsState()
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showEditSheet by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.isEditMode, uiState.progress) {
-        if (uiState.isEditMode) {
-            uiState.progress?.let { p ->
-                editContent        = p.content
-                editCompletedCount = p.completedCount.toString()
-                editTotalCount     = p.totalCount.toString()
-                editIsCompleted    = p.isCompleted
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        uiState.progress?.subjectName ?: "",
+                        style = LoorveTypography.titleMedium,
+                        color = OnBackground
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, null, tint = OnBackground)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
+            )
+        },
+        containerColor = Background
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            uiState.progress?.let { progress ->
+                LoorveCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = progress.content,
+                            style = LoorveTypography.bodyLarge,
+                            color = OnBackground
+                        )
+                        LoorveProgressBar(
+                            completed = progress.completed,
+                            total = progress.total,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            text = progress.dateFormatted,
+                            style = LoorveTypography.labelMedium,
+                            color = OnSurfaceVariant
+                        )
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = if (progress.isCompleted) Success.copy(0.15f) else Tertiary.copy(0.15f)
+                        ) {
+                            Text(
+                                text = if (progress.isCompleted) "완료" else "진행 중",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                style = LoorveTypography.labelMedium,
+                                color = if (progress.isCompleted) Success else Tertiary
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { showEditSheet = true },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Primary),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Primary)
+                    ) {
+                        Text("수정", color = Primary)
+                    }
+                    TextButton(
+                        onClick = { showDeleteDialog = true },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("삭제", color = Error)
+                    }
+                }
             }
         }
-    }
-
-    var showExitConfirmDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog      by remember { mutableStateOf(false) }
-
-    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-    DisposableEffect(uiState.isEditMode, uiState.isDirty) {
-        val callback = object : OnBackPressedCallback(enabled = uiState.isEditMode) {
-            override fun handleOnBackPressed() {
-                if (uiState.isDirty) showExitConfirmDialog = true
-                else onExitEditMode()
-            }
-        }
-        backDispatcher?.addCallback(callback)
-        onDispose { callback.remove() }
-    }
-
-    if (showExitConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showExitConfirmDialog = false },
-            title   = { Text("저장하지 않고 나가시겠어요?") },
-            text    = { Text("변경 사항이 저장되지 않습니다.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showExitConfirmDialog = false
-                    onExitEditMode()
-                }) { Text("나가기") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showExitConfirmDialog = false }) { Text("계속 편집") }
-            }
-        )
     }
 
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title   = { Text("진도 삭제") },
-            text    = { Text("이 항목을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDelete()
-                    }
-                ) { Text("삭제", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("취소") }
-            }
-        )
-    }
-
-    Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text(if (uiState.isEditMode) "진도 편집" else "진도 상세") },
-                navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            if (uiState.isEditMode) {
-                                if (uiState.isDirty) showExitConfirmDialog = true
-                                else onExitEditMode()
-                            } else {
-                                onNavigateBack()
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "뒤로 가기"
-                        )
-                    }
-                },
-                actions = {
-                    if (!uiState.isEditMode && uiState.progress != null) {
-                        IconButton(onClick = onEnterEditMode) {
-                            Icon(
-                                imageVector        = Icons.Filled.Edit,
-                                contentDescription = "편집"
-                            )
-                        }
-                        IconButton(onClick = { showDeleteDialog = true }) {
-                            Icon(
-                                imageVector        = Icons.Filled.Delete,
-                                contentDescription = "삭제",
-                                tint               = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                    if (uiState.isEditMode) {
-                        TextButton(
-                            onClick = {
-                                val base      = uiState.progress ?: return@TextButton
-                                val completed = editCompletedCount.toIntOrNull() ?: 0
-                                val total     = editTotalCount.toIntOrNull() ?: 0
-                                onSave(
-                                    base.copy(
-                                        content        = editContent,
-                                        completedCount = completed,
-                                        totalCount     = total,
-                                        isCompleted    = editIsCompleted
-                                    )
-                                )
-                            }
-                        ) { Text("저장") }
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 24.dp)
-        ) {
-            when {
-                uiState.isLoading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
-                uiState.errorMessage != null -> {
-                    Column(
-                        modifier            = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text  = uiState.errorMessage ?: "오류가 발생했습니다.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(onClick = onRetry) { Text("다시 시도") }
-                    }
-                }
-                uiState.progress == null -> {
-                    Text(
-                        text     = "데이터를 찾을 수 없습니다.",
-                        modifier = Modifier.align(Alignment.Center),
-                        style    = MaterialTheme.typography.bodyLarge,
-                        color    = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                else -> {
-                    val progress = uiState.progress
-                    if (uiState.isEditMode) {
-                        ProgressEditBody(
-                            editContent        = editContent,
-                            editCompletedCount = editCompletedCount,
-                            editTotalCount     = editTotalCount,
-                            editIsCompleted    = editIsCompleted,
-                            reviewScheduleMode       = uiState.reviewScheduleMode,
-                            manualReviewDateTime     = uiState.manualReviewDateTime,
-                            onContentChange          = { editContent = it; onEditChanged(it, editCompletedCount, editTotalCount, editIsCompleted) },
-                            onCompletedCountChange   = { if (it.all(Char::isDigit)) { editCompletedCount = it; onEditChanged(editContent, it, editTotalCount, editIsCompleted) } },
-                            onTotalCountChange       = { if (it.all(Char::isDigit)) { editTotalCount = it; onEditChanged(editContent, editCompletedCount, it, editIsCompleted) } },
-                            onIsCompletedChange      = { editIsCompleted = it; onEditChanged(editContent, editCompletedCount, editTotalCount, it) },
-                            onReviewScheduleModeChanged   = onReviewScheduleModeChanged,
-                            onManualReviewDateTimeChanged = onManualReviewDateTimeChanged
-                        )
-                    } else {
-                        ProgressViewBody(
-                            progress             = progress,
-                            reviewDates          = uiState.generatedReviewDates,
-                            onNavigateToCalendar = onNavigateToCalendar
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ✅ 원인1 수정: 이중 삽입된 Column 블록 제거 후 올바른 단일 함수 본문 유지
-@Composable
-private fun ProgressViewBody(
-    progress: Progress,
-    reviewDates: List<java.time.LocalDate> = emptyList(),
-    onNavigateToCalendar: () -> Unit = {}
-) {
-    val formattedDate = remember(progress.createdAt) {
-        if (progress.createdAt <= 0L) "날짜 미설정"
-        else java.time.Instant.ofEpochMilli(progress.createdAt)
-            .atZone(java.time.ZoneId.of("Asia/Seoul"))
-            .toLocalDate()
-            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy년 MM월 dd일"))
-    }
-
-    val reviewLabels = listOf("D+1", "D+3", "D+7", "D+14", "D+30")
-
-    Column(
-        modifier            = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        ProgressInfoCard {
-            DetailRow(label = "작성일", value = formattedDate)
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            DetailRow(label = "학습 내용", value = progress.content)
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            DetailRow(
-                label = "완료 수 / 전체 수",
-                value = "${progress.completedCount} / ${progress.totalCount}"
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            DetailRow(
-                label = "완료 여부",
-                value = if (progress.isCompleted) "✅ 완료" else "⏳ 진행 중"
-            )
-        }
-
-        if (reviewDates.isNotEmpty()) {
-            Card(
-                modifier  = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors    = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text  = "📅 생성된 복습 일정",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    reviewDates.forEachIndexed { index, date ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text  = "${index + 1}회차 (${reviewLabels.getOrElse(index) { "" }})",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Text(
-                                text  = date.format(
-                                    java.time.format.DateTimeFormatter.ofPattern("MM월 dd일")
-                                ),
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.SemiBold
-                                ),
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedButton(
-                        onClick   = onNavigateToCalendar,
-                        modifier  = Modifier.fillMaxWidth()
-                    ) {
-                        Text("캘린더에서 확인하기 →")
-                    }
-                }
-            }
-        }
-    }
-    // ✅ ProgressViewBody 닫는 괄호 (중복 Column 블록 완전 삭제)
-}
-
-@Composable
-private fun ProgressInfoCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier  = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            content  = content
-        )
-    }
-}
-
-@Composable
-private fun DetailRow(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text  = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text  = value,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ProgressEditBody(
-    editContent: String,
-    editCompletedCount: String,
-    editTotalCount: String,
-    editIsCompleted: Boolean,
-    reviewScheduleMode: ReviewScheduleMode,
-    manualReviewDateTime: Long?,
-    onContentChange: (String) -> Unit,
-    onCompletedCountChange: (String) -> Unit,
-    onTotalCountChange: (String) -> Unit,
-    onIsCompletedChange: (Boolean) -> Unit,
-    onReviewScheduleModeChanged: (ReviewScheduleMode) -> Unit,
-    onManualReviewDateTimeChanged: (Long) -> Unit
-) {
-    // DatePickerDialog 상태
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
-
-    // 선택된 날짜를 임시 보관 (타임피커로 넘기기 위해)
-    var tempSelectedDateMs by remember { mutableStateOf<Long?>(null) }
-
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = manualReviewDateTime
-            ?: System.currentTimeMillis()
-    )
-
-    // 기존 선택값에서 시/분 초기화
-    val initialHour: Int
-    val initialMinute: Int
-    if (manualReviewDateTime != null) {
-        val cal = Calendar.getInstance().apply { timeInMillis = manualReviewDateTime }
-        initialHour   = cal.get(Calendar.HOUR_OF_DAY)
-        initialMinute = cal.get(Calendar.MINUTE)
-    } else {
-        val cal = Calendar.getInstance()
-        initialHour   = cal.get(Calendar.HOUR_OF_DAY)
-        initialMinute = cal.get(Calendar.MINUTE)
-    }
-    val timePickerState = rememberTimePickerState(
-        initialHour   = initialHour,
-        initialMinute = initialMinute,
-        is24Hour      = true
-    )
-
-    // DatePickerDialog
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
+            containerColor = Surface,
+            title = { Text("진도 삭제", color = OnBackground) },
+            text = { Text("이 학습 기록을 삭제하시겠습니까?", color = OnSurface) },
             confirmButton = {
                 TextButton(onClick = {
-                    tempSelectedDateMs = datePickerState.selectedDateMillis
-                    showDatePicker = false
-                    showTimePicker = true
-                }) { Text("다음") }
+                    viewModel.delete(progressId)
+                    onBack()
+                }) { Text("삭제", color = Error) }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("취소") }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
-
-    // TimePickerDialog (커스텀 AlertDialog 활용)
-    if (showTimePicker) {
-        AlertDialog(
-            onDismissRequest = { showTimePicker = false },
-            title = { Text("복습 시각 선택") },
-            text = {
-                TimePicker(state = timePickerState)
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val dateMs = tempSelectedDateMs ?: System.currentTimeMillis()
-                    val cal = Calendar.getInstance().apply {
-                        timeInMillis = dateMs
-                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
-                        set(Calendar.MINUTE, timePickerState.minute)
-                        set(Calendar.SECOND, 0)
-                        set(Calendar.MILLISECOND, 0)
-                    }
-                    onManualReviewDateTimeChanged(cal.timeInMillis)
-                    showTimePicker = false
-                }) { Text("확인") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text("취소") }
-            }
-        )
-    }
-
-    Column(
-        modifier            = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        OutlinedTextField(
-            value         = editContent,
-            onValueChange = onContentChange,
-            label         = { Text("학습 내용") },
-            modifier      = Modifier.fillMaxWidth(),
-            minLines      = 3,
-            maxLines      = 6
-        )
-        OutlinedTextField(
-            value         = editCompletedCount,
-            onValueChange = { if (it.all(Char::isDigit)) onCompletedCountChange(it) },
-            label         = { Text("완료 수") },
-            modifier      = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
-        OutlinedTextField(
-            value         = editTotalCount,
-            onValueChange = { if (it.all(Char::isDigit)) onTotalCountChange(it) },
-            label         = { Text("전체 수") },
-            modifier      = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
-        Row(
-            modifier          = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(text = "완료 여부", style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = editIsCompleted, onCheckedChange = onIsCompletedChange)
-        }
-
-        // ✅ 복습 스케줄 설정 섹션 (신규 추가)
-        HorizontalDivider()
-        Text(
-            text  = "복습 스케줄 설정",
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        // 망각곡선 자동 설정 RadioButton
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
-        ) {
-            RadioButton(
-                selected = reviewScheduleMode == ReviewScheduleMode.FORGETTING_CURVE,
-                onClick  = { onReviewScheduleModeChanged(ReviewScheduleMode.FORGETTING_CURVE) }
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(
-                    text  = "망각곡선 자동 설정",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text  = "D+1, D+3, D+7, D+14, D+30 — 5개 알람",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        // 직접 입력 RadioButton
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
-        ) {
-            RadioButton(
-                selected = reviewScheduleMode == ReviewScheduleMode.MANUAL,
-                onClick  = { onReviewScheduleModeChanged(ReviewScheduleMode.MANUAL) }
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(
-                    text  = "직접 입력",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text  = "복습 예정 일시를 직접 지정 — 1개 알람",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        // 직접 입력 모드일 때 일시 선택 버튼 + 표시
-        if (reviewScheduleMode == ReviewScheduleMode.MANUAL) {
-            Card(
-                modifier  = Modifier.fillMaxWidth(),
-                colors    = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    val displayText = if (manualReviewDateTime != null) {
-                        java.time.Instant.ofEpochMilli(manualReviewDateTime)
-                            .atZone(java.time.ZoneId.of("Asia/Seoul"))
-                            .format(
-                                java.time.format.DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 HH:mm")
-                            )
-                    } else {
-                        "날짜·시간을 선택하세요"
-                    }
-                    Text(
-                        text  = "📅 복습 예정: $displayText",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    OutlinedButton(
-                        onClick  = { showDatePicker = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("날짜 / 시간 선택")
-                    }
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("취소", color = OnSurfaceVariant)
                 }
             }
-        }
-    }
-}
-
-// ✅ 원인3 수정: Preview에 onNavigateToCalendar 인자 추가
-@Preview(showBackground = true, name = "뷰 모드 Preview")
-@Composable
-private fun ProgressDetailContentViewModePreview() {
-    val sampleProgress = Progress(
-        progressId     = "preview-id",
-        examId         = "exam-001",
-        content        = "Chapter 3: Kotlin Coroutines 정리 및 Flow 학습",
-        completedCount = 7,
-        totalCount     = 10,
-        isCompleted    = false,
-        createdAt      = 1_753_884_000_000L
-    )
-    MaterialTheme {
-        ProgressDetailContent(
-            uiState           = ProgressDetailUiState(
-                progress  = sampleProgress,
-                isLoading = false,
-                isEditMode = false
-            ),
-            snackbarHostState    = SnackbarHostState(),
-            onNavigateBack       = {},
-            onEnterEditMode      = {},
-            onExitEditMode       = {},
-            onSave               = {},
-            onDelete             = {},
-            onRetry              = {},
-            onEditChanged        = { _, _, _, _ -> },
-            onNavigateToCalendar = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "편집 모드 Preview")
-@Composable
-private fun ProgressDetailContentEditModePreview() {
-    val sampleProgress = Progress(
-        progressId     = "preview-id",
-        examId         = "exam-001",
-        content        = "Chapter 3: Kotlin Coroutines 정리",
-        completedCount = 7,
-        totalCount     = 10,
-        isCompleted    = false,
-        createdAt      = 1_753_884_000_000L
-    )
-    MaterialTheme {
-        ProgressDetailContent(
-            uiState           = ProgressDetailUiState(
-                progress   = sampleProgress,
-                isLoading  = false,
-                isEditMode = true
-            ),
-            snackbarHostState    = SnackbarHostState(),
-            onNavigateBack       = {},
-            onEnterEditMode      = {},
-            onExitEditMode       = {},
-            onSave               = {},
-            onDelete             = {},
-            onRetry              = {},
-            onEditChanged        = { _, _, _, _ -> },
-            onNavigateToCalendar = {}
         )
     }
 }

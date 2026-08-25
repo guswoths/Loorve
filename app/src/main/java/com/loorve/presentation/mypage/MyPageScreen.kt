@@ -1,254 +1,196 @@
 package com.loorve.presentation.mypage
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.loorve.presentation.auth.AuthUiState
-import com.loorve.presentation.auth.AuthViewModel
+import com.google.firebase.auth.FirebaseAuth
+import com.loorve.ui.component.*
+import com.loorve.ui.theme.*
 
-// ─── MyPage UiState ────────────────────────────────────────────────────────
-data class MyPageUiState(
-    val displayName: String = "",
-    val email: String = "",
-    val isLoggingOut: Boolean = false,
-    val logoutComplete: Boolean = false,
-    val errorMessage: String? = null
-)
-
-// ─── MyPageScreen ──────────────────────────────────────────────────────────
-/**
- * 마이페이지 허브 화면
- *
- * - 계정 정보 표시 (domain User 모델 경유, FirebaseAuth 직접 참조 금지)
- * - 로그아웃: 확인 Dialog → signOut() → Login 화면으로 백스택 전체 클리어
- * - 알림 시간 설정으로 이동
- *
- * @param onNavigateBack                  상단 뒤로가기 버튼
- * @param onNavigateToNotificationTimeSetting  알림 시간 설정 화면 이동
- * @param onLogoutComplete                로그아웃 완료 후 Login 화면으로 이동 (백스택 클리어는 NavHost에서)
- * @param authViewModel                   AuthViewModel (Hilt 주입)
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyPageScreen(
-    onNavigateBack: () -> Unit,
-    onNavigateToNotificationTimeSetting: () -> Unit,
-    onLogoutComplete: () -> Unit,
-    authViewModel: AuthViewModel = hiltViewModel()
+    onSignOut: () -> Unit,
+    viewModel: MyPageViewModel = hiltViewModel()
 ) {
-    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
-
-    // 로그아웃 완료 감지 → 네비게이션 처리 후 상태 초기화
-    LaunchedEffect(authUiState) {
-        if (authUiState is AuthUiState.LogoutComplete) {
-            authViewModel.resetState()
-            onLogoutComplete()
-        }
-    }
-
-    // 로그아웃 확인 Dialog 표시 여부
-    var showLogoutDialog by remember { mutableStateOf(false) }
-
-    // 로그아웃 에러 Snackbar
-    val snackbarHostState = remember { SnackbarHostState() }
-    val errorMessage = (authUiState as? AuthUiState.Error)?.message
-    LaunchedEffect(errorMessage) {
-        if (errorMessage != null) {
-            snackbarHostState.showSnackbar(
-                message     = errorMessage,
-                duration    = SnackbarDuration.Long,
-                withDismissAction = true
-            )
-            authViewModel.resetState()
-        }
-    }
-
-    // 현재 로그인 사용자 정보를 domain User 경유로 가져옴
-    // AuthUiState.Success에서 user를 읽거나, getCurrentUser() Flow를 사용
-    // 여기서는 AuthRepository.getCurrentUser()를 MyPageViewModel로 래핑하는 것이 이상적이나,
-    // AuthViewModel이 이미 authRepository를 보유 중이므로 별도 ViewModel 없이
-    // collectAsStateWithLifecycle로 Flow를 직접 수집 (단일 책임 유지)
-    val currentUser by authViewModel.currentUser.collectAsStateWithLifecycle(initialValue = null)
-
-    if (showLogoutDialog) {
-        LogoutConfirmDialog(
-            onConfirm = {
-                showLogoutDialog = false
-                authViewModel.signOut()
-            },
-            onDismiss = { showLogoutDialog = false }
-        )
-    }
+    val user = FirebaseAuth.getInstance().currentUser
+    val uiState by viewModel.uiState.collectAsState()
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("마이페이지") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "뒤로가기"
-                        )
+                title = {
+                    Text("MY", style = LoorveTypography.titleLarge, color = OnBackground)
+                },
+                actions = {
+                    IconButton(onClick = { /* settings */ }) {
+                        Icon(Icons.Default.Settings, null, tint = OnBackground)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
             )
         },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { innerPadding ->
-
-        val isLoading = authUiState is AuthUiState.Loading
-
-        Column(
+        containerColor = Background
+    ) { padding ->
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(padding)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(vertical = 20.dp, bottom = 88.dp)
         ) {
-
-            // ── 계정 정보 섹션 ────────────────────────────────────────
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors   = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+            // 프로필 섹션
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector        = Icons.Default.AccountCircle,
-                        contentDescription = null,
-                        modifier           = Modifier.size(56.dp),
-                        tint               = MaterialTheme.colorScheme.primary
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(listOf(GradientStart, GradientEnd))
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = user?.displayName?.firstOrNull()?.toString() ?: "?",
+                            style = LoorveTypography.displayLarge,
+                            color = Color.White
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = user?.displayName ?: "사용자",
+                        style = LoorveTypography.titleMedium,
+                        color = OnBackground
                     )
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text  = currentUser?.nickname ?: "로딩 중...",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text  = currentUser?.email ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Text(
+                        text = user?.email ?: "",
+                        style = LoorveTypography.bodyMedium,
+                        color = OnSurfaceVariant
+                    )
+                    TextButton(onClick = { /* 프로필 편집 */ }) {
+                        Text("프로필 편집", color = Primary)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // 통계 카드 Row
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    listOf(
+                        Triple("총 학습일", uiState.totalStudyDays.toString(), "일"),
+                        Triple("완료 진도", uiState.completedProgress.toString(), "개"),
+                        Triple("등록 시험", uiState.examCount.toString(), "개")
+                    ).forEach { (label, value, unit) ->
+                        LoorveCard(modifier = Modifier.weight(1f)) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "$value$unit",
+                                    style = LoorveTypography.titleLarge,
+                                    color = Primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = label,
+                                    style = LoorveTypography.labelMedium,
+                                    color = OnSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
-            // ── 설정 메뉴 ─────────────────────────────────────────────
-            Text(
-                text     = "설정",
-                style    = MaterialTheme.typography.labelLarge,
-                color    = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
+            // 메뉴 리스트
+            item {
+                LoorveCard(modifier = Modifier.fillMaxWidth()) {
+                    Column {
+                        val menuItems = listOf(
+                            Triple(Icons.Default.Notifications, "알림 설정", { }),
+                            Triple(Icons.Default.Tune, "복습 설정", { }),
+                        )
+                        menuItems.forEachIndexed { index, (icon, label, action) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(icon, null, tint = OnSurface, modifier = Modifier.size(22.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Text(label, style = LoorveTypography.bodyLarge, color = OnBackground, modifier = Modifier.weight(1f))
+                                Icon(Icons.Default.ChevronRight, null, tint = OnSurfaceVariant)
+                            }
+                            if (index < menuItems.lastIndex) {
+                                Divider(color = SurfaceVariant, thickness = 0.5.dp)
+                            }
+                        }
+                    }
+                }
+            }
 
-            // 알림 시간 설정
-            MyPageMenuItem(
-                icon    = Icons.Default.Notifications,
-                label   = "알림 시간 설정",
-                onClick = onNavigateToNotificationTimeSetting
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // ── 로그아웃 버튼 ─────────────────────────────────────────
-            OutlinedButton(
-                onClick  = { showLogoutDialog = true },
-                enabled  = !isLoading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                colors   = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                )
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier  = Modifier.size(20.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("로그아웃", style = MaterialTheme.typography.labelLarge)
+            // 로그아웃 / 계정 삭제
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            viewModel.signOut()
+                            onSignOut()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("로그아웃", color = OnSurface, style = LoorveTypography.bodyLarge)
+                    }
+                    TextButton(
+                        onClick = { showDeleteDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("계정 삭제", color = Error, style = LoorveTypography.bodyLarge)
+                    }
                 }
             }
         }
     }
-}
 
-// ─── 로그아웃 확인 Dialog ──────────────────────────────────────────────────
-@Composable
-private fun LogoutConfirmDialog(
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title   = { Text("로그아웃") },
-        text    = { Text("로그아웃 하시겠습니까?") },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(
-                    text  = "로그아웃",
-                    color = MaterialTheme.colorScheme.error
-                )
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            containerColor = Surface,
+            title = { Text("계정 삭제", color = OnBackground) },
+            text = { Text("정말 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.", color = OnSurface) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteAccount()
+                    onSignOut()
+                }) { Text("삭제", color = Error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("취소", color = OnSurfaceVariant)
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소")
-            }
-        }
-    )
-}
-
-// ─── 메뉴 아이템 공통 컴포넌트 ────────────────────────────────────────────
-@Composable
-private fun MyPageMenuItem(
-    icon    : androidx.compose.ui.graphics.vector.ImageVector,
-    label   : String,
-    onClick : () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape   = MaterialTheme.shapes.medium,
-        color   = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(
-                imageVector        = icon,
-                contentDescription = null,
-                tint               = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text     = label,
-                style    = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        )
     }
 }
