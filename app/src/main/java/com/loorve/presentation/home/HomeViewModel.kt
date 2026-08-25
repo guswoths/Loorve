@@ -71,7 +71,7 @@ class HomeViewModel @Inject constructor(
                 .catch { exception ->
                     _uiState.update {
                         it.copy(
-                            isLoading    = false,
+                            isLoading = false,
                             errorMessage = exception.message ?: "목록을 불러오지 못했습니다."
                         )
                     }
@@ -80,15 +80,16 @@ class HomeViewModel @Inject constructor(
                     val nearest = exams
                         .mapNotNull { exam ->
                             runCatching {
-                                val examDate = LocalDate.parse(exam.examDate)
-                                val today    = LocalDate.now()
-                                // Long → Int 명시적 변환
-                                val days     = ChronoUnit.DAYS.between(today, examDate).toInt()
+                                // ✅ exam.examDate가 Long(epoch ms)이므로 Instant → LocalDate 변환
+                                val examDate = Instant.ofEpochMilli(exam.examDate)
+                                    .atZone(ZoneId.of("Asia/Seoul"))
+                                    .toLocalDate()
+                                val today = LocalDate.now()
+                                val days = ChronoUnit.DAYS.between(today, examDate).toInt()
                                 if (days >= 0) {
                                     NearestExamUiModel(
-                                        subjectName       = exam.subjectName,
-                                        daysLeft          = days,
-                                        // examDate(LocalDate) → String 포맷
+                                        subjectName = exam.subjectName,
+                                        daysLeft = days,
                                         examDateFormatted = examDate.format(displayFormatter)
                                     )
                                 } else null
@@ -98,8 +99,8 @@ class HomeViewModel @Inject constructor(
 
                     _uiState.update {
                         it.copy(
-                            isLoading   = false,
-                            exams       = exams,
+                            isLoading = false,
+                            exams = exams,
                             nearestExam = nearest
                         )
                     }
@@ -115,12 +116,11 @@ class HomeViewModel @Inject constructor(
                 .collect { list ->
                     val uiList = list.map { p ->
                         ProgressUiModel(
-                            id            = p.progressId,
-                            examId        = p.examId,
-                            content       = p.content,
-                            completed     = p.completedCount,
-                            total         = p.totalCount,
-                            // createdAt(Long epoch ms) → LocalDate → 포맷
+                            id = p.progressId,
+                            examId = p.examId,
+                            content = p.content,
+                            completed = p.completedCount,
+                            total = p.totalCount,
                             dateFormatted = runCatching {
                                 Instant.ofEpochMilli(p.createdAt)
                                     .atZone(ZoneId.of("Asia/Seoul"))
@@ -144,7 +144,7 @@ class HomeViewModel @Inject constructor(
         if (uid.isNullOrBlank()) {
             _uiState.update {
                 it.copy(
-                    saveMessage  = "로그인 정보가 없습니다. 다시 로그인해 주세요.",
+                    saveMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요.",
                     errorMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요."
                 )
             }
@@ -155,11 +155,11 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(isSaving = true, saveMessage = null, errorMessage = null) }
 
             val progress = Progress(
-                examId         = examId,
-                content        = content.trim(),
+                examId = examId,
+                content = content.trim(),
                 completedCount = completedCount,
-                totalCount     = totalCount,
-                isCompleted    = totalCount > 0 && completedCount >= totalCount
+                totalCount = totalCount,
+                isCompleted = totalCount > 0 && completedCount >= totalCount
             )
 
             val result = addProgressUseCase(uid, progress)
@@ -168,8 +168,8 @@ class HomeViewModel @Inject constructor(
                     it.copy(isSaving = false, saveMessage = "학습 진도가 저장되었습니다.")
                 } else {
                     it.copy(
-                        isSaving     = false,
-                        saveMessage  = result.exceptionOrNull()?.message ?: "저장하지 못했습니다.",
+                        isSaving = false,
+                        saveMessage = result.exceptionOrNull()?.message ?: "저장하지 못했습니다.",
                         errorMessage = result.exceptionOrNull()?.message ?: "저장하지 못했습니다."
                     )
                 }
