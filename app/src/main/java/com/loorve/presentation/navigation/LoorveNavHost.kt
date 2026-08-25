@@ -1,5 +1,3 @@
-// app/src/main/java/com/loorve/presentation/navigation/LoorveNavHost.kt
-
 package com.loorve.presentation.navigation
 
 import android.os.Build
@@ -41,7 +39,8 @@ import com.loorve.presentation.progress.ProgressDetailScreen
 import com.loorve.presentation.settings.BatteryOptimizationGuideScreen
 import kotlinx.coroutines.delay
 
-// ─── 타입 안전 라우트 정의 ───────────────────────────────────────────────
+// ─── 타입 안전 라우트 정의 ────────────────────────────────────────────────
+// ✅ Screen 선언은 이 파일에만 존재. Screen.kt / NavGraph.kt의 중복 선언 삭제 필요
 sealed class Screen(val route: String) {
     object Splash                   : Screen("splash")
     object Onboarding               : Screen("onboarding")
@@ -58,13 +57,7 @@ sealed class Screen(val route: String) {
     object NotificationPermission   : Screen("notification_permission")
 }
 
-// ─── 스플래시 Composable ────────────────────────────────────────────────
-// 변경 내용:
-//   - displayMedium → headlineLarge (과대한 제목 억제)
-//   - CircularProgressIndicator 제거 (깔끔한 브랜드 인상)
-//   - 배경색을 MaterialTheme.colorScheme.background(#F3F0EA 베이지)로 명시
-//   - "복습 스케줄러" 부제목 추가
-// ────────────────────────────────────────────────────────────────────────
+// ─── 스플래시 ─────────────────────────────────────────────────────────────
 @Composable
 private fun SplashScreen(
     onSplashComplete: (isLoggedIn: Boolean) -> Unit
@@ -83,7 +76,7 @@ private fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background), // #F3F0EA 웜 베이지
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -92,19 +85,19 @@ private fun SplashScreen(
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Bold
                 ),
-                color = MaterialTheme.colorScheme.primary   // #4F5A3F 올리브
+                color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text  = "복습 스케줄러",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant   // #736C63
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
 
-// ─── 앱 전체 네비게이션 그래프 ───────────────────────────────────────────
+// ─── 앱 전체 네비게이션 그래프 ────────────────────────────────────────────
 @Composable
 fun LoorveNavHost(
     navController: NavHostController = rememberNavController()
@@ -114,10 +107,10 @@ fun LoorveNavHost(
         startDestination = Screen.Splash.route
     ) {
 
-        // ── 1. 스플래시 ──────────────────────────────────────────────────
+        // ── 1. 스플래시 ────────────────────────────────────────────────────
         composable(Screen.Splash.route) {
             SplashScreen(
-                onSplashComplete = { isLoggedIn: Boolean ->
+                onSplashComplete = { isLoggedIn ->
                     val destination = if (isLoggedIn) Screen.Home.route
                     else Screen.Onboarding.route
                     navController.navigate(destination) {
@@ -127,10 +120,11 @@ fun LoorveNavHost(
             )
         }
 
-        // ── 2. 온보딩 ────────────────────────────────────────────────────
+        // ── 2. 온보딩 ──────────────────────────────────────────────────────
+        // ✅ onOnboardingComplete → onFinished (OnboardingScreen 실제 파라미터명)
         composable(Screen.Onboarding.route) {
             OnboardingScreen(
-                onOnboardingComplete = {
+                onFinished = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
@@ -138,7 +132,7 @@ fun LoorveNavHost(
             )
         }
 
-        // ── 3. 로그인 ────────────────────────────────────────────────────
+        // ── 3. 로그인 ──────────────────────────────────────────────────────
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
@@ -149,7 +143,7 @@ fun LoorveNavHost(
             )
         }
 
-        // ── 4. 시험 설정 ─────────────────────────────────────────────────
+        // ── 4. 시험 설정 ───────────────────────────────────────────────────
         composable(Screen.ExamSetting.route) {
             ExamSettingScreen(
                 onSaveSuccess = {
@@ -160,15 +154,9 @@ fun LoorveNavHost(
             )
         }
 
-        // ── 5. 홈 ────────────────────────────────────────────────────────
-        // 변경 내용:
-        //   - onNavigateToExamSetting 파라미터 추가
-        //     (EmptyStateView "시험 추가하기" CTA → ExamSetting 화면 이동)
-        //   - 배터리 최적화 가이드 로직은 기존 그대로 유지
-        // ─────────────────────────────────────────────────────────────────
+        // ── 5. 홈 ──────────────────────────────────────────────────────────
         composable(Screen.Home.route) {
             val context = LocalContext.current
-
             val lifecycleOwner = LocalLifecycleOwner.current
             val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow
                 .collectAsStateWithLifecycle()
@@ -178,11 +166,9 @@ fun LoorveNavHost(
             LaunchedEffect(lifecycleState) {
                 if (lifecycleState == Lifecycle.State.RESUMED && !batteryGuideShown) {
                     val isIgnoring = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        val pm = context.getSystemService<PowerManager>()
-                        pm?.isIgnoringBatteryOptimizations(context.packageName) ?: true
-                    } else {
-                        true
-                    }
+                        context.getSystemService<PowerManager>()
+                            ?.isIgnoringBatteryOptimizations(context.packageName) ?: true
+                    } else true
                     if (!isIgnoring) {
                         batteryGuideShown = true
                         navController.navigate(Screen.BatteryOptimizationGuide.route)
@@ -200,14 +186,13 @@ fun LoorveNavHost(
                 onNavigateToMyPage = {
                     navController.navigate(Screen.MyPage.route)
                 },
-                // ✅ 신규 추가: 홈 빈 상태 "시험 추가하기" CTA 연결
                 onNavigateToExamSetting = {
                     navController.navigate(Screen.ExamSetting.route)
                 }
             )
         }
 
-        // ── 6. 진도 상세 ─────────────────────────────────────────────────
+        // ── 6. 진도 상세 ───────────────────────────────────────────────────
         composable(
             route     = Screen.ProgressDetail.route,
             arguments = listOf(navArgument("progressId") { type = NavType.StringType })
@@ -215,22 +200,19 @@ fun LoorveNavHost(
             val progressId = backStackEntry.arguments?.getString("progressId")
                 ?: return@composable
             ProgressDetailScreen(
-                progressId           = progressId,
-                onNavigateBack       = { navController.popBackStack() },
-                onNavigateToCalendar = {
-                    navController.navigate(Screen.Calendar.route)
-                }
+                progressId     = progressId,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
-        // ── 7. 복습 캘린더 ───────────────────────────────────────────────
+        // ── 7. 복습 캘린더 ─────────────────────────────────────────────────
         composable(Screen.Calendar.route) {
             ReviewCalendarScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
 
-        // ── 8. 배터리 최적화 가이드 ──────────────────────────────────────
+        // ── 8. 배터리 최적화 가이드 ────────────────────────────────────────
         composable(Screen.BatteryOptimizationGuide.route) {
             BatteryOptimizationGuideScreen(
                 onNavigateBack = { navController.popBackStack() },
@@ -238,21 +220,22 @@ fun LoorveNavHost(
             )
         }
 
-        // ── 9. 알림 권한 ─────────────────────────────────────────────────
+        // ── 9. 알림 권한 ───────────────────────────────────────────────────
         composable(Screen.NotificationPermission.route) {
             NotificationPermissionRoute(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
 
-        // ── 10. 마이페이지 ───────────────────────────────────────────────
+        // ── 10. 마이페이지 ─────────────────────────────────────────────────
+        // ✅ onNavigateBack → onBack, onLogoutComplete → onSignOut
         composable(Screen.MyPage.route) {
             MyPageScreen(
-                onNavigateBack = { navController.popBackStack() },
+                onBack = { navController.popBackStack() },
                 onNavigateToNotificationTimeSetting = {
                     navController.navigate(Screen.NotificationTimeSetting.route)
                 },
-                onLogoutComplete = {
+                onSignOut = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
                     }
@@ -260,7 +243,7 @@ fun LoorveNavHost(
             )
         }
 
-        // ── 11. 알림 시간 설정 ───────────────────────────────────────────
+        // ── 11. 알림 시간 설정 ─────────────────────────────────────────────
         composable(Screen.NotificationTimeSetting.route) {
             NotificationTimeSettingScreen(
                 onNavigateBack = { navController.popBackStack() }
