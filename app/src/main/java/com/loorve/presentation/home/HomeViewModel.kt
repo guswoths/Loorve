@@ -34,7 +34,8 @@ data class ProgressUiModel(
     val content: String,
     val completed: Int,
     val total: Int,
-    val dateFormatted: String
+    val dateFormatted: String,
+    val createdAt: Long = 0L          // ✅ 추가: HomeScreen 달력 필터링용
 )
 
 data class HomeUiState(
@@ -44,7 +45,13 @@ data class HomeUiState(
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val saveMessage: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    // ✅ 추가: 주간 복습률 카드용
+    val weeklyCompletionRate: Float = 0f,
+    val weeklyCompleted: Int = 0,
+    val weeklyTotal: Int = 0,
+    // ✅ 추가: 미니 달력 점 표시용
+    val scheduledDates: Set<LocalDate> = emptySet()
 )
 
 @HiltViewModel
@@ -58,6 +65,7 @@ class HomeViewModel @Inject constructor(
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     private val displayFormatter = DateTimeFormatter.ofPattern("M월 d일")
+    private val seoulZone = ZoneId.of("Asia/Seoul")
 
     init {
         loadExams()
@@ -80,9 +88,8 @@ class HomeViewModel @Inject constructor(
                     val nearest = exams
                         .mapNotNull { exam ->
                             runCatching {
-                                // ✅ exam.examDate가 Long(epoch ms)이므로 Instant → LocalDate 변환
                                 val examDate = Instant.ofEpochMilli(exam.examDate)
-                                    .atZone(ZoneId.of("Asia/Seoul"))
+                                    .atZone(seoulZone)
                                     .toLocalDate()
                                 val today = LocalDate.now()
                                 val days = ChronoUnit.DAYS.between(today, examDate).toInt()
@@ -121,15 +128,49 @@ class HomeViewModel @Inject constructor(
                             content = p.content,
                             completed = p.completedCount,
                             total = p.totalCount,
+                            createdAt = p.createdAt,   // ✅ 원본 epoch ms 보존
                             dateFormatted = runCatching {
                                 Instant.ofEpochMilli(p.createdAt)
-                                    .atZone(ZoneId.of("Asia/Seoul"))
+                                    .atZone(seoulZone)
                                     .toLocalDate()
                                     .format(displayFormatter)
                             }.getOrElse { p.createdAt.toString() }
                         )
                     }
-                    _uiState.update { it.copy(progressList = uiList) }
+
+                    // ✅ 주간 복습률 계산 (이번 주 월~일)
+                    val today = LocalDate.now()
+                    val weekStart = today.with(java.time.DayOfWeek.MONDAY)
+                    val weekEnd = today.with(java.time.DayOfWeek.SUNDAY)
+                    val weeklyList = uiList.filter { p ->
+                        runCatching {
+                            val d = Instant.ofEpochMilli(p.createdAt)
+                                .atZone(seoulZone).toLocalDate()
+                            !d.isBefore(weekStart) && !d.isAfter(weekEnd)
+                        }.getOrElse { false }
+                    }
+                    val weeklyCompleted = weeklyList.sumOf { it.completed }
+                    val weeklyTotal = weeklyList.sumOf { it.total }
+                    val weeklyRate = if (weeklyTotal > 0)
+                        weeklyCompleted.toFloat() / weeklyTotal.toFloat() else 0f
+
+                    // ✅ 달력 점 표시용 날짜 Set 생성
+                    val scheduledDates = uiList.mapNotNull { p ->
+                        runCatching {
+                            Instant.ofEpochMilli(p.createdAt)
+                                .atZone(seoulZone).toLocalDate()
+                        }.getOrNull()
+                    }.toSet()
+
+                    _uiState.update {
+                        it.copy(
+                            progressList = uiList,
+                            weeklyCompleted = weeklyCompleted,
+                            weeklyTotal = weeklyTotal,
+                            weeklyCompletionRate = weeklyRate,
+                            scheduledDates = scheduledDates
+                        )
+                    }
                 }
         }
     }
