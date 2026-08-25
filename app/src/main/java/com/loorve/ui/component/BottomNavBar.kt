@@ -3,7 +3,6 @@ package com.loorve.ui.component
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -26,11 +25,11 @@ data class BottomNavItem(
     val label: String
 )
 
+// ── 목업 기준 3탭으로 변경 ──────────────────────────────────
 val bottomNavItems = listOf(
-    BottomNavItem("home",     Icons.Filled.Home,          "홈"),
-    BottomNavItem("calendar", Icons.Filled.CalendarMonth, "복습"),
-    BottomNavItem("exam",     Icons.Filled.Assignment,    "시험"),
-    BottomNavItem("mypage",   Icons.Filled.Person,        "MY")
+    BottomNavItem("home",   Icons.Filled.Home,     "HOME"),
+    BottomNavItem("calendar", Icons.Filled.CalendarMonth, "REVIEW"),
+    BottomNavItem("my_page",  Icons.Filled.Settings,      "SETTINGS")
 )
 
 @Composable
@@ -84,7 +83,6 @@ fun BottomNavBar(
                         color = iconColor
                     )
                     Spacer(Modifier.height(2.dp))
-                    // 선택 dot indicator
                     Box(
                         modifier = Modifier
                             .size(if (selected) 4.dp else 0.dp)
