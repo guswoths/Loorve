@@ -454,7 +454,7 @@ private fun ReviewScheduleItem(
             if (!schedule.isCompleted) {
                 Button(
                     onClick        = onComplete,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 24.dp)
                 ) {
                     Text("완료", style = MaterialTheme.typography.labelMedium)
                 }

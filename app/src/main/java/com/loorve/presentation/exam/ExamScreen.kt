@@ -21,6 +21,8 @@ import com.loorve.ui.component.*
 import com.loorve.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
