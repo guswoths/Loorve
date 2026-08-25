@@ -1,5 +1,3 @@
-// 파일 경로: app/src/main/java/com/loorve/ui/component/LoorveComponents.kt
-
 package com.loorve.ui.component
 
 import androidx.compose.foundation.layout.*
@@ -15,8 +13,8 @@ import androidx.compose.ui.unit.sp
 
 // ✅ LoorveCard, SectionLabel, EmptyStateView는 각 개별 파일에 정의되어 있으므로
 // 이 파일에서는 중복 정의하지 않습니다.
-// 필요 시 import해서 사용하세요.
 
+@OptIn(ExperimentalMaterial3Api::class)  // ✅ 이 어노테이션 추가
 @Composable
 fun LoorveTopBar(
     title: String,

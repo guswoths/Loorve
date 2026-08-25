@@ -15,7 +15,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
@@ -80,13 +82,13 @@ class HomeViewModel @Inject constructor(
                             runCatching {
                                 val examDate = LocalDate.parse(exam.examDate)
                                 val today    = LocalDate.now()
-                                // ✅ Long → Int 변환: toInt() 명시
+                                // ✅ Long → Int 명시적 변환
                                 val days     = ChronoUnit.DAYS.between(today, examDate).toInt()
                                 if (days >= 0) {
                                     NearestExamUiModel(
                                         subjectName       = exam.subjectName,
                                         daysLeft          = days,
-                                        // ✅ Int를 String으로 변환
+                                        // ✅ examDate(LocalDate)를 String으로 포맷
                                         examDateFormatted = examDate.format(displayFormatter)
                                     )
                                 } else null
@@ -113,15 +115,19 @@ class HomeViewModel @Inject constructor(
                 .collect { list ->
                     val uiList = list.map { p ->
                         ProgressUiModel(
-                            // ✅ p.id, p.date 필드명 정확히 매핑
-                            id            = p.id,
+                            // ✅ Progress 도메인 모델의 실제 필드명 사용
+                            id            = p.progressId,
                             examId        = p.examId,
                             content       = p.content,
                             completed     = p.completedCount,
                             total         = p.totalCount,
+                            // ✅ createdAt(Long epoch ms) → LocalDate → 포맷
                             dateFormatted = runCatching {
-                                LocalDate.parse(p.date).format(displayFormatter)
-                            }.getOrElse { p.date }
+                                Instant.ofEpochMilli(p.createdAt)
+                                    .atZone(ZoneId.of("Asia/Seoul"))
+                                    .toLocalDate()
+                                    .format(displayFormatter)
+                            }.getOrElse { p.createdAt.toString() }
                         )
                     }
                     _uiState.update { it.copy(progressList = uiList) }

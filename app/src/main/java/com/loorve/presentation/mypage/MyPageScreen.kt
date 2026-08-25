@@ -1,6 +1,7 @@
 package com.loorve.presentation.mypage
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable   // ✅ 이 import 추가
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -23,8 +24,8 @@ import com.loorve.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyPageScreen(
-    onBack: () -> Unit,                               // ✅ 추가
-    onNavigateToNotificationTimeSetting: () -> Unit,  // ✅ 추가
+    onBack: () -> Unit,
+    onNavigateToNotificationTimeSetting: () -> Unit,
     onSignOut: () -> Unit,
     viewModel: MyPageViewModel = hiltViewModel()
 ) {
@@ -39,7 +40,7 @@ fun MyPageScreen(
                     Text("MY", style = LoorveTypography.titleLarge, color = OnBackground)
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {           // ✅ 추가
+                    IconButton(onClick = onBack) {
                         Icon(
                             Icons.Default.ArrowBack,
                             contentDescription = "뒤로가기",
@@ -63,7 +64,7 @@ fun MyPageScreen(
                 .padding(padding)
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(top = 20.dp, bottom = 88.dp)  // ✅ 수정
+            contentPadding = PaddingValues(top = 20.dp, bottom = 88.dp)
         ) {
             // 프로필 섹션
             item {
@@ -139,7 +140,7 @@ fun MyPageScreen(
                 LoorveCard(modifier = Modifier.fillMaxWidth()) {
                     Column {
                         val menuItems = listOf(
-                            Triple(Icons.Default.Notifications, "알림 설정", onNavigateToNotificationTimeSetting), // ✅ 수정
+                            Triple(Icons.Default.Notifications, "알림 설정", onNavigateToNotificationTimeSetting),
                             Triple(Icons.Default.Tune, "복습 설정", { }),
                         )
                         menuItems.forEachIndexed { index, (icon, label, action) ->
@@ -147,7 +148,7 @@ fun MyPageScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(56.dp)
-                                    .clickable { action() },           // ✅ 클릭 연결
+                                    .clickable { action() },  // ✅ clickable import 추가로 정상 동작
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(icon, null, tint = OnSurface, modifier = Modifier.size(22.dp))
