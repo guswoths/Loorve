@@ -1,3 +1,4 @@
+// ProgressDetailScreen.kt 전체 수정본
 package com.loorve.presentation.progress
 
 import androidx.compose.foundation.layout.*
@@ -9,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.google.firebase.auth.FirebaseAuth
 import com.loorve.ui.component.*
 import com.loorve.ui.theme.*
 
@@ -19,17 +21,17 @@ fun ProgressDetailScreen(
     onBack: () -> Unit,
     viewModel: ProgressDetailViewModel = hiltViewModel()
 ) {
-    LaunchedEffect(progressId) { viewModel.load(progressId) }
+    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    LaunchedEffect(progressId) { viewModel.loadProgress(uid, progressId) }  // ✅ 수정
     val uiState by viewModel.uiState.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var showEditSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        uiState.progress?.subjectName ?: "",
+                        uiState.progress?.content ?: "",  // ✅ subjectName 없으므로 content 사용
                         style = LoorveTypography.titleMedium,
                         color = OnBackground
                     )
@@ -52,6 +54,7 @@ fun ProgressDetailScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             uiState.progress?.let { progress ->
+                val isCompleted = progress.completedCount > 0 && progress.completedCount >= progress.totalCount
                 LoorveCard(modifier = Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
@@ -60,24 +63,31 @@ fun ProgressDetailScreen(
                             color = OnBackground
                         )
                         LoorveProgressBar(
-                            completed = progress.completed,
-                            total = progress.total,
+                            completed = progress.completedCount,  // ✅ 도메인 모델 실제 필드명
+                            total = progress.totalCount,
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text(
-                            text = progress.dateFormatted,
+                            text = run {
+                                try {
+                                    val date = java.time.Instant.ofEpochMilli(progress.createdAt)
+                                        .atZone(java.time.ZoneId.of("Asia/Seoul"))
+                                        .toLocalDate()
+                                    date.format(java.time.format.DateTimeFormatter.ofPattern("M월 d일"))
+                                } catch (e: Exception) { "" }
+                            },
                             style = LoorveTypography.labelMedium,
                             color = OnSurfaceVariant
                         )
                         Surface(
                             shape = MaterialTheme.shapes.small,
-                            color = if (progress.isCompleted) Success.copy(0.15f) else Tertiary.copy(0.15f)
+                            color = if (isCompleted) Success.copy(0.15f) else Tertiary.copy(0.15f)
                         ) {
                             Text(
-                                text = if (progress.isCompleted) "완료" else "진행 중",
+                                text = if (isCompleted) "완료" else "진행 중",
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                 style = LoorveTypography.labelMedium,
-                                color = if (progress.isCompleted) Success else Tertiary
+                                color = if (isCompleted) Success else Tertiary
                             )
                         }
                     }
@@ -88,7 +98,7 @@ fun ProgressDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { showEditSheet = true },
+                        onClick = { /* 수정 기능 추후 구현 */ },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Primary),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Primary)
@@ -114,7 +124,7 @@ fun ProgressDetailScreen(
             text = { Text("이 학습 기록을 삭제하시겠습니까?", color = OnSurface) },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.delete(progressId)
+                    viewModel.deleteProgress(uid, progressId)  // ✅ 수정
                     onBack()
                 }) { Text("삭제", color = Error) }
             },

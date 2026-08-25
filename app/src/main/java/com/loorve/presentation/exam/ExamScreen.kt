@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add       // ✅ 중복 제거: 여기서 한 번만 선언
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.material3.SwipeToDismissBox
@@ -21,8 +22,6 @@ import com.loorve.ui.component.*
 import com.loorve.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,7 +59,12 @@ fun ExamScreen(
                 .padding(padding)
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(vertical = 16.dp, bottom = 88.dp)
+            contentPadding = PaddingValues(   // ✅ 수정: 4-파라미터 형태 사용
+                top = 16.dp,
+                bottom = 88.dp,
+                start = 0.dp,
+                end = 0.dp
+            )
         ) {
             if (uiState.exams.isEmpty()) {
                 item {

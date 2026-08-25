@@ -6,7 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -68,7 +69,8 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues),
             contentPadding = PaddingValues(
-                horizontal = 20.dp,
+                start = 20.dp,
+                end = 20.dp,
                 top = 8.dp,
                 bottom = 88.dp
             ),
@@ -90,8 +92,9 @@ fun HomeScreen(
                 SectionLabel("오늘의 학습")
                 ProgressInputSection(
                     exams = uiState.exams,
-                    onSave = { input -> viewModel.addProgress(input) },
-                    isSaving = uiState.isSaving
+                    onSave = { examId, content, completedCount, totalCount ->
+                        viewModel.addProgress(examId, content, completedCount, totalCount)
+                    }
                 )
             }
 
@@ -134,19 +137,38 @@ fun HomeScreen(
                                     color = OnBackground
                                 )
                                 Spacer(Modifier.height(4.dp))
+                                // ✅ examDateFormatted: NearestExamUiModel이 아닌 Exam 도메인 모델이므로
+                                // exam.examDate(Long)을 직접 포맷팅하거나 ViewModel에서 UiModel 변환 필요
+                                // 여기서는 examDate(Long)을 LocalDate로 변환하여 표시
                                 Text(
-                                    text = exam.examDateFormatted,
+                                    text = run {
+                                        try {
+                                            val date = java.time.Instant.ofEpochMilli(exam.examDate)
+                                                .atZone(java.time.ZoneId.of("Asia/Seoul"))
+                                                .toLocalDate()
+                                            date.format(java.time.format.DateTimeFormatter.ofPattern("M월 d일"))
+                                        } catch (e: Exception) { "" }
+                                    },
                                     style = LoorveTypography.labelMedium,
                                     color = OnSurfaceVariant
                                 )
                             }
-                            if (exam.daysLeft >= 0) {
+                            // daysLeft 계산
+                            val daysLeft = run {
+                                try {
+                                    val examDate = java.time.Instant.ofEpochMilli(exam.examDate)
+                                        .atZone(java.time.ZoneId.of("Asia/Seoul"))
+                                        .toLocalDate()
+                                    java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), examDate).toInt()
+                                } catch (e: Exception) { -1 }
+                            }
+                            if (daysLeft >= 0) {
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = Primary.copy(alpha = 0.1f)
                                 ) {
                                     Text(
-                                        text = if (exam.daysLeft == 0) "D-Day" else "D-${exam.daysLeft}",
+                                        text = if (daysLeft == 0) "D-Day" else "D-$daysLeft",
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                         style = LoorveTypography.labelMedium,
                                         color = Primary,
@@ -171,6 +193,7 @@ fun HomeScreen(
                 }
             } else {
                 items(uiState.progressList, key = { it.id }) { progress ->
+                    val isCompleted = progress.completed > 0 && progress.completed >= progress.total
                     LoorveCard(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onNavigateToProgressDetail(progress.id) }
@@ -203,16 +226,16 @@ fun HomeScreen(
                                 )
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = if (progress.isCompleted)
+                                    color = if (isCompleted)
                                         Success.copy(alpha = 0.15f)
                                     else
                                         Tertiary.copy(alpha = 0.15f)
                                 ) {
                                     Text(
-                                        text = if (progress.isCompleted) "완료" else "진행 중",
+                                        text = if (isCompleted) "완료" else "진행 중",
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                         style = LoorveTypography.labelMedium,
-                                        color = if (progress.isCompleted) Success else Tertiary,
+                                        color = if (isCompleted) Success else Tertiary,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 }
