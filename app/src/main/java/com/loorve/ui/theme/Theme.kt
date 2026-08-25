@@ -29,7 +29,9 @@ fun LoorveTheme(content: @Composable () -> Unit) {
         SideEffect {
             val window = (view.context as Activity).window
             @Suppress("DEPRECATION")
-            window.statusBarColor = Background.toArgb()
+            window.statusBarColor     = Background.toArgb()  // 0xFF0F0F14
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = Background.toArgb()  // 하단 내비 바도 동일 배경
             WindowCompat.getInsetsController(window, view)
                 .isAppearanceLightStatusBars = false
         }
