@@ -30,9 +30,6 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
-// ─────────────────────────────────────────────
-// 메인 홈 화면
-// ─────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -105,7 +102,7 @@ fun HomeScreen(
             // ── 2) 복습률 카드 ──
             item {
                 HomeReviewRateCard(
-                    rate = uiState.weeklyCompletionRate,       // 0f~1f
+                    rate = uiState.weeklyCompletionRate,
                     completed = uiState.weeklyCompleted,
                     total = uiState.weeklyTotal
                 )
@@ -114,10 +111,16 @@ fun HomeScreen(
             // ── 3) 미니 달력 ──
             item {
                 SectionLabel("${LocalDate.now().monthValue}월 복습 스케줄")
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "점이 있는 날짜를 선택해 상세 일정을 확인하세요",
+                    style = LoorveTypography.labelSmall,
+                    color = OnSurfaceVariant
+                )
                 Spacer(Modifier.height(8.dp))
                 HomeMiniCalendar(
                     selectedDate = selectedDate,
-                    scheduledDates = uiState.scheduledDates,   // Set<LocalDate>
+                    scheduledDates = uiState.scheduledDates,
                     onDateSelected = { selectedDate = it }
                 )
             }
@@ -132,6 +135,15 @@ fun HomeScreen(
             }
 
             if (todaySchedules.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "${selectedDate.format(DateTimeFormatter.ofPattern("M월 d일"))} · 복습 일정",
+                        style = LoorveTypography.labelMedium,
+                        color = Primary,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                    )
+                }
                 items(todaySchedules, key = { "sched_${it.id}" }) { progress ->
                     HomeScheduleCard(
                         subjectName = uiState.exams
@@ -314,10 +326,6 @@ fun HomeScreen(
     }
 }
 
-// ─────────────────────────────────────────────
-// 신규 서브 컴포저블들
-// ─────────────────────────────────────────────
-
 /** 모티베이션 헤더 */
 @Composable
 private fun HomeMotivationHeader() {
@@ -344,7 +352,7 @@ private fun HomeMotivationHeader() {
 /** 이번 주 복습률 카드 */
 @Composable
 private fun HomeReviewRateCard(
-    rate: Float,          // 0f ~ 1f (ViewModel 없을 경우 0f 기본값)
+    rate: Float,
     completed: Int,
     total: Int
 ) {
@@ -376,13 +384,17 @@ private fun HomeReviewRateCard(
                     modifier = Modifier.fillMaxWidth(0.85f)
                 )
             }
-            Box(contentAlignment = Alignment.Center) {
+            // ✅ 수정: Box → Column으로 교체하여 레이블 겹침 버그 해결
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
                     text = "전체 복습률",
                     style = LoorveTypography.labelSmall,
-                    color = OnSurfaceVariant,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(bottom = 28.dp)
+                    color = OnSurfaceVariant
                 )
+                Spacer(Modifier.height(4.dp))
                 Text(
                     text = "$percent%",
                     style = LoorveTypography.headlineMedium,
@@ -404,13 +416,12 @@ private fun HomeMiniCalendar(
 ) {
     val today = LocalDate.now()
     val yearMonth = YearMonth.of(selectedDate.year, selectedDate.month)
-    val firstDayOfWeek = yearMonth.atDay(1).dayOfWeek.value % 7  // 일=0, 월=1...
+    val firstDayOfWeek = yearMonth.atDay(1).dayOfWeek.value % 7
     val daysInMonth = yearMonth.lengthOfMonth()
     val dayLabels = listOf("일", "월", "화", "수", "목", "금", "토")
 
     LoorveCard(modifier = Modifier.fillMaxWidth()) {
         Column {
-            // 요일 헤더
             Row(modifier = Modifier.fillMaxWidth()) {
                 dayLabels.forEach { label ->
                     Text(
@@ -424,7 +435,6 @@ private fun HomeMiniCalendar(
             }
             Spacer(Modifier.height(6.dp))
 
-            // 날짜 그리드
             val totalCells = firstDayOfWeek + daysInMonth
             val rows = (totalCells + 6) / 7
             var day = 1
@@ -521,11 +531,27 @@ private fun HomeScheduleCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "지금 바로 시작할 수 있어요",
-                    style = LoorveTypography.labelSmall,
-                    color = OnSurfaceVariant
-                )
+                // ✅ 수정: 예상 시간 텍스트 추가
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "예상 20분",
+                        style = LoorveTypography.labelSmall,
+                        color = Primary.copy(alpha = 0.8f)
+                    )
+                    Text(
+                        text = "·",
+                        style = LoorveTypography.labelSmall,
+                        color = OnSurfaceVariant
+                    )
+                    Text(
+                        text = "지금 바로 시작할 수 있어요",
+                        style = LoorveTypography.labelSmall,
+                        color = OnSurfaceVariant
+                    )
+                }
             }
             Spacer(Modifier.width(12.dp))
             FilledIconButton(
