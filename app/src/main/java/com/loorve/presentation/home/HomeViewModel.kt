@@ -82,13 +82,13 @@ class HomeViewModel @Inject constructor(
                             runCatching {
                                 val examDate = LocalDate.parse(exam.examDate)
                                 val today    = LocalDate.now()
-                                // ✅ Long → Int 명시적 변환
+                                // Long → Int 명시적 변환
                                 val days     = ChronoUnit.DAYS.between(today, examDate).toInt()
                                 if (days >= 0) {
                                     NearestExamUiModel(
                                         subjectName       = exam.subjectName,
                                         daysLeft          = days,
-                                        // ✅ examDate(LocalDate)를 String으로 포맷
+                                        // examDate(LocalDate) → String 포맷
                                         examDateFormatted = examDate.format(displayFormatter)
                                     )
                                 } else null
@@ -111,17 +111,16 @@ class HomeViewModel @Inject constructor(
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         viewModelScope.launch {
             getProgressListUseCase(uid)
-                .catch { /* 진도 로딩 실패는 조용히 무시 */ }
+                .catch { /* 진도 로딩 실패는 무시 */ }
                 .collect { list ->
                     val uiList = list.map { p ->
                         ProgressUiModel(
-                            // ✅ Progress 도메인 모델의 실제 필드명 사용
                             id            = p.progressId,
                             examId        = p.examId,
                             content       = p.content,
                             completed     = p.completedCount,
                             total         = p.totalCount,
-                            // ✅ createdAt(Long epoch ms) → LocalDate → 포맷
+                            // createdAt(Long epoch ms) → LocalDate → 포맷
                             dateFormatted = runCatching {
                                 Instant.ofEpochMilli(p.createdAt)
                                     .atZone(ZoneId.of("Asia/Seoul"))
