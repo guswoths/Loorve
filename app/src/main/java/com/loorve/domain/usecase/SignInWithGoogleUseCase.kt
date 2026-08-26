@@ -31,10 +31,10 @@ class SignInWithGoogleUseCase(
      *  - idToken은 민감한 인증 자격증명입니다. 절대 로그(Logcat 등)에 출력하지 마세요.
      *  - idToken의 유효기간은 일반적으로 1시간이므로 장기 저장하지 마세요.
      *
-     * @return 로그인 성공 시 [Result.success]와 함께 인증된 [User]를 반환,
+     * @return 로그인 성공 시 [Result.success]와 함께 인증된 [User]와 신규유저 여부(Boolean)를 반환,
      *         실패 시 [Result.failure]와 함께 발생한 예외를 반환합니다.
      */
-    suspend operator fun invoke(idToken: String): Result<User> {
+    suspend operator fun invoke(idToken: String): Result<Pair<User, Boolean>> {
         if (idToken.isBlank()) {
             return Result.failure(IllegalArgumentException("idToken은 비어있을 수 없습니다."))
         }
