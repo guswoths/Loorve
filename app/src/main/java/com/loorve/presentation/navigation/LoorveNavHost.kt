@@ -87,7 +87,6 @@ sealed class Screen(val route: String) {
 private fun SplashScreen(
     onSplashComplete: (isLoggedIn: Boolean) -> Unit
 ) {
-    // ── 기능 로직: 절대 변경하지 않음 ──────────────────────────────
     var triggered by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -98,16 +97,13 @@ private fun SplashScreen(
             onSplashComplete(isLoggedIn)
         }
     }
-    // ─────────────────────────────────────────────────────────────
 
-    // 그라디언트 브러시 (GradientStart #A78BFA → GradientEnd #EC4899)
     val gradientBrush = Brush.linearGradient(
         colors = listOf(GradientStart, GradientEnd),
         start = Offset(0f, 0f),
         end = Offset(Float.POSITIVE_INFINITY, 0f)
     )
 
-    // 로딩 인디케이터 회전 애니메이션
     val infiniteTransition = rememberInfiniteTransition(label = "splashProgress")
     val progressAlpha by infiniteTransition.animateFloat(
         initialValue = 0.4f,
@@ -122,15 +118,13 @@ private fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background), // Background #0F0F14
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-
-            // ── 앱 이름: 그라디언트 텍스트 ──
             Text(
                 text = "Loorve",
                 style = TextStyle(
@@ -144,20 +138,18 @@ private fun SplashScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // ── 서브타이틀 ──
             Text(
                 text = "시험일 기반 자동 복습 스케줄러",
                 style = MaterialTheme.typography.bodyMedium,
-                color = OnSurfaceVariant, // #8B8B9E
+                color = OnSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // ── 로딩 인디케이터 ──
             CircularProgressIndicator(
                 modifier = Modifier.size(32.dp),
-                color = Primary,           // #A78BFA
+                color = Primary,
                 strokeWidth = 3.dp,
                 strokeCap = StrokeCap.Round,
                 trackColor = Color.Transparent
@@ -165,11 +157,10 @@ private fun SplashScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ── 하단 로딩 메시지 ──
             Text(
                 text = "계정과 복습 블록을 불러오는 중",
                 style = MaterialTheme.typography.bodySmall,
-                color = OnSurfaceVariant, // #8B8B9E
+                color = OnSurfaceVariant,
                 textAlign = TextAlign.Center
             )
         }
@@ -331,7 +322,7 @@ fun LoorveNavHost(
 
         composable(Screen.MyPage.route) {
             MyPageScreen(
-                onBack = {
+                onBack = {                          // ✅ 수정: onNavigateBack → onBack
                     navController.popBackStack()
                 },
                 onNavigateToNotificationTimeSetting = {
