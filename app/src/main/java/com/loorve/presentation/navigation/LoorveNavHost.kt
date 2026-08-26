@@ -287,7 +287,7 @@ fun LoorveNavHost(
 
             ProgressDetailScreen(
                 progressId = progressId,
-                onNavigateBack = {
+                onBack = {                      // ✅ 수정: onNavigateBack → onBack
                     navController.popBackStack()
                 }
             )
@@ -322,7 +322,7 @@ fun LoorveNavHost(
 
         composable(Screen.MyPage.route) {
             MyPageScreen(
-                onBack = {                          // ✅ MyPageScreen 선언 파라미터: onBack
+                onBack = {
                     navController.popBackStack()
                 },
                 onNavigateToNotificationTimeSetting = {
@@ -340,7 +340,7 @@ fun LoorveNavHost(
 
         composable(Screen.NotificationTimeSetting.route) {
             NotificationTimeSettingScreen(
-                onNavigateBack = {              // ✅ NotificationTimeSettingScreen 선언 파라미터: onNavigateBack
+                onNavigateBack = {              // ✅ 수정: onBack → onNavigateBack
                     navController.popBackStack()
                 }
             )
