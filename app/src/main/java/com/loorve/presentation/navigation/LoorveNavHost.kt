@@ -1,3 +1,4 @@
+// 경로: app/src/main/java/com/loorve/presentation/navigation/LoorveNavHost.kt
 package com.loorve.presentation.navigation
 
 import android.os.PowerManager
@@ -279,13 +280,13 @@ fun LoorveNavHost(
 
             ProgressDetailScreen(
                 progressId = progressId,
-                onBack = { navController.popBackStack() }  // ProgressDetailScreen은 onBack 사용
+                onBack = { navController.popBackStack() }  // ✅ 수정: onNavigateBack → onBack
             )
         }
 
         composable(Screen.Calendar.route) {
             ReviewCalendarScreen(
-                onNavigateBack = { navController.popBackStack() }  // ✅ 수정: onBack → onNavigateBack
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
