@@ -32,4 +32,10 @@ interface AuthRepository {
 
     suspend fun signInWithGoogle(idToken: String): Result<User>
     suspend fun launchGoogleSignIn(activityContext: Context): Result<User>
+
+    /**
+     * 현재 사용자의 모든 Firestore 데이터를 삭제하고 Firebase Auth 계정도 삭제합니다.
+     * 최근 로그인이 필요한 경우 [Result.failure]와 함께 재로그인 안내 메시지를 반환합니다.
+     */
+    suspend fun deleteAccount(): Result<Unit>
 }

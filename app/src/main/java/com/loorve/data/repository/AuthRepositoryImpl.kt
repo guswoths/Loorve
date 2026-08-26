@@ -2,12 +2,14 @@ package com.loorve.data.repository
 
 import android.content.Context
 import android.util.Log
+import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FieldValue
@@ -23,7 +25,6 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
-import androidx.credentials.ClearCredentialStateRequest
 
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
@@ -32,6 +33,9 @@ class AuthRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : AuthRepository {
 
+    // ─────────────────────────────────────────────────────────────
+    // 이메일 로그인
+    // ─────────────────────────────────────────────────────────────
     override suspend fun login(email: String, password: String): Result<User> {
         return try {
             val result = firebaseAuth
@@ -51,6 +55,13 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // @Deprecated logout() — signOut() 사용 권장
+    // ─────────────────────────────────────────────────────────────
+    @Deprecated(
+        message = "signOut()으로 교체 예정. 마이페이지 로그아웃은 signOut()을 사용하세요.",
+        replaceWith = ReplaceWith("signOut()")
+    )
     override suspend fun logout(): Result<Unit> {
         return try {
             firebaseAuth.signOut()
@@ -60,21 +71,20 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // 로그아웃 — 로그인 방식 무관하게 항상 credential 초기화
+    // (재로그인 시 계정 선택 팝업 반드시 표시)
+    // ─────────────────────────────────────────────────────────────
     override suspend fun signOut(): Result<Unit> {
         return try {
             val currentUser = firebaseAuth.currentUser
-            val isGoogleProvider = currentUser?.providerData
-                ?.any { it.providerId == "google.com" } == true
 
-            if (isGoogleProvider) {
-                try {
-                    val credentialManager = CredentialManager.create(context)
-                    credentialManager.clearCredentialState(
-                        ClearCredentialStateRequest()
-                    )
-                } catch (e: Exception) {
-                    Log.w(TAG, "Google credential revoke 실패 (계속 진행): ${e.message}")
-                }
+            // 로그인 방식 무관하게 항상 credential 초기화
+            try {
+                val credentialManager = CredentialManager.create(context)
+                credentialManager.clearCredentialState(ClearCredentialStateRequest())
+            } catch (e: Exception) {
+                Log.w(TAG, "clearCredentialState 실패 (계속 진행): ${e.message}")
             }
 
             firebaseAuth.signOut()
@@ -86,6 +96,79 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // 계정 삭제
+    // 순서: Firestore 데이터 삭제 → credential 초기화 → Auth 계정 삭제
+    // (Auth 먼저 삭제 시 Firestore 권한 오류 발생 가능)
+    // ─────────────────────────────────────────────────────────────
+    override suspend fun deleteAccount(): Result<Unit> {
+        return try {
+            val currentUser = firebaseAuth.currentUser
+                ?: return Result.failure(Exception("로그인 상태가 아닙니다."))
+            val uid = currentUser.uid
+
+            // 1. users/{uid}/progress 서브컬렉션 삭제
+            val progressDocs = firestore
+                .collection("users").document(uid)
+                .collection("progress")
+                .get().await()
+            progressDocs.documents.forEach { it.reference.delete().await() }
+            Log.d(TAG, "progress 삭제 완료 (uid=$uid, count=${progressDocs.size()})")
+
+            // 2. users/{uid}/reviewSchedules 서브컬렉션 삭제
+            val scheduleDocs = firestore
+                .collection("users").document(uid)
+                .collection("reviewSchedules")
+                .get().await()
+            scheduleDocs.documents.forEach { it.reference.delete().await() }
+            Log.d(TAG, "reviewSchedules 삭제 완료 (uid=$uid, count=${scheduleDocs.size()})")
+
+            // 3. exams 컬렉션 (createdBy == uid) 삭제
+            val examDocs = firestore
+                .collection("exams")
+                .whereEqualTo("createdBy", uid)
+                .get().await()
+            examDocs.documents.forEach { it.reference.delete().await() }
+            Log.d(TAG, "exams 삭제 완료 (uid=$uid, count=${examDocs.size()})")
+
+            // 4. examResults 컬렉션 (userId == uid) 삭제
+            val resultDocs = firestore
+                .collection("examResults")
+                .whereEqualTo("userId", uid)
+                .get().await()
+            resultDocs.documents.forEach { it.reference.delete().await() }
+            Log.d(TAG, "examResults 삭제 완료 (uid=$uid, count=${resultDocs.size()})")
+
+            // 5. users/{uid} 루트 문서 삭제
+            firestore.collection("users").document(uid).delete().await()
+            Log.d(TAG, "users 문서 삭제 완료 (uid=$uid)")
+
+            // 6. Credential 초기화 (Google 포함 모든 방식)
+            try {
+                CredentialManager.create(context)
+                    .clearCredentialState(ClearCredentialStateRequest())
+            } catch (e: Exception) {
+                Log.w(TAG, "deleteAccount: clearCredentialState 실패: ${e.message}")
+            }
+
+            // 7. Firebase Auth 계정 삭제 (반드시 마지막)
+            currentUser.delete().await()
+            Log.d(TAG, "계정 삭제 완료 (uid=$uid)")
+
+            Result.success(Unit)
+
+        } catch (e: FirebaseAuthRecentLoginRequiredException) {
+            Log.w(TAG, "계정 삭제: 재로그인 필요", e)
+            Result.failure(Exception("보안을 위해 재로그인 후 다시 시도해주세요."))
+        } catch (e: Exception) {
+            Log.e(TAG, "계정 삭제 실패", e)
+            Result.failure(Exception("계정 삭제 중 오류가 발생했습니다. 다시 시도해주세요.", e))
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 현재 유저 상태 Flow
+    // ─────────────────────────────────────────────────────────────
     override fun getCurrentUser(): Flow<User?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener { auth ->
             trySend(auth.currentUser?.toDomainUser())
@@ -94,13 +177,16 @@ class AuthRepositoryImpl @Inject constructor(
         awaitClose { firebaseAuth.removeAuthStateListener(listener) }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Google 로그인 (Credential Manager)
+    // ─────────────────────────────────────────────────────────────
     override suspend fun launchGoogleSignIn(activityContext: Context): Result<User> {
         return try {
             val credentialManager = CredentialManager.create(activityContext)
 
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID) // ✅ BuildConfig 참조
+                .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
                 .setAutoSelectEnabled(false)
                 .build()
 
@@ -146,6 +232,9 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Private helpers
+    // ─────────────────────────────────────────────────────────────
     private suspend fun createOrUpdateUserDocument(user: User) {
         try {
             val docRef = firestore.collection("users").document(user.id)
@@ -202,6 +291,5 @@ class AuthRepositoryImpl @Inject constructor(
 
     companion object {
         private const val TAG = "AuthRepository"
-        // ✅ WEB_CLIENT_ID는 BuildConfig로 이동 — 이 상수 삭제
     }
 }
