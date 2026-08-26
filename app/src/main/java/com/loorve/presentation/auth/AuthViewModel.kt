@@ -20,7 +20,8 @@ sealed interface AuthUiState {
     data object Loading : AuthUiState
     data object Cancelled : AuthUiState
     data object LogoutComplete : AuthUiState
-    data class Success(val user: User) : AuthUiState
+    /** isNewUser = true: Firestore users 문서가 없던 신규(또는 재가입) 사용자 */
+    data class Success(val user: User, val isNewUser: Boolean) : AuthUiState
     data class NetworkError(val message: String) : AuthUiState
     data class Error(val message: String) : AuthUiState
 }
@@ -28,20 +29,21 @@ sealed interface AuthUiState {
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val signOutUseCase: SignOutUseCase          // ← SignOutUseCase 주입 추가
+    private val signOutUseCase: SignOutUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    /** 현재 로그인 사용자 Flow — MyPageScreen에서 계정 정보 표시용 */
     val currentUser = authRepository.getCurrentUser()
 
     fun signInWithGoogle(idToken: String) {
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             authRepository.signInWithGoogle(idToken)
-                .onSuccess { user -> _uiState.value = AuthUiState.Success(user) }
+                .onSuccess { (user, isNewUser) ->
+                    _uiState.value = AuthUiState.Success(user, isNewUser)
+                }
                 .onFailure { e -> _uiState.value = classifyError(e) }
         }
     }
@@ -50,7 +52,9 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             authRepository.launchGoogleSignIn(context)
-                .onSuccess { user -> _uiState.value = AuthUiState.Success(user) }
+                .onSuccess { (user, isNewUser) ->
+                    _uiState.value = AuthUiState.Success(user, isNewUser)
+                }
                 .onFailure { e ->
                     _uiState.value = if (e.message == "CANCELLED") AuthUiState.Cancelled
                     else classifyError(e)
@@ -58,20 +62,10 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    /**
-     * 로그아웃 처리.
-     * SignOutUseCase가 순서대로 처리:
-     *   1. 등록된 AlarmManager 알람 전체 취소
-     *   2. 알림 시간 DataStore(NotificationTimePreferences) 초기화
-     *   3. Firebase signOut (Google Credential revoke 포함)
-     *
-     * 성공 → LogoutComplete (View에서 네비게이션 후 resetState() 호출)
-     * 실패 → Error (Snackbar 안내, 강제 이탈 금지)
-     */
     fun signOut() {
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            signOutUseCase()                            // ← authRepository.signOut() 대신 UseCase 호출
+            signOutUseCase()
                 .onSuccess { _uiState.value = AuthUiState.LogoutComplete }
                 .onFailure { e ->
                     _uiState.value = AuthUiState.Error(

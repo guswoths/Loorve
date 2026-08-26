@@ -79,7 +79,6 @@ class AuthRepositoryImpl @Inject constructor(
         return try {
             val currentUser = firebaseAuth.currentUser
 
-            // 로그인 방식 무관하게 항상 credential 초기화
             try {
                 val credentialManager = CredentialManager.create(context)
                 credentialManager.clearCredentialState(ClearCredentialStateRequest())
@@ -99,7 +98,6 @@ class AuthRepositoryImpl @Inject constructor(
     // ─────────────────────────────────────────────────────────────
     // 계정 삭제
     // 순서: Firestore 데이터 삭제 → credential 초기화 → Auth 계정 삭제
-    // (Auth 먼저 삭제 시 Firestore 권한 오류 발생 가능)
     // ─────────────────────────────────────────────────────────────
     override suspend fun deleteAccount(): Result<Unit> {
         return try {
@@ -107,7 +105,6 @@ class AuthRepositoryImpl @Inject constructor(
                 ?: return Result.failure(Exception("로그인 상태가 아닙니다."))
             val uid = currentUser.uid
 
-            // 1. users/{uid}/progress 서브컬렉션 삭제
             val progressDocs = firestore
                 .collection("users").document(uid)
                 .collection("progress")
@@ -115,7 +112,6 @@ class AuthRepositoryImpl @Inject constructor(
             progressDocs.documents.forEach { it.reference.delete().await() }
             Log.d(TAG, "progress 삭제 완료 (uid=$uid, count=${progressDocs.size()})")
 
-            // 2. users/{uid}/reviewSchedules 서브컬렉션 삭제
             val scheduleDocs = firestore
                 .collection("users").document(uid)
                 .collection("reviewSchedules")
@@ -123,7 +119,6 @@ class AuthRepositoryImpl @Inject constructor(
             scheduleDocs.documents.forEach { it.reference.delete().await() }
             Log.d(TAG, "reviewSchedules 삭제 완료 (uid=$uid, count=${scheduleDocs.size()})")
 
-            // 3. exams 컬렉션 (createdBy == uid) 삭제
             val examDocs = firestore
                 .collection("exams")
                 .whereEqualTo("createdBy", uid)
@@ -131,7 +126,6 @@ class AuthRepositoryImpl @Inject constructor(
             examDocs.documents.forEach { it.reference.delete().await() }
             Log.d(TAG, "exams 삭제 완료 (uid=$uid, count=${examDocs.size()})")
 
-            // 4. examResults 컬렉션 (userId == uid) 삭제
             val resultDocs = firestore
                 .collection("examResults")
                 .whereEqualTo("userId", uid)
@@ -139,11 +133,9 @@ class AuthRepositoryImpl @Inject constructor(
             resultDocs.documents.forEach { it.reference.delete().await() }
             Log.d(TAG, "examResults 삭제 완료 (uid=$uid, count=${resultDocs.size()})")
 
-            // 5. users/{uid} 루트 문서 삭제
             firestore.collection("users").document(uid).delete().await()
             Log.d(TAG, "users 문서 삭제 완료 (uid=$uid)")
 
-            // 6. Credential 초기화 (Google 포함 모든 방식)
             try {
                 CredentialManager.create(context)
                     .clearCredentialState(ClearCredentialStateRequest())
@@ -151,7 +143,6 @@ class AuthRepositoryImpl @Inject constructor(
                 Log.w(TAG, "deleteAccount: clearCredentialState 실패: ${e.message}")
             }
 
-            // 7. Firebase Auth 계정 삭제 (반드시 마지막)
             currentUser.delete().await()
             Log.d(TAG, "계정 삭제 완료 (uid=$uid)")
 
@@ -180,7 +171,7 @@ class AuthRepositoryImpl @Inject constructor(
     // ─────────────────────────────────────────────────────────────
     // Google 로그인 (Credential Manager)
     // ─────────────────────────────────────────────────────────────
-    override suspend fun launchGoogleSignIn(activityContext: Context): Result<User> {
+    override suspend fun launchGoogleSignIn(activityContext: Context): Result<Pair<User, Boolean>> {
         return try {
             val credentialManager = CredentialManager.create(activityContext)
 
@@ -214,15 +205,15 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun signInWithGoogle(idToken: String): Result<User> {
+    override suspend fun signInWithGoogle(idToken: String): Result<Pair<User, Boolean>> {
         return try {
             val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
             val authResult = firebaseAuth.signInWithCredential(firebaseCredential).await()
             val user = authResult.user
                 ?: return Result.failure(Exception("Google 로그인 실패: 사용자 정보 없음"))
             val domainUser = user.toDomainUser()
-            createOrUpdateUserDocument(domainUser)
-            Result.success(domainUser)
+            val isNewUser = createOrUpdateUserDocument(domainUser)
+            Result.success(Pair(domainUser, isNewUser))
         } catch (e: com.google.firebase.auth.FirebaseAuthException) {
             Result.failure(Exception(mapFirebaseAuthError(e.errorCode), e))
         } catch (e: java.io.IOException) {
@@ -235,8 +226,13 @@ class AuthRepositoryImpl @Inject constructor(
     // ─────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────
-    private suspend fun createOrUpdateUserDocument(user: User) {
-        try {
+
+    /**
+     * @return isNewUser — true: Firestore 문서 신규 생성, false: 기존 문서 업데이트
+     * Firestore 오류 발생 시 false를 반환해 기존 사용자로 안전하게 처리
+     */
+    private suspend fun createOrUpdateUserDocument(user: User): Boolean {
+        return try {
             val docRef = firestore.collection("users").document(user.id)
             val snapshot = docRef.get().await()
             val isNewUser = !snapshot.exists()
@@ -254,13 +250,17 @@ class AuthRepositoryImpl @Inject constructor(
 
             docRef.set(data, SetOptions.merge()).await()
             Log.d(TAG, "Firestore users 문서 ${if (isNewUser) "생성" else "업데이트"} 완료 (uid=${user.id})")
+            isNewUser
 
         } catch (e: com.google.firebase.firestore.FirebaseFirestoreException) {
             Log.e(TAG, "Firestore 권한 오류 (uid=${user.id}): ${e.code}", e)
+            false
         } catch (e: java.io.IOException) {
             Log.e(TAG, "Firestore 네트워크 오류 (uid=${user.id})", e)
+            false
         } catch (e: Exception) {
             Log.e(TAG, "Firestore 문서 저장 실패 (uid=${user.id})", e)
+            false
         }
     }
 

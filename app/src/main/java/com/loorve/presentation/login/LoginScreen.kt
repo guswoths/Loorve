@@ -31,17 +31,17 @@ import com.loorve.ui.theme.*
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
+    onLoginSuccess: (isNewUser: Boolean) -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
-    // 로그인 성공 → 홈으로 이동
+    // 로그인 성공 → isNewUser 여부를 NavHost로 전달
     LaunchedEffect(uiState) {
-        when (uiState) {
-            is AuthUiState.Success -> onLoginSuccess()
+        when (val state = uiState) {
+            is AuthUiState.Success -> onLoginSuccess(state.isNewUser)
             is AuthUiState.Cancelled -> viewModel.resetState()
             else -> Unit
         }

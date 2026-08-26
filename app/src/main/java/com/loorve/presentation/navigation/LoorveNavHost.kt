@@ -191,10 +191,11 @@ fun LoorveNavHost(
         composable(Screen.Splash.route) {
             SplashScreen(
                 onSplashComplete = { isLoggedIn ->
+                    // 기존 로그인 사용자 → Home, 비로그인 → Login
                     val destination = if (isLoggedIn) {
                         Screen.Home.route
                     } else {
-                        Screen.Onboarding.route
+                        Screen.Login.route
                     }
                     navController.navigate(destination) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
@@ -203,21 +204,24 @@ fun LoorveNavHost(
             )
         }
 
-        composable(Screen.Onboarding.route) {
-            OnboardingScreen(
-                onFinished = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+        composable(Screen.Login.route) {
+            LoginScreen(
+                onLoginSuccess = { isNewUser ->
+                    // 신규 사용자(Firestore 문서 미존재) → Onboarding, 기존 사용자 → Home
+                    val destination = if (isNewUser) Screen.Onboarding.route else Screen.Home.route
+                    navController.navigate(destination) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
             )
         }
 
-        composable(Screen.Login.route) {
-            LoginScreen(
-                onLoginSuccess = {
+        composable(Screen.Onboarding.route) {
+            OnboardingScreen(
+                onFinished = {
+                    // 온보딩 완료 후 Home으로 이동 (뒤로 가기 시 Login으로 돌아가지 않도록 inclusive = true)
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
                 }
             )
