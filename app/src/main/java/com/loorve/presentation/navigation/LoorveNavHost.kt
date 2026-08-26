@@ -322,7 +322,7 @@ fun LoorveNavHost(
 
         composable(Screen.MyPage.route) {
             MyPageScreen(
-                onBack = {                          // ✅ 수정: onNavigateBack → onBack
+                onBack = {                          // ✅ MyPageScreen 선언 파라미터: onBack
                     navController.popBackStack()
                 },
                 onNavigateToNotificationTimeSetting = {
@@ -340,7 +340,7 @@ fun LoorveNavHost(
 
         composable(Screen.NotificationTimeSetting.route) {
             NotificationTimeSettingScreen(
-                onNavigateBack = {
+                onNavigateBack = {              // ✅ NotificationTimeSettingScreen 선언 파라미터: onNavigateBack
                     navController.popBackStack()
                 }
             )
