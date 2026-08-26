@@ -285,9 +285,10 @@ fun LoorveNavHost(
                 ?.getString("progressId")
                 ?: return@composable
 
+            // ✅ ProgressDetailScreen의 파라미터명은 onBack
             ProgressDetailScreen(
                 progressId = progressId,
-                onBack = {                      // ✅ 수정: onNavigateBack → onBack
+                onBack = {
                     navController.popBackStack()
                 }
             )
@@ -339,8 +340,9 @@ fun LoorveNavHost(
         }
 
         composable(Screen.NotificationTimeSetting.route) {
+            // ✅ 핵심 수정: onBack → onNavigateBack (실제 함수 시그니처에 맞춤)
             NotificationTimeSettingScreen(
-                onNavigateBack = {              // ✅ 수정: onBack → onNavigateBack
+                onNavigateBack = {
                     navController.popBackStack()
                 }
             )
