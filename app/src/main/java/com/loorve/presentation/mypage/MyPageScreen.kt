@@ -1,3 +1,6 @@
+// app/src/main/java/com/loorve/presentation/mypage/MyPageScreen.kt
+// 상단 import에 아래가 있는지 확인 (별도 파일로 분리되었으므로 같은 패키지라 import 불필요)
+// ViewModel, UiState, Event 모두 같은 패키지(mypage)이므로 추가 import 없이 동작
 package com.loorve.presentation.mypage
 
 import androidx.compose.foundation.background
@@ -6,7 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout  // ✅ AutoMirrored 추가
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -152,7 +155,7 @@ fun MyPageScreen(
             item {
                 LoorveCard(modifier = Modifier.fillMaxWidth()) {
                     SettingsRow(
-                        icon = Icons.AutoMirrored.Filled.Logout,  // ✅ 핵심 수정
+                        icon = Icons.AutoMirrored.Filled.Logout,
                         title = "로그아웃",
                         subtitle = "이 기기에서 계정 연결 해제",
                         actionLabel = "실행",
