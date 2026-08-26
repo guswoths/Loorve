@@ -2,12 +2,21 @@ package com.loorve.presentation.navigation
 
 import android.os.Build
 import android.os.PowerManager
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,8 +27,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
@@ -42,6 +58,10 @@ import com.loorve.presentation.notification.NotificationPermissionRoute
 import com.loorve.presentation.onboarding.OnboardingScreen
 import com.loorve.presentation.progress.ProgressDetailScreen
 import com.loorve.presentation.settings.BatteryOptimizationGuideScreen
+import com.loorve.ui.theme.GradientEnd
+import com.loorve.ui.theme.GradientStart
+import com.loorve.ui.theme.OnSurfaceVariant
+import com.loorve.ui.theme.Primary
 import kotlinx.coroutines.delay
 
 sealed class Screen(val route: String) {
@@ -62,43 +82,95 @@ sealed class Screen(val route: String) {
     object NotificationPermission : Screen("notification_permission")
 }
 
+@OptIn(ExperimentalTextApi::class)
 @Composable
 private fun SplashScreen(
     onSplashComplete: (isLoggedIn: Boolean) -> Unit
 ) {
+    // ── 기능 로직: 절대 변경하지 않음 ──────────────────────────────
     var triggered by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         delay(2_000L)
-
         if (!triggered) {
             triggered = true
             val isLoggedIn = FirebaseAuth.getInstance().currentUser != null
             onSplashComplete(isLoggedIn)
         }
     }
+    // ─────────────────────────────────────────────────────────────
+
+    // 그라디언트 브러시 (GradientStart #A78BFA → GradientEnd #EC4899)
+    val gradientBrush = Brush.linearGradient(
+        colors = listOf(GradientStart, GradientEnd),
+        start = Offset(0f, 0f),
+        end = Offset(Float.POSITIVE_INFINITY, 0f)
+    )
+
+    // 로딩 인디케이터 회전 애니메이션
+    val infiniteTransition = rememberInfiniteTransition(label = "splashProgress")
+    val progressAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "progressAlpha"
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background), // Background #0F0F14
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+
+            // ── 앱 이름: 그라디언트 텍스트 ──
             Text(
                 text = "Loorve",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontWeight = FontWeight.Bold
+                style = TextStyle(
+                    fontFamily = MaterialTheme.typography.displayLarge.fontFamily,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = MaterialTheme.typography.displayLarge.fontSize,
+                    brush = gradientBrush
                 ),
-                color = MaterialTheme.colorScheme.primary
+                textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
+            // ── 서브타이틀 ──
             Text(
-                text = "복습 스케줄러",
+                text = "시험일 기반 자동 복습 스케줄러",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = OnSurfaceVariant, // #8B8B9E
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            // ── 로딩 인디케이터 ──
+            CircularProgressIndicator(
+                modifier = Modifier.size(32.dp),
+                color = Primary,           // #A78BFA
+                strokeWidth = 3.dp,
+                strokeCap = StrokeCap.Round,
+                trackColor = Color.Transparent
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── 하단 로딩 메시지 ──
+            Text(
+                text = "계정과 복습 블록을 불러오는 중",
+                style = MaterialTheme.typography.bodySmall,
+                color = OnSurfaceVariant, // #8B8B9E
+                textAlign = TextAlign.Center
             )
         }
     }
