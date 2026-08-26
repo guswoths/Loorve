@@ -30,7 +30,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.graphicsLayer  // ✅ graphicsLayer import 추가
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
@@ -133,7 +133,6 @@ private fun SplashScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                // noinspection TypographyDashes
                 text = "Loorve",
                 style = TextStyle(
                     fontFamily = MaterialTheme.typography.displayLarge.fontFamily,
@@ -155,7 +154,6 @@ private fun SplashScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // ✅ graphicsLayer를 Modifier extension으로 올바르게 호출
             CircularProgressIndicator(
                 modifier = Modifier
                     .size(32.dp)
@@ -279,6 +277,7 @@ fun LoorveNavHost(
                 ?.getString("progressId")
                 ?: return@composable
 
+            // ✅ ProgressDetailScreen의 파라미터는 onBack (시그니처 확인 완료)
             ProgressDetailScreen(
                 progressId = progressId,
                 onBack = { navController.popBackStack() }
@@ -286,6 +285,7 @@ fun LoorveNavHost(
         }
 
         composable(Screen.Calendar.route) {
+            // ✅ ReviewCalendarScreen의 파라미터는 onNavigateBack (시그니처 확인 완료)
             ReviewCalendarScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
@@ -305,6 +305,7 @@ fun LoorveNavHost(
         }
 
         composable(Screen.MyPage.route) {
+            // ✅ MyPageScreen의 파라미터는 onBack (시그니처 확인 완료)
             MyPageScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToNotificationTimeSetting = {
