@@ -19,30 +19,45 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.loorve.presentation.auth.AuthUiState
+import com.loorve.presentation.auth.AuthViewModel
 import com.loorve.ui.theme.*
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
-    viewModel: LoginViewModel = hiltViewModel()
+    viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
-    LaunchedEffect(uiState.isLoggedIn) {
-        if (uiState.isLoggedIn) onLoginSuccess()
-    }
-    LaunchedEffect(uiState.error) {
-        uiState.error?.let { snackbarHostState.showSnackbar(it) }
+    // 로그인 성공 → 홈으로 이동
+    LaunchedEffect(uiState) {
+        when (uiState) {
+            is AuthUiState.Success -> onLoginSuccess()
+            is AuthUiState.Cancelled -> viewModel.resetState()
+            else -> Unit
+        }
     }
 
-    // 로딩 중일 때: 스플래시 화면 표시
-    if (uiState.isLoading) {
+    // 에러 Snackbar 표시
+    LaunchedEffect(uiState) {
+        when (val state = uiState) {
+            is AuthUiState.Error -> snackbarHostState.showSnackbar(state.message)
+            is AuthUiState.NetworkError -> snackbarHostState.showSnackbar(state.message)
+            else -> Unit
+        }
+    }
+
+    // 로딩 중: 스플래시 화면 표시
+    if (uiState is AuthUiState.Loading) {
         SplashLoadingScreen()
         return
     }
@@ -117,8 +132,8 @@ fun LoginScreen(
 
                 // ── Google 로그인 버튼 ──
                 GoogleSignInButton(
-                    enabled = !uiState.isLoading,
-                    onClick = { viewModel.signInWithGoogle() }
+                    enabled = uiState !is AuthUiState.Loading,
+                    onClick = { viewModel.launchGoogleSignIn(context) }
                 )
 
                 Spacer(Modifier.height(20.dp))
@@ -140,7 +155,6 @@ fun LoginScreen(
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 @Composable
 private fun SplashLoadingScreen() {
-    // 점 세 개 페이드 애니메이션
     val infiniteTransition = rememberInfiniteTransition(label = "dot_anim")
     val alpha1 by infiniteTransition.animateFloat(
         initialValue = 0.2f, targetValue = 1f,
@@ -174,21 +188,16 @@ private fun SplashLoadingScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // 로고
             Text(
                 text = "Loorve",
                 style = LoorveTypography.displayLarge,
                 color = Primary
             )
-
-            // 설명 텍스트
             Text(
                 text = "계정과 복습 블록을 불러오는 중",
                 style = LoorveTypography.bodyMedium,
                 color = OnSurfaceVariant
             )
-
-            // 점 3개 로딩 인디케이터
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -239,7 +248,6 @@ private fun GoogleSignInButton(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 20.dp)
         ) {
-            // Google G 텍스트 아이콘 (drawable 추가 전 임시)
             Text(
                 text = "G",
                 color = Primary,

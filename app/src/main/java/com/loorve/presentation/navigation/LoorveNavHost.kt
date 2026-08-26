@@ -216,7 +216,7 @@ fun LoorveNavHost(
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
-                    navController.navigate(Screen.ExamSetting.route) {
+                    navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
@@ -280,7 +280,7 @@ fun LoorveNavHost(
 
             ProgressDetailScreen(
                 progressId = progressId,
-                onBack = { navController.popBackStack() }  // ✅ 수정: onNavigateBack → onBack
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
