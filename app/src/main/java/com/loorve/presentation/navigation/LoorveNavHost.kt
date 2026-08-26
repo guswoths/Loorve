@@ -1,6 +1,5 @@
 package com.loorve.presentation.navigation
 
-import android.os.Build
 import android.os.PowerManager
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -31,6 +30,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer  // ✅ graphicsLayer import 추가
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
@@ -62,8 +62,12 @@ import com.loorve.ui.theme.GradientEnd
 import com.loorve.ui.theme.GradientStart
 import com.loorve.ui.theme.OnSurfaceVariant
 import com.loorve.ui.theme.Primary
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 
+// ────────────────────────────────────────────────────────────────
+// Screen Route 정의
+// ────────────────────────────────────────────────────────────────
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Onboarding : Screen("onboarding")
@@ -82,6 +86,9 @@ sealed class Screen(val route: String) {
     object NotificationPermission : Screen("notification_permission")
 }
 
+// ────────────────────────────────────────────────────────────────
+// SplashScreen
+// ────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalTextApi::class)
 @Composable
 private fun SplashScreen(
@@ -90,7 +97,7 @@ private fun SplashScreen(
     var triggered by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        delay(2_000L)
+        delay(2.seconds)
         if (!triggered) {
             triggered = true
             val isLoggedIn = FirebaseAuth.getInstance().currentUser != null
@@ -126,6 +133,7 @@ private fun SplashScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
+                // noinspection TypographyDashes
                 text = "Loorve",
                 style = TextStyle(
                     fontFamily = MaterialTheme.typography.displayLarge.fontFamily,
@@ -147,8 +155,11 @@ private fun SplashScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
+            // ✅ graphicsLayer를 Modifier extension으로 올바르게 호출
             CircularProgressIndicator(
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier
+                    .size(32.dp)
+                    .graphicsLayer(alpha = progressAlpha),
                 color = Primary,
                 strokeWidth = 3.dp,
                 strokeCap = StrokeCap.Round,
@@ -167,6 +178,9 @@ private fun SplashScreen(
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// LoorveNavHost
+// ────────────────────────────────────────────────────────────────
 @Composable
 fun LoorveNavHost(
     navController: NavHostController = rememberNavController()
@@ -183,11 +197,8 @@ fun LoorveNavHost(
                     } else {
                         Screen.Onboarding.route
                     }
-
                     navController.navigate(destination) {
-                        popUpTo(Screen.Splash.route) {
-                            inclusive = true
-                        }
+                        popUpTo(Screen.Splash.route) { inclusive = true }
                     }
                 }
             )
@@ -197,9 +208,7 @@ fun LoorveNavHost(
             OnboardingScreen(
                 onFinished = {
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.Onboarding.route) {
-                            inclusive = true
-                        }
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
                 }
             )
@@ -209,9 +218,7 @@ fun LoorveNavHost(
             LoginScreen(
                 onLoginSuccess = {
                     navController.navigate(Screen.ExamSetting.route) {
-                        popUpTo(Screen.Login.route) {
-                            inclusive = true
-                        }
+                        popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
             )
@@ -221,9 +228,7 @@ fun LoorveNavHost(
             ExamSettingScreen(
                 onSaveSuccess = {
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.ExamSetting.route) {
-                            inclusive = true
-                        }
+                        popUpTo(Screen.ExamSetting.route) { inclusive = true }
                     }
                 }
             )
@@ -238,18 +243,11 @@ fun LoorveNavHost(
             var batteryGuideShown by remember { mutableStateOf(false) }
 
             LaunchedEffect(lifecycleState) {
-                if (
-                    lifecycleState == Lifecycle.State.RESUMED &&
-                    !batteryGuideShown
-                ) {
+                if (lifecycleState == Lifecycle.State.RESUMED && !batteryGuideShown) {
                     val isIgnoringBatteryOptimizations =
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            context.getSystemService<PowerManager>()
-                                ?.isIgnoringBatteryOptimizations(context.packageName)
-                                ?: true
-                        } else {
-                            true
-                        }
+                        context.getSystemService<PowerManager>()
+                            ?.isIgnoringBatteryOptimizations(context.packageName)
+                            ?: true
 
                     if (!isIgnoringBatteryOptimizations) {
                         batteryGuideShown = true
@@ -266,9 +264,7 @@ fun LoorveNavHost(
                     navController.navigate(Screen.ExamSetting.route)
                 },
                 onNavigateToProgressDetail = { progressId ->
-                    navController.navigate(
-                        Screen.ProgressDetail.createRoute(progressId)
-                    )
+                    navController.navigate(Screen.ProgressDetail.createRoute(progressId))
                 }
             )
         }
@@ -276,75 +272,55 @@ fun LoorveNavHost(
         composable(
             route = Screen.ProgressDetail.route,
             arguments = listOf(
-                navArgument("progressId") {
-                    type = NavType.StringType
-                }
+                navArgument("progressId") { type = NavType.StringType }
             )
         ) { backStackEntry ->
             val progressId = backStackEntry.arguments
                 ?.getString("progressId")
                 ?: return@composable
 
-            // ✅ ProgressDetailScreen의 파라미터명은 onBack
             ProgressDetailScreen(
                 progressId = progressId,
-                onBack = {
-                    navController.popBackStack()
-                }
+                onBack = { navController.popBackStack() }
             )
         }
 
         composable(Screen.Calendar.route) {
             ReviewCalendarScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                }
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
         composable(Screen.BatteryOptimizationGuide.route) {
             BatteryOptimizationGuideScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
-                onSkip = {
-                    navController.popBackStack()
-                }
+                onNavigateBack = { navController.popBackStack() },
+                onSkip = { navController.popBackStack() }
             )
         }
 
         composable(Screen.NotificationPermission.route) {
             NotificationPermissionRoute(
-                onNavigateBack = {
-                    navController.popBackStack()
-                }
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
         composable(Screen.MyPage.route) {
             MyPageScreen(
-                onBack = {
-                    navController.popBackStack()
-                },
+                onBack = { navController.popBackStack() },
                 onNavigateToNotificationTimeSetting = {
                     navController.navigate(Screen.NotificationTimeSetting.route)
                 },
                 onSignOut = {
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(0) {
-                            inclusive = true
-                        }
+                        popUpTo(0) { inclusive = true }
                     }
                 }
             )
         }
 
         composable(Screen.NotificationTimeSetting.route) {
-            // ✅ 핵심 수정: onBack → onNavigateBack (실제 함수 시그니처에 맞춤)
             NotificationTimeSettingScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                }
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }
