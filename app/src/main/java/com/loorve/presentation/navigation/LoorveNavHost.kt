@@ -48,6 +48,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.ui.geometry.Size
 import com.google.firebase.auth.FirebaseAuth
 import com.loorve.presentation.calendar.ReviewCalendarScreen
 import com.loorve.presentation.exam.ExamSettingScreen
@@ -65,6 +66,7 @@ import com.loorve.ui.theme.OnSurfaceVariant
 import com.loorve.ui.theme.Primary
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
+
 
 // ────────────────────────────────────────────────────────────────
 // Screen Route 정의
@@ -97,6 +99,7 @@ private fun SplashScreen(
 ) {
     var triggered by remember { mutableStateOf(false) }
 
+    // ⛔ 기능 금지 구역 — 절대 수정 금지
     LaunchedEffect(Unit) {
         delay(2.seconds)
         if (!triggered) {
@@ -106,12 +109,14 @@ private fun SplashScreen(
         }
     }
 
+    // 로고 그라디언트 브러시 (좌→우 linear)
     val gradientBrush = Brush.linearGradient(
         colors = listOf(GradientStart, GradientEnd),
         start = Offset(0f, 0f),
         end = Offset(Float.POSITIVE_INFINITY, 0f)
     )
 
+    // 인디케이터 펄스 애니메이션
     val infiniteTransition = rememberInfiniteTransition(label = "splashProgress")
     val progressAlpha by infiniteTransition.animateFloat(
         initialValue = 0.4f,
@@ -123,12 +128,27 @@ private fun SplashScreen(
         label = "progressAlpha"
     )
 
+    // 배경 radial gradient 오버레이 브러시 (중앙 라벤더 빛 → 투명)
+    val radialOverlayBrush = Brush.radialGradient(
+        colors = listOf(
+            Primary.copy(alpha = 0.06f),
+            Color.Transparent
+        )
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
+        // 은은한 라벤더 radial 오버레이 (전체 화면 중앙에서 바깥으로 퍼짐)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(radialOverlayBrush)
+        )
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
