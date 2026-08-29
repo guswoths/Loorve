@@ -6,27 +6,80 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.loorve.ui.component.BannerAdView
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddReviewBlockScreen(
     onNavigateBack: () -> Unit,
-    onSaveSuccess: () -> Unit = {}
+    onSaveSuccess: () -> Unit = {},
+    // ReviewCalendarViewModel을 주입받아 저장 후 reload 호출
+    reviewCalendarViewModel: ReviewCalendarViewModel = hiltViewModel()
 ) {
-    // UI 상태만 관리 (기능 로직 없음)
     var examName by remember { mutableStateOf("") }
-    var examDate by remember { mutableStateOf("") }
-    // 0 = 에빙하우스, 1 = 직접 세팅
+    // String → Long? 으로 타입 변경 (DatePicker 선택 결과 millis)
+    var examDateMillis by remember { mutableStateOf<Long?>(null) }
     var selectedCycleOption by remember { mutableStateOf(0) }
 
+    var isLoading by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
+    // 표시용 날짜 문자열 (선택 전: placeholder, 선택 후: "YYYY년 MM월 DD일")
+    val examDateDisplay = examDateMillis?.let { millis ->
+        Instant.ofEpochMilli(millis)
+            .atZone(ZoneId.of("Asia/Seoul"))
+            .toLocalDate()
+            .format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일"))
+    }
+
+    // DatePicker 상태
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = examDateMillis
+    )
+
+    // DatePickerDialog 표시
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    examDateMillis = datePickerState.selectedDateMillis
+                    showDatePicker = false
+                }) {
+                    Text("확인")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("취소")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("복습 블록 생성하기") },
@@ -42,21 +95,87 @@ fun AddReviewBlockScreen(
         },
         bottomBar = {
             Column {
-                // 하단 고정 버튼
                 Button(
-                    onClick = onSaveSuccess,
+                    onClick = {
+                        // 입력값 검증
+                        val uid = FirebaseAuth.getInstance().currentUser?.uid
+                        if (uid == null) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("로그인 정보가 없습니다. 다시 로그인해 주세요.")
+                            }
+                            return@Button
+                        }
+                        if (examName.isBlank()) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("시험 이름을 입력해주세요.")
+                            }
+                            return@Button
+                        }
+                        if (examDateMillis == null) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("시험 종료일을 선택해주세요.")
+                            }
+                            return@Button
+                        }
+
+                        // Firestore 저장
+                        coroutineScope.launch {
+                            isLoading = true
+                            try {
+                                val examDateLocal = Instant.ofEpochMilli(examDateMillis!!)
+                                    .atZone(ZoneId.of("Asia/Seoul"))
+                                    .toLocalDate()
+
+                                val data = hashMapOf(
+                                    "examName"           to examName.trim(),
+                                    "examDate"           to examDateLocal.toString(), // "YYYY-MM-DD"
+                                    "examDateMillis"     to examDateMillis,
+                                    "cycleOption"        to selectedCycleOption,     // 0=에빙하우스, 1=직접세팅
+                                    "createdAt"          to System.currentTimeMillis(),
+                                    "uid"                to uid
+                                )
+
+                                // 보안: users/{uid}/reviewBlocks/{autoId}
+                                FirebaseFirestore.getInstance()
+                                    .collection("users")
+                                    .document(uid)
+                                    .collection("reviewBlocks")
+                                    .add(data)
+                                    .await()
+
+                                // 저장 완료 → 캘린더 뷰 갱신 후 복귀
+                                reviewCalendarViewModel.reloadCurrentMonth()
+                                onSaveSuccess()
+                            } catch (e: Exception) {
+                                snackbarHostState.showSnackbar(
+                                    message = "저장에 실패했습니다: ${e.message ?: "알 수 없는 오류"}",
+                                    duration = SnackbarDuration.Long
+                                )
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    },
+                    enabled = !isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                         .height(52.dp),
                     shape = MaterialTheme.shapes.medium
                 ) {
-                    Text(
-                        text  = "블록 생성하기",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-                    )
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color    = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text  = "블록 생성하기",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
                 }
-                // 배너 광고
                 BannerAdView(modifier = Modifier.fillMaxWidth())
             }
         }
@@ -71,14 +190,12 @@ fun AddReviewBlockScreen(
         ) {
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 본문 설명 텍스트
             Text(
                 text  = "시험 정보와 복습 주기를 정하면 블록이 자동 생성됩니다.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            // 안내 카드
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer
@@ -90,8 +207,8 @@ fun AddReviewBlockScreen(
                     verticalAlignment = Alignment.Top
                 ) {
                     Text(
-                        text  = "💡",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text     = "💡",
+                        style    = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 1.dp, end = 8.dp)
                     )
                     Column {
@@ -120,14 +237,23 @@ fun AddReviewBlockScreen(
                 singleLine    = true
             )
 
-            // 시험 종료일 입력
+            // 시험 종료일 — 읽기전용 필드 + 캘린더 아이콘 클릭으로 DatePickerDialog 오픈
             OutlinedTextField(
-                value         = examDate,
-                onValueChange = { examDate = it },
+                value         = examDateDisplay ?: "",
+                onValueChange = { /* 읽기 전용 */ },
                 label         = { Text("시험 종료일") },
-                placeholder   = { Text("2026년 9월 12일") },
+                placeholder   = { Text("시험 종료일을 선택해주세요") },
                 modifier      = Modifier.fillMaxWidth(),
-                singleLine    = true
+                readOnly      = true,
+                singleLine    = true,
+                trailingIcon  = {
+                    IconButton(onClick = { showDatePicker = true }) {
+                        Icon(
+                            imageVector        = Icons.Outlined.CalendarToday,
+                            contentDescription = "날짜 선택"
+                        )
+                    }
+                }
             )
 
             // 복습 주기 선택

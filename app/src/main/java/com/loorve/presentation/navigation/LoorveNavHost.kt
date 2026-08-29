@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Home
@@ -349,7 +350,7 @@ fun LoorveNavHost(
             )
         }
 
-        // ── Screen.Home — Scaffold + 하단 네비게이션 바 (탭 전환 방식으로 변경) ──
+        // ── Screen.Home — Scaffold + 하단 네비게이션 바 ──
         composable(Screen.Home.route) {
             val context = LocalContext.current
             val lifecycleOwner = LocalLifecycleOwner.current
@@ -385,12 +386,17 @@ fun LoorveNavHost(
                             val isSelected = selectedTabIndex == item.index
                             NavigationBarItem(
                                 selected = isSelected,
-                                onClick = {
-                                    // 탭 클릭 시 navigate 대신 selectedTabIndex 전환
-                                    selectedTabIndex = item.index
-                                },
+                                onClick = { selectedTabIndex = item.index },
                                 icon = {
+                                    // 커스텀 인디케이터: 콘텐츠 크기에 맞춘 pill 형태 배경
                                     Row(
+                                        modifier = Modifier
+                                            .background(
+                                                color = if (isSelected) Primary.copy(alpha = 0.1f)
+                                                else Color.Transparent,
+                                                shape = RoundedCornerShape(50)
+                                            )
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Icon(
@@ -408,18 +414,19 @@ fun LoorveNavHost(
                                     }
                                 },
                                 label = null,
+                                // 기본 wide indicator 완전 제거 → 커스텀 배경으로 대체
                                 colors = NavigationBarItemDefaults.colors(
-                                    indicatorColor = Primary.copy(alpha = 0.1f)
+                                    indicatorColor = Color.Transparent
                                 )
                             )
                         }
                     }
                 }
             ) { innerPadding ->
-                // selectedTabIndex에 따라 content 영역 전환
-                Box(modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
                 ) {
                     when (selectedTabIndex) {
                         0 -> HomeScreen(
@@ -472,7 +479,6 @@ fun LoorveNavHost(
             )
         }
 
-        // 독립 라우트로도 유지 (딥링크 등 직접 접근 시 뒤로가기 표시)
         composable(Screen.Calendar.route) {
             ReviewCalendarScreen(
                 onNavigateBack = { navController.popBackStack() },

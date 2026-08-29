@@ -39,8 +39,6 @@ class ReviewCalendarViewModel @Inject constructor(
     val uiState: StateFlow<ReviewCalendarUiState> = _uiState.asStateFlow()
 
     private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-
-    // ✅ 핵심 수정: 이전 월 구독 Job을 명시적으로 추적·취소
     private var loadJob: Job? = null
 
     fun onMonthChanged(yearMonth: YearMonth) {
@@ -98,6 +96,15 @@ class ReviewCalendarViewModel @Inject constructor(
         loadSchedulesForMonth(_uiState.value.displayYearMonth)
     }
 
+    /**
+     * 복습 블록 생성 후 popBackStack으로 복귀 시 호출.
+     * 현재 월 스케줄을 Firestore에서 강제 재로드.
+     */
+    fun reloadCurrentMonth() {
+        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        loadSchedulesForMonth(_uiState.value.displayYearMonth)
+    }
+
     private fun loadSchedulesForMonth(yearMonth: YearMonth) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: run {
             _uiState.update {
@@ -112,7 +119,6 @@ class ReviewCalendarViewModel @Inject constructor(
         val startDate = yearMonth.atDay(1).format(dateFormatter)
         val endDate = yearMonth.atEndOfMonth().format(dateFormatter)
 
-        // ✅ 이전 월 리스너 Job 취소 후 새로 시작 (중복 리스너 방지)
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             reviewScheduleRepository
