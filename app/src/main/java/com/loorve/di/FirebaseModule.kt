@@ -1,3 +1,4 @@
+// app/src/main/java/com/loorve/di/FirebaseModule.kt
 package com.loorve.di
 
 import com.google.firebase.auth.FirebaseAuth
@@ -14,11 +15,11 @@ object FirebaseModule {
 
     @Provides
     @Singleton
-    fun provideFirebaseAuth(): FirebaseAuth =
-        FirebaseAuth.getInstance()
+    fun provideFirebaseFirestore(): FirebaseFirestore =
+        FirebaseFirestore.getInstance()
 
     @Provides
     @Singleton
-    fun provideFirebaseFirestore(): FirebaseFirestore =
-        FirebaseFirestore.getInstance()
+    fun provideFirebaseAuth(): FirebaseAuth =
+        FirebaseAuth.getInstance()
 }
