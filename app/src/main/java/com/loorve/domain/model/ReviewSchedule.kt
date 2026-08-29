@@ -11,8 +11,11 @@ import androidx.annotation.Keep
 data class ReviewSchedule(
     val reviewScheduleId: String = "",
     val originProgressId: String = "",
-    val reviewDate: Long = 0L,          // ← Firestore timestamp는 Long(epoch ms)으로 통일
+    val reviewDate: Long = 0L,          // Firestore timestamp는 Long(epoch ms)으로 통일
+    val reviewRound: Int = 0,           // 복습 회차 (1부터 시작)
     val isCompleted: Boolean = false,
     val createdAt: Long = 0L,
+    val updatedAt: Long = 0L,           // 업데이트 시각
+    val uid: String = "",               // 소유자 UID (Firestore 보안 규칙용)
     val scheduledDate: String = ""      // ISO 8601 문자열 필드 (있을 경우)
 )

@@ -17,6 +17,18 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+// 연쇄 실패 방지를 위해 ReviewSchedule 관련 바인딩을 별도 모듈로 분리
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class ReviewScheduleModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindReviewScheduleRepository(
+        impl: ReviewScheduleRepositoryImpl
+    ): ReviewScheduleRepository
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
@@ -44,10 +56,4 @@ abstract class RepositoryModule {
     abstract fun bindReviewBlockRepository(
         impl: ReviewBlockRepositoryImpl
     ): ReviewBlockRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindReviewScheduleRepository(
-        impl: ReviewScheduleRepositoryImpl
-    ): ReviewScheduleRepository
 }
