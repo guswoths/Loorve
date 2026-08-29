@@ -435,6 +435,7 @@ fun LoorveNavHost(
                         )
                         1 -> ReviewCalendarScreen(
                             onNavigateBack = null,
+                            isEmbedded = true,
                             onNavigateToAddBlock = {
                                 navController.navigate(Screen.AddReviewBlock.route)
                             }
