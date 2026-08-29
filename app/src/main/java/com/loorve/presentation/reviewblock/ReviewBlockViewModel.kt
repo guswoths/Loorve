@@ -1,77 +1,50 @@
-// firestore.rules (프로젝트 루트)
-rules_version = '2';
-service cloud.firestore {
-    match /databases/{database}/documents {
+package com.loorve.presentation.reviewblock
 
-        // ✅ 최상위 exams 컬렉션
-        match /exams/{examId} {
-            allow create: if request.auth != null
-                && request.resource.data.createdBy == request.auth.uid;
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.loorve.domain.model.ReviewBlock
+import com.loorve.domain.repository.ReviewBlockRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-            allow get, list: if request.auth != null
-            && resource.data.createdBy == request.auth.uid;
+sealed class ReviewBlockUiState {
+    object Idle : ReviewBlockUiState()
+    object Loading : ReviewBlockUiState()
+    object Success : ReviewBlockUiState()
+    data class Error(val message: String) : ReviewBlockUiState()
+}
 
-            allow update: if request.auth != null
-                && resource.data.createdBy == request.auth.uid
-                && request.resource.data.createdBy == resource.data.createdBy;
+@HiltViewModel
+class ReviewBlockViewModel @Inject constructor(
+    private val reviewBlockRepository: ReviewBlockRepository
+) : ViewModel() {
 
-            allow delete: if request.auth != null
-                && resource.data.createdBy == request.auth.uid;
+    private val _uiState = MutableStateFlow<ReviewBlockUiState>(ReviewBlockUiState.Idle)
+    val uiState: StateFlow<ReviewBlockUiState> = _uiState.asStateFlow()
+
+    private val _reviewBlocks = MutableStateFlow<List<ReviewBlock>>(emptyList())
+    val reviewBlocks: StateFlow<List<ReviewBlock>> = _reviewBlocks.asStateFlow()
+
+    fun saveReviewBlock(block: ReviewBlock) {
+        viewModelScope.launch {
+            _uiState.value = ReviewBlockUiState.Loading
+            reviewBlockRepository.saveReviewBlock(block)
+                .onSuccess {
+                    _uiState.value = ReviewBlockUiState.Success
+                }
+                .onFailure { e ->
+                    _uiState.value = ReviewBlockUiState.Error(
+                        e.message ?: "알 수 없는 오류가 발생했습니다."
+                    )
+                }
         }
+    }
 
-        // ✅ 사용자 문서
-        match /users/{userId} {
-            allow read, create, update: if request.auth != null
-            && request.auth.uid == userId;
-
-            // ✅ progress 서브컬렉션
-            match /progress/{progressId} {
-                allow read, create, update, delete: if request.auth != null
-                && request.auth.uid == userId;
-            }
-
-            // ✅ reviewSchedules 서브컬렉션
-            match /reviewSchedules/{scheduleId} {
-                allow read, create, update, delete: if request.auth != null
-                && request.auth.uid == userId;
-            }
-
-            // ✅ reviewBlocks 서브컬렉션 (수정: uid 필드 누락 시 명확한 오류 유도)
-            match /reviewBlocks/{blockId} {
-                allow read, update, delete: if request.auth != null
-                && request.auth.uid == userId;
-
-                allow create: if request.auth != null
-                    && request.auth.uid == userId
-                    && request.resource.data.uid == request.auth.uid
-                    // ✅ 추가: 필수 필드 존재 여부 검증으로 불완전한 문서 차단
-                    && request.resource.data.keys().hasAll(['blockId', 'uid', 'createdAt']);
-            }
-        }
-
-        // ✅ examResults 컬렉션
-        match /examResults/{resultId} {
-            allow create: if request.auth != null
-                && request.resource.data.userId == request.auth.uid;
-
-            allow get: if request.auth != null
-                && resource.data.userId == request.auth.uid;
-
-            allow list: if request.auth != null
-                && request.auth.uid != null;
-
-            allow update: if request.auth != null
-                && resource.data.userId == request.auth.uid
-                && request.resource.data.userId == resource.data.userId;
-
-            allow delete: if request.auth != null
-                && resource.data.userId == request.auth.uid;
-        }
-
-        // ✅ [방어] 최상위 reviewBlocks 경로 실수 접근 명시적 차단
-        match /reviewBlocks/{blockId} {
-            allow read, write: if false;
-        }
-
+    fun resetState() {
+        _uiState.value = ReviewBlockUiState.Idle
     }
 }
