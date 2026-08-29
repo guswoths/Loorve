@@ -35,6 +35,17 @@ service cloud.firestore {
         allow read, create, update, delete: if request.auth != null
           && request.auth.uid == userId;
       }
+
+      // ✅ reviewBlocks 서브컬렉션: 본인 복습 블록 읽기/쓰기/삭제 허용
+      //    create 시 uid 필드가 요청자 uid와 일치해야 함 (데이터 위변조 방지)
+      match /reviewBlocks/{blockId} {
+        allow read, update, delete: if request.auth != null
+          && request.auth.uid == userId;
+
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.uid == request.auth.uid;
+      }
     }
 
     // ✅ examResults 컬렉션: get/list 분리, update 시 userId 불변 보장
