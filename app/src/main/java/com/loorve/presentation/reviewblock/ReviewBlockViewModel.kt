@@ -1,0 +1,77 @@
+// firestore.rules (프로젝트 루트)
+rules_version = '2';
+service cloud.firestore {
+    match /databases/{database}/documents {
+
+        // ✅ 최상위 exams 컬렉션
+        match /exams/{examId} {
+            allow create: if request.auth != null
+                && request.resource.data.createdBy == request.auth.uid;
+
+            allow get, list: if request.auth != null
+            && resource.data.createdBy == request.auth.uid;
+
+            allow update: if request.auth != null
+                && resource.data.createdBy == request.auth.uid
+                && request.resource.data.createdBy == resource.data.createdBy;
+
+            allow delete: if request.auth != null
+                && resource.data.createdBy == request.auth.uid;
+        }
+
+        // ✅ 사용자 문서
+        match /users/{userId} {
+            allow read, create, update: if request.auth != null
+            && request.auth.uid == userId;
+
+            // ✅ progress 서브컬렉션
+            match /progress/{progressId} {
+                allow read, create, update, delete: if request.auth != null
+                && request.auth.uid == userId;
+            }
+
+            // ✅ reviewSchedules 서브컬렉션
+            match /reviewSchedules/{scheduleId} {
+                allow read, create, update, delete: if request.auth != null
+                && request.auth.uid == userId;
+            }
+
+            // ✅ reviewBlocks 서브컬렉션 (수정: uid 필드 누락 시 명확한 오류 유도)
+            match /reviewBlocks/{blockId} {
+                allow read, update, delete: if request.auth != null
+                && request.auth.uid == userId;
+
+                allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.uid == request.auth.uid
+                    // ✅ 추가: 필수 필드 존재 여부 검증으로 불완전한 문서 차단
+                    && request.resource.data.keys().hasAll(['blockId', 'uid', 'createdAt']);
+            }
+        }
+
+        // ✅ examResults 컬렉션
+        match /examResults/{resultId} {
+            allow create: if request.auth != null
+                && request.resource.data.userId == request.auth.uid;
+
+            allow get: if request.auth != null
+                && resource.data.userId == request.auth.uid;
+
+            allow list: if request.auth != null
+                && request.auth.uid != null;
+
+            allow update: if request.auth != null
+                && resource.data.userId == request.auth.uid
+                && request.resource.data.userId == resource.data.userId;
+
+            allow delete: if request.auth != null
+                && resource.data.userId == request.auth.uid;
+        }
+
+        // ✅ [방어] 최상위 reviewBlocks 경로 실수 접근 명시적 차단
+        match /reviewBlocks/{blockId} {
+            allow read, write: if false;
+        }
+
+    }
+}

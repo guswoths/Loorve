@@ -1,3 +1,4 @@
+// firestore.rules (프로젝트 루트)
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -35,22 +36,17 @@ service cloud.firestore {
           && request.auth.uid == userId;
       }
 
-      // ✅ reviewBlocks 서브컬렉션
-      //    create 시 uid 필드가 요청자 uid와 일치해야 함
+      // ✅ reviewBlocks 서브컬렉션 (수정: uid 필드 누락 시 명확한 오류 유도)
       match /reviewBlocks/{blockId} {
         allow read, update, delete: if request.auth != null
           && request.auth.uid == userId;
 
         allow create: if request.auth != null
           && request.auth.uid == userId
-          && request.resource.data.uid == request.auth.uid;
+          && request.resource.data.uid == request.auth.uid
+          // ✅ 추가: 필수 필드 존재 여부 검증으로 불완전한 문서 차단
+          && request.resource.data.keys().hasAll(['blockId', 'uid', 'createdAt']);
       }
-
-      // ✅ [추가] reviewBlocks 최상위 경로 실수 방어 — 코드에서 경로 오기재 시
-      // 아래를 추가하면 오진단에 도움이 됨 (임시 디버그용, 배포 전 제거)
-      // match /debug/{any} {
-      //   allow read, write: if request.auth != null;
-      // }
     }
 
     // ✅ examResults 컬렉션
@@ -70,6 +66,11 @@ service cloud.firestore {
 
       allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
+    }
+
+    // ✅ [방어] 최상위 reviewBlocks 경로 실수 접근 명시적 차단
+    match /reviewBlocks/{blockId} {
+      allow read, write: if false;
     }
 
   }
