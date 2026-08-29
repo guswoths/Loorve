@@ -1,21 +1,22 @@
 // app/src/main/java/com/loorve/domain/model/ReviewSchedule.kt
 package com.loorve.domain.model
 
-import androidx.annotation.Keep
+import com.google.firebase.firestore.DocumentId
 
 /**
- * Firestore toObject() 역직렬화를 위해 모든 필드에 기본값을 부여하고,
- * @Keep으로 ProGuard/R8 난독화 방지
+ * 복습 일정 도메인 모델
+ * Firestore 역직렬화를 위해 기본 생성자(no-arg) 필요 → 모든 필드에 기본값 부여
  */
-@Keep
 data class ReviewSchedule(
+    @DocumentId
     val reviewScheduleId: String = "",
+    val uid: String = "",
     val originProgressId: String = "",
-    val reviewDate: Long = 0L,          // Firestore timestamp는 Long(epoch ms)으로 통일
-    val reviewRound: Int = 0,           // 복습 회차 (1부터 시작)
+    val reviewDate: Long = 0L,         // Unix epoch ms (Asia/Seoul 기준)
+    val scheduledDate: String = "",    // ISO 8601 "YYYY-MM-DD"
     val isCompleted: Boolean = false,
-    val createdAt: Long = 0L,
-    val updatedAt: Long = 0L,           // 업데이트 시각
-    val uid: String = "",               // 소유자 UID (Firestore 보안 규칙용)
-    val scheduledDate: String = ""      // ISO 8601 문자열 필드 (있을 경우)
+    val completedAt: Long? = null,
+    val reviewRound: Int = 1,          // 1차, 2차, 3차 복습 회차
+    val title: String = "",
+    val createdAt: Long = 0L
 )

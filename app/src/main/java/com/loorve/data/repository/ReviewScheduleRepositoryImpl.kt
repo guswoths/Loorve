@@ -16,7 +16,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 
-// ✅ @Singleton 제거 — 스코프는 RepositoryModule에서만 관리
 class ReviewScheduleRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : ReviewScheduleRepository {
@@ -27,189 +26,101 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
 
     @Throws(IllegalStateException::class)
     private suspend fun requireValidAuthWithRefresh(uid: String) {
-        if (uid.isBlank()) {
-            throw IllegalStateException("로그인 정보가 없습니다. uid가 비어 있습니다.")
-        }
+        if (uid.isBlank()) throw IllegalStateException("로그인 정보가 없습니다. uid가 비어 있습니다.")
         val currentUser = FirebaseAuth.getInstance().currentUser
             ?: throw IllegalStateException("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.")
-
-        if (currentUser.uid != uid) {
-            throw IllegalStateException("인증 정보가 일치하지 않습니다. 다시 로그인해 주세요.")
-        }
-
-        try {
-            currentUser.getIdToken(true).await()
-        } catch (e: Exception) {
+        if (currentUser.uid != uid) throw IllegalStateException("인증 정보가 일치하지 않습니다.")
+        try { currentUser.getIdToken(true).await() } catch (e: Exception) {
             Log.w(TAG, "토큰 갱신 실패 (무시하고 진행): ${e.message}")
         }
     }
 
     private fun FirebaseFirestoreException.toUserMessage(): String = when (code) {
-        FirebaseFirestoreException.Code.PERMISSION_DENIED ->
-            "저장에 실패했습니다: 권한이 없습니다. 로그인 상태를 확인해 주세요."
-        FirebaseFirestoreException.Code.UNAVAILABLE ->
-            "서버에 연결할 수 없습니다. 네트워크 연결을 확인해 주세요."
-        FirebaseFirestoreException.Code.NOT_FOUND ->
-            "대상 문서를 찾을 수 없습니다."
+        FirebaseFirestoreException.Code.PERMISSION_DENIED -> "권한이 없습니다. 로그인 상태를 확인해 주세요."
+        FirebaseFirestoreException.Code.UNAVAILABLE -> "네트워크 연결을 확인해 주세요."
+        FirebaseFirestoreException.Code.NOT_FOUND -> "대상 문서를 찾을 수 없습니다."
         else -> "Firestore 오류: ${message}"
     }
 
     private fun scheduleCollection(uid: String) =
         firestore.collection("users").document(uid).collection("reviewSchedules")
 
-    override suspend fun createReviewSchedule(uid: String, schedule: ReviewSchedule): Result<Unit> {
-        return try {
+    override suspend fun createReviewSchedule(uid: String, schedule: ReviewSchedule): Result<Unit> =
+        runCatching {
             requireValidAuthWithRefresh(uid)
             scheduleCollection(uid).document(schedule.reviewScheduleId).set(schedule).await()
             Log.d(TAG, "createReviewSchedule 완료: uid=$uid, id=${schedule.reviewScheduleId}")
-            Result.success(Unit)
-        } catch (e: IllegalStateException) {
-            Log.e(TAG, "createReviewSchedule 인증 실패: ${e.message}")
-            Result.failure(e)
-        } catch (e: FirebaseFirestoreException) {
-            Log.e(TAG, "createReviewSchedule Firestore 오류(${e.code}): uid=$uid", e)
-            Result.failure(IllegalStateException(e.toUserMessage(), e))
-        } catch (e: Exception) {
-            Log.e(TAG, "createReviewSchedule 실패: uid=$uid", e)
-            Result.failure(e)
         }
-    }
 
-    override suspend fun saveReviewSchedule(uid: String, schedule: ReviewSchedule): Result<Unit> {
-        return try {
+    override suspend fun saveReviewSchedule(uid: String, schedule: ReviewSchedule): Result<Unit> =
+        runCatching {
             requireValidAuthWithRefresh(uid)
-            firestore
-                .collection("users")
-                .document(uid)
-                .collection("reviewSchedules")
-                .document(schedule.reviewScheduleId)
-                .set(schedule)
-                .await()
+            scheduleCollection(uid).document(schedule.reviewScheduleId).set(schedule).await()
             Log.d(TAG, "saveReviewSchedule 완료: uid=$uid, id=${schedule.reviewScheduleId}")
-            Result.success(Unit)
-        } catch (e: IllegalStateException) {
-            Log.e(TAG, "saveReviewSchedule 인증 실패: ${e.message}")
-            Result.failure(e)
-        } catch (e: FirebaseFirestoreException) {
-            Log.e(TAG, "saveReviewSchedule Firestore 오류(${e.code}): uid=$uid", e)
-            Result.failure(IllegalStateException(e.toUserMessage(), e))
-        } catch (e: Exception) {
-            Log.e(TAG, "saveReviewSchedule 실패: uid=$uid", e)
-            Result.failure(e)
         }
-    }
 
-    override suspend fun saveReviewSchedules(uid: String, schedules: List<ReviewSchedule>): Result<Unit> {
-        return try {
+    override suspend fun saveReviewSchedules(uid: String, schedules: List<ReviewSchedule>): Result<Unit> =
+        runCatching {
             requireValidAuthWithRefresh(uid)
             val batch = firestore.batch()
             schedules.forEach { schedule ->
-                val ref = scheduleCollection(uid).document(schedule.reviewScheduleId)
-                batch.set(ref, schedule)
+                batch.set(scheduleCollection(uid).document(schedule.reviewScheduleId), schedule)
             }
             batch.commit().await()
             Log.d(TAG, "saveReviewSchedules 완료: uid=$uid, count=${schedules.size}")
-            Result.success(Unit)
-        } catch (e: IllegalStateException) {
-            Log.e(TAG, "saveReviewSchedules 인증 실패: ${e.message}")
-            Result.failure(e)
-        } catch (e: FirebaseFirestoreException) {
-            Log.e(TAG, "saveReviewSchedules Firestore 오류(${e.code}): uid=$uid", e)
-            Result.failure(IllegalStateException(e.toUserMessage(), e))
-        } catch (e: Exception) {
-            Log.e(TAG, "saveReviewSchedules 실패: uid=$uid", e)
-            Result.failure(e)
         }
-    }
 
     override suspend fun updateReviewCompletion(
         uid: String, scheduleId: String, isCompleted: Boolean
-    ): Result<Unit> {
-        return try {
-            requireValidAuthWithRefresh(uid)
-            scheduleCollection(uid).document(scheduleId)
-                .update("isCompleted", isCompleted).await()
-            Result.success(Unit)
-        } catch (e: IllegalStateException) {
-            Log.e(TAG, "updateReviewCompletion 인증 실패: ${e.message}")
-            Result.failure(e)
-        } catch (e: FirebaseFirestoreException) {
-            Log.e(TAG, "updateReviewCompletion Firestore 오류(${e.code}): uid=$uid", e)
-            Result.failure(IllegalStateException(e.toUserMessage(), e))
-        } catch (e: Exception) {
-            Log.e(TAG, "updateReviewCompletion 실패: uid=$uid", e)
-            Result.failure(e)
-        }
+    ): Result<Unit> = runCatching {
+        requireValidAuthWithRefresh(uid)
+        scheduleCollection(uid).document(scheduleId).update("isCompleted", isCompleted).await()
     }
 
     override suspend fun completeReviewSchedule(uid: String, scheduleId: String): Result<Unit> =
         updateReviewCompletion(uid, scheduleId, true)
 
-    override suspend fun deleteReviewSchedule(uid: String, scheduleId: String): Result<Unit> {
-        return try {
+    override suspend fun deleteReviewSchedule(uid: String, scheduleId: String): Result<Unit> =
+        runCatching {
             requireValidAuthWithRefresh(uid)
             scheduleCollection(uid).document(scheduleId).delete().await()
             Log.d(TAG, "deleteReviewSchedule 완료: uid=$uid, scheduleId=$scheduleId")
-            Result.success(Unit)
-        } catch (e: IllegalStateException) {
-            Log.e(TAG, "deleteReviewSchedule 인증 실패: ${e.message}")
-            Result.failure(e)
-        } catch (e: FirebaseFirestoreException) {
-            Log.e(TAG, "deleteReviewSchedule Firestore 오류(${e.code}): uid=$uid", e)
-            Result.failure(IllegalStateException(e.toUserMessage(), e))
-        } catch (e: Exception) {
-            Log.e(TAG, "deleteReviewSchedule 실패: uid=$uid", e)
-            Result.failure(e)
         }
-    }
 
     override fun getReviewSchedulesByDateRange(
         uid: String, startDate: String, endDate: String
     ): Flow<List<ReviewSchedule>> = callbackFlow {
-        if (uid.isBlank()) {
-            close(IllegalStateException("uid가 비어 있습니다."))
-            return@callbackFlow
-        }
+        if (uid.isBlank()) { close(IllegalStateException("uid가 비어 있습니다.")); return@callbackFlow }
         val zone = ZoneId.of("Asia/Seoul")
         val startEpoch = LocalDate.parse(startDate).atStartOfDay(zone).toInstant().toEpochMilli()
         val endEpoch = LocalDate.parse(endDate).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
-
         val listener = scheduleCollection(uid)
             .whereGreaterThanOrEqualTo("reviewDate", startEpoch)
             .whereLessThanOrEqualTo("reviewDate", endEpoch)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) { close(error); return@addSnapshotListener }
-                val list = snapshot?.toObjects(ReviewSchedule::class.java) ?: emptyList()
-                trySend(list)
+                trySend(snapshot?.toObjects(ReviewSchedule::class.java) ?: emptyList())
             }
         awaitClose { listener.remove() }
     }
 
     override fun getTodayReviewSchedules(uid: String): Flow<List<ReviewSchedule>> =
-        getReviewSchedulesByDateRange(
-            uid,
-            LocalDate.now().toString(),
-            LocalDate.now().toString()
-        )
+        getReviewSchedulesByDateRange(uid, LocalDate.now().toString(), LocalDate.now().toString())
 
     override fun getOverdueAndIncompleteSchedules(uid: String): Flow<List<ReviewSchedule>> =
         emptyFlow()
 
-    override suspend fun getReviewScheduleById(
-        uid: String,
-        scheduleId: String
-    ): Result<ReviewSchedule> = runCatching {
-        if (uid.isBlank()) error("uid가 비어 있습니다.")
-        firestore.collection("users").document(uid)
-            .collection("reviewSchedules").document(scheduleId)
-            .get().await()
-            .toObject(ReviewSchedule::class.java)
-            ?: error("ReviewSchedule not found: $scheduleId")
-    }
+    override suspend fun getReviewScheduleById(uid: String, scheduleId: String): Result<ReviewSchedule> =
+        runCatching {
+            if (uid.isBlank()) error("uid가 비어 있습니다.")
+            firestore.collection("users").document(uid)
+                .collection("reviewSchedules").document(scheduleId)
+                .get().await()
+                .toObject(ReviewSchedule::class.java) ?: error("ReviewSchedule not found: $scheduleId")
+        }
 
     override suspend fun getReviewSchedulesByProgressId(
-        uid: String,
-        progressId: String
+        uid: String, progressId: String
     ): Result<List<ReviewSchedule>> = runCatching {
         if (uid.isBlank()) error("uid가 비어 있습니다.")
         firestore.collection("users").document(uid)
@@ -220,21 +131,14 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getUpcomingIncompleteSchedules(
-        uid: String,
-        fromMillis: Long
+        uid: String, fromMillis: Long
     ): Result<List<ReviewSchedule>> = runCatching {
         if (uid.isBlank()) error("uid가 비어 있습니다.")
-        val snapshot = firestore
-            .collection("users")
-            .document(uid)
+        firestore.collection("users").document(uid)
             .collection("reviewSchedules")
             .whereEqualTo("isCompleted", false)
             .whereGreaterThan("reviewDate", fromMillis)
-            .get()
-            .await()
-
-        snapshot.documents.mapNotNull { doc ->
-            doc.toObject(ReviewSchedule::class.java)
-        }
+            .get().await()
+            .documents.mapNotNull { it.toObject(ReviewSchedule::class.java) }
     }
 }
