@@ -15,9 +15,8 @@ import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
+// ✅ @Singleton 제거 — 스코프는 RepositoryModule에서만 관리
 class ReviewScheduleRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : ReviewScheduleRepository {
@@ -26,7 +25,6 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         private const val TAG = "ReviewScheduleRepo"
     }
 
-    // ✅ 수정: 토큰 강제 갱신 후 uid 검증
     @Throws(IllegalStateException::class)
     private suspend fun requireValidAuthWithRefresh(uid: String) {
         if (uid.isBlank()) {
@@ -39,13 +37,10 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
             throw IllegalStateException("인증 정보가 일치하지 않습니다. 다시 로그인해 주세요.")
         }
 
-        // ✅ 핵심: 토큰이 만료됐을 경우 강제 갱신 (forceRefresh = true)
-        // 이렇게 하면 Firestore가 갱신된 ID 토큰으로 재인증됨
         try {
             currentUser.getIdToken(true).await()
         } catch (e: Exception) {
             Log.w(TAG, "토큰 갱신 실패 (무시하고 진행): ${e.message}")
-            // 갱신 실패 시 기존 토큰으로 계속 진행 (네트워크 없을 때 오프라인 처리)
         }
     }
 
@@ -64,7 +59,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
 
     override suspend fun createReviewSchedule(uid: String, schedule: ReviewSchedule): Result<Unit> {
         return try {
-            requireValidAuthWithRefresh(uid)   // ✅ 토큰 갱신 포함
+            requireValidAuthWithRefresh(uid)
             scheduleCollection(uid).document(schedule.reviewScheduleId).set(schedule).await()
             Log.d(TAG, "createReviewSchedule 완료: uid=$uid, id=${schedule.reviewScheduleId}")
             Result.success(Unit)
@@ -80,12 +75,9 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun saveReviewSchedule(
-        uid: String,
-        schedule: ReviewSchedule
-    ): Result<Unit> {
+    override suspend fun saveReviewSchedule(uid: String, schedule: ReviewSchedule): Result<Unit> {
         return try {
-            requireValidAuthWithRefresh(uid)   // ✅ 토큰 갱신 포함
+            requireValidAuthWithRefresh(uid)
             firestore
                 .collection("users")
                 .document(uid)
@@ -109,7 +101,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
 
     override suspend fun saveReviewSchedules(uid: String, schedules: List<ReviewSchedule>): Result<Unit> {
         return try {
-            requireValidAuthWithRefresh(uid)   // ✅ 토큰 갱신 포함
+            requireValidAuthWithRefresh(uid)
             val batch = firestore.batch()
             schedules.forEach { schedule ->
                 val ref = scheduleCollection(uid).document(schedule.reviewScheduleId)
@@ -134,7 +126,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         uid: String, scheduleId: String, isCompleted: Boolean
     ): Result<Unit> {
         return try {
-            requireValidAuthWithRefresh(uid)   // ✅ 토큰 갱신 포함
+            requireValidAuthWithRefresh(uid)
             scheduleCollection(uid).document(scheduleId)
                 .update("isCompleted", isCompleted).await()
             Result.success(Unit)
@@ -155,7 +147,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
 
     override suspend fun deleteReviewSchedule(uid: String, scheduleId: String): Result<Unit> {
         return try {
-            requireValidAuthWithRefresh(uid)   // ✅ 토큰 갱신 포함
+            requireValidAuthWithRefresh(uid)
             scheduleCollection(uid).document(scheduleId).delete().await()
             Log.d(TAG, "deleteReviewSchedule 완료: uid=$uid, scheduleId=$scheduleId")
             Result.success(Unit)
