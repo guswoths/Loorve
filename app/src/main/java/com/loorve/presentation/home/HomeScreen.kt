@@ -5,13 +5,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.*
@@ -25,7 +26,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,8 +49,6 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-
-    // ── [수정 ④] 캘린더 표시 월을 별도 state로 분리 ──
     var displayYearMonth by remember { mutableStateOf(YearMonth.now()) }
 
     LaunchedEffect(uiState.saveMessage) {
@@ -105,12 +103,12 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            // ── 1) 모티베이션 헤더 (유지) ──
+            // ── 1) 모티베이션 헤더 ──
             item {
                 HomeMotivationHeader()
             }
 
-            // ── 2) 전체 복습률 카드 [수정 ①②: 오늘의 문장/주간 진행 바 제거 → 전체 복습률로 교체] ──
+            // ── 2) 전체 복습률 카드 ──
             item {
                 HomeReviewRateCard(
                     rate = uiState.weeklyCompletionRate,
@@ -119,43 +117,56 @@ fun HomeScreen(
                 )
             }
 
-            // ── 3) 복습 스케줄 블록 [수정 ③④: 헤더 강조 + 스와이프 월 이동] ──
+            // ── 3) 복습 스케줄 블록 (화살표 버튼으로 월 이동) ──
             item {
                 LoorveCard(modifier = Modifier.fillMaxWidth()) {
                     Column {
-                        // ── [수정 ③] 캘린더 헤더 강조 텍스트 ──
-                        Text(
-                            text = "${displayYearMonth.monthValue}월 복습 스케줄",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Primary,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
+                        // 화살표 버튼 포함 캘린더 헤더
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            IconButton(onClick = { displayYearMonth = displayYearMonth.minusMonths(1) }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ChevronLeft,
+                                    contentDescription = "이전 달",
+                                    tint = Primary
+                                )
+                            }
+                            Text(
+                                text = "${displayYearMonth.year}년 ${displayYearMonth.monthValue}월 복습 스케줄",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Primary
+                            )
+                            IconButton(onClick = { displayYearMonth = displayYearMonth.plusMonths(1) }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ChevronRight,
+                                    contentDescription = "다음 달",
+                                    tint = Primary
+                                )
+                            }
+                        }
                         Text(
                             text = "점이 있는 날짜를 선택해 상세 일정을 확인하세요",
                             style = LoorveTypography.labelSmall,
-                            color = OnSurfaceVariant
+                            color = OnSurfaceVariant,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                         )
                         Spacer(Modifier.height(8.dp))
 
-                        // ── [수정 ④] 스와이프 제스처로 월 이동 ──
                         HomeMiniCalendar(
                             displayYearMonth = displayYearMonth,
                             selectedDate = selectedDate,
                             scheduledDates = uiState.scheduledDates,
-                            onDateSelected = { selectedDate = it },
-                            onSwipeLeft = {
-                                displayYearMonth = displayYearMonth.plusMonths(1)
-                            },
-                            onSwipeRight = {
-                                displayYearMonth = displayYearMonth.minusMonths(1)
-                            }
+                            onDateSelected = { selectedDate = it }
                         )
                     }
                 }
             }
 
-            // ── 4) 선택 날짜의 복습 일정 카드 (유지) ──
+            // ── 4) 선택 날짜의 복습 일정 카드 ──
             val todaySchedules = uiState.progressList.filter { progress ->
                 try {
                     val d = java.time.Instant.ofEpochMilli(progress.createdAt)
@@ -192,22 +203,11 @@ fun HomeScreen(
                     )
                 }
             }
-
-            // ── 5) 오늘의 학습 입력 섹션 (유지) ──
-            item {
-                SectionLabel("오늘의 학습")
-                ProgressInputSection(
-                    exams = uiState.exams,
-                    onSave = { examId, content, completedCount, totalCount ->
-                        viewModel.addProgress(examId, content, completedCount, totalCount)
-                    }
-                )
-            }
         }
     }
 }
 
-/** 모티베이션 헤더 (유지) */
+/** 모티베이션 헤더 */
 @Composable
 private fun HomeMotivationHeader() {
     Column(
@@ -230,12 +230,7 @@ private fun HomeMotivationHeader() {
     }
 }
 
-/**
- * [수정 ①②] 전체 복습률 카드
- * - "오늘의 문장" 레이블 및 문장 텍스트 제거
- * - "이번 주 N개 중 N개 완료" 텍스트 및 LoorveProgressBar 제거
- * - 원형 차트 + "전체 복습률" 퍼센트만 표시
- */
+/** 전체 복습률 카드 */
 @Composable
 private fun HomeReviewRateCard(
     rate: Float,
@@ -256,7 +251,6 @@ private fun HomeReviewRateCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ── [수정 ①] "전체 복습률" 헤더 텍스트 ──
             Text(
                 text = "전체 복습률",
                 style = LoorveTypography.labelMedium,
@@ -264,7 +258,6 @@ private fun HomeReviewRateCard(
             )
             Spacer(Modifier.height(16.dp))
 
-            // ── [수정 ②] 원형 차트 ──
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.size(120.dp)
@@ -301,7 +294,6 @@ private fun HomeReviewRateCard(
                     }
                 }
 
-                // ── [수정 ①] 퍼센트 숫자 표시 ──
                 Text(
                     text = "$percent%",
                     fontWeight = FontWeight.Bold,
@@ -321,48 +313,23 @@ private fun HomeReviewRateCard(
 }
 
 /**
- * [수정 ③④] 미니 달력
- * - displayYearMonth 파라미터 추가 → 표시 월을 외부에서 제어
- * - onSwipeLeft / onSwipeRight 콜백으로 월 이동
- * - 헤더 강조는 호출부(LoorveCard Column)에서 처리
+ * 미니 달력
+ * - displayYearMonth: 외부에서 표시 월 제어
+ * - 스와이프 제스처 제거, 화살표 버튼은 호출부(LoorveCard Column)에서 처리
  */
 @Composable
 private fun HomeMiniCalendar(
     displayYearMonth: YearMonth,
     selectedDate: LocalDate,
     scheduledDates: Set<LocalDate>,
-    onDateSelected: (LocalDate) -> Unit,
-    onSwipeLeft: () -> Unit,
-    onSwipeRight: () -> Unit
+    onDateSelected: (LocalDate) -> Unit
 ) {
     val today = LocalDate.now()
     val firstDayOfWeek = displayYearMonth.atDay(1).dayOfWeek.value % 7
     val daysInMonth = displayYearMonth.lengthOfMonth()
     val dayLabels = listOf("일", "월", "화", "수", "목", "금", "토")
 
-    // 스와이프 감지 임계값 (px)
-    val swipeThreshold = 50f
-    var dragAccumulator by remember { mutableStateOf(0f) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(displayYearMonth) {
-                detectHorizontalDragGestures(
-                    onDragStart = { dragAccumulator = 0f },
-                    onDragEnd = {
-                        when {
-                            dragAccumulator < -swipeThreshold -> onSwipeLeft()
-                            dragAccumulator > swipeThreshold  -> onSwipeRight()
-                        }
-                        dragAccumulator = 0f
-                    },
-                    onHorizontalDrag = { _, dragAmount ->
-                        dragAccumulator += dragAmount
-                    }
-                )
-            }
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         // 요일 헤더
         Row(modifier = Modifier.fillMaxWidth()) {
             dayLabels.forEach { label ->
@@ -442,7 +409,7 @@ private fun HomeMiniCalendar(
     }
 }
 
-/** 복습 일정 카드 (유지) */
+/** 복습 일정 카드 */
 @Composable
 private fun HomeScheduleCard(
     subjectName: String,
