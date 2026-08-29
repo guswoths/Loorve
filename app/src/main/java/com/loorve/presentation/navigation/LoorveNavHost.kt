@@ -13,11 +13,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +46,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
@@ -62,6 +74,7 @@ import com.loorve.presentation.notification.NotificationPermissionRoute
 import com.loorve.presentation.onboarding.OnboardingScreen
 import com.loorve.presentation.progress.ProgressDetailScreen
 import com.loorve.presentation.settings.BatteryOptimizationGuideScreen
+import com.loorve.ui.theme.Background
 import com.loorve.ui.theme.GradientEnd
 import com.loorve.ui.theme.GradientStart
 import com.loorve.ui.theme.OnSurfaceVariant
@@ -92,6 +105,21 @@ sealed class Screen(val route: String) {
 }
 
 // ────────────────────────────────────────────────────────────────
+// 하단 탭 데이터 클래스
+// ────────────────────────────────────────────────────────────────
+private data class BottomNavItem(
+    val label: String,
+    val icon: ImageVector,
+    val index: Int
+)
+
+private val bottomNavItems = listOf(
+    BottomNavItem("홈", Icons.Outlined.Home, 0),
+    BottomNavItem("복습", Icons.Outlined.AutoStories, 1),
+    BottomNavItem("설정", Icons.Outlined.Settings, 2)
+)
+
+// ────────────────────────────────────────────────────────────────
 // SplashScreen
 // ────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalTextApi::class)
@@ -111,17 +139,14 @@ private fun SplashScreen(
         }
     }
 
-    // 로고 그라디언트 브러시 (좌→우 linear)
     val gradientBrush = Brush.linearGradient(
         colors = listOf(GradientStart, GradientEnd),
         start = Offset(0f, 0f),
         end = Offset(Float.POSITIVE_INFINITY, 0f)
     )
 
-    // ── 애니메이션 정의 ──────────────────────────────────────────
     val infiniteTransition = rememberInfiniteTransition(label = "splashProgress")
 
-    // 1) 원형 스피너 회전각 (0 → 360, 1.2초 1회전)
     val sweepRotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -132,7 +157,6 @@ private fun SplashScreen(
         label = "sweepRotation"
     )
 
-    // 2) 외부 트랙 링 펄스 scale (1.0 → 1.08 → 1.0)
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
         targetValue = 1.08f,
@@ -143,7 +167,6 @@ private fun SplashScreen(
         label = "pulseScale"
     )
 
-    // 3) 중앙 "..." 점 페이드 인/아웃
     val dotsAlpha by infiniteTransition.animateFloat(
         initialValue = 0.2f,
         targetValue = 1.0f,
@@ -154,7 +177,6 @@ private fun SplashScreen(
         label = "dotsAlpha"
     )
 
-    // 배경 radial gradient 오버레이 브러시 (중앙 라벤더 빛 → 투명)
     val radialOverlayBrush = Brush.radialGradient(
         colors = listOf(
             Primary.copy(alpha = 0.06f),
@@ -168,7 +190,6 @@ private fun SplashScreen(
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
-        // 은은한 라벤더 radial 오버레이 (전체 화면 중앙에서 바깥으로 퍼짐)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -201,12 +222,10 @@ private fun SplashScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // ── 그라디언트 원형 로딩바 (Canvas) ──────────────────
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.size(100.dp)
             ) {
-                // 외부 트랙 링 (펄스 scale 적용)
                 Canvas(
                     modifier = Modifier
                         .size(100.dp)
@@ -225,7 +244,6 @@ private fun SplashScreen(
                     )
                 }
 
-                // 그라디언트 진행 링 (회전 스피너)
                 Canvas(modifier = Modifier.size(100.dp)) {
                     val strokeWidth = 8.dp.toPx()
                     val inset = strokeWidth / 2f
@@ -251,7 +269,6 @@ private fun SplashScreen(
                     }
                 }
 
-                // 중앙 "..." 점 3개 (페이드 인/아웃)
                 Text(
                     text = "···",
                     style = MaterialTheme.typography.bodySmall,
@@ -259,7 +276,6 @@ private fun SplashScreen(
                     textAlign = TextAlign.Center
                 )
             }
-            // ── 그라디언트 원형 로딩바 끝 ──────────────────────────
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -287,7 +303,6 @@ fun LoorveNavHost(
         composable(Screen.Splash.route) {
             SplashScreen(
                 onSplashComplete = { isLoggedIn ->
-                    // 기존 로그인 사용자 → Home, 비로그인 → Login
                     val destination = if (isLoggedIn) {
                         Screen.Home.route
                     } else {
@@ -303,7 +318,6 @@ fun LoorveNavHost(
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = { isNewUser ->
-                    // 신규 사용자(Firestore 문서 미존재) → Onboarding, 기존 사용자 → Home
                     val destination = if (isNewUser) Screen.Onboarding.route else Screen.Home.route
                     navController.navigate(destination) {
                         popUpTo(Screen.Login.route) { inclusive = true }
@@ -315,7 +329,6 @@ fun LoorveNavHost(
         composable(Screen.Onboarding.route) {
             OnboardingScreen(
                 onFinished = {
-                    // 온보딩 완료 후 Home으로 이동 (뒤로 가기 시 Login으로 돌아가지 않도록 inclusive = true)
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
@@ -333,6 +346,7 @@ fun LoorveNavHost(
             )
         }
 
+        // ── [수정 B] Screen.Home — Scaffold + 하단 네비게이션 바 추가 ──
         composable(Screen.Home.route) {
             val context = LocalContext.current
             val lifecycleOwner = LocalLifecycleOwner.current
@@ -341,6 +355,7 @@ fun LoorveNavHost(
 
             var batteryGuideShown by remember { mutableStateOf(false) }
 
+            // ⛔ 기능 금지 구역 — 절대 수정 금지
             LaunchedEffect(lifecycleState) {
                 if (lifecycleState == Lifecycle.State.RESUMED && !batteryGuideShown) {
                     val isIgnoringBatteryOptimizations =
@@ -355,17 +370,67 @@ fun LoorveNavHost(
                 }
             }
 
-            HomeScreen(
-                onNavigateToMyPage = {
-                    navController.navigate(Screen.MyPage.route)
-                },
-                onNavigateToExamSetting = {
-                    navController.navigate(Screen.ExamSetting.route)
-                },
-                onNavigateToProgressDetail = { progressId ->
-                    navController.navigate(Screen.ProgressDetail.createRoute(progressId))
+            var selectedTabIndex by remember { mutableStateOf(0) }
+
+            Scaffold(
+                containerColor = Background,
+                bottomBar = {
+                    NavigationBar(
+                        containerColor = Background
+                    ) {
+                        bottomNavItems.forEach { item ->
+                            val isSelected = selectedTabIndex == item.index
+                            NavigationBarItem(
+                                selected = isSelected,
+                                onClick = {
+                                    when (item.index) {
+                                        0 -> selectedTabIndex = 0 // 홈: 현재 화면 유지
+                                        1 -> navController.navigate(Screen.Calendar.route)
+                                        2 -> navController.navigate(Screen.MyPage.route)
+                                    }
+                                },
+                                icon = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = item.icon,
+                                            contentDescription = item.label,
+                                            tint = if (isSelected) Primary else OnSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = item.label,
+                                            color = if (isSelected) Primary else OnSurfaceVariant,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                },
+                                label = null, // Row 커스텀 레이아웃 사용으로 기본 label 비활성
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = Primary.copy(alpha = 0.1f)
+                                )
+                            )
+                        }
+                    }
                 }
-            )
+            ) { innerPadding ->
+                // innerPadding은 HomeScreen 내부 Scaffold에 이미 처리되므로
+                // Box로 감싸 전달 (HomeScreen 자체 Scaffold가 padding 처리함)
+                Box(modifier = Modifier.size(innerPadding.calculateBottomPadding())) // 하단 패딩 예약
+                HomeScreen(
+                    onNavigateToMyPage = {
+                        navController.navigate(Screen.MyPage.route)
+                    },
+                    onNavigateToExamSetting = {
+                        navController.navigate(Screen.ExamSetting.route)
+                    },
+                    onNavigateToProgressDetail = { progressId ->
+                        navController.navigate(Screen.ProgressDetail.createRoute(progressId))
+                    }
+                )
+            }
         }
 
         composable(

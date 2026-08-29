@@ -1,5 +1,8 @@
 package com.loorve.presentation.home
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,7 +20,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -359,6 +367,13 @@ private fun HomeReviewRateCard(
     val safeRate = if (rate.isNaN() || rate < 0f) 0f else rate.coerceAtMost(1f)
     val percent = (safeRate * 100).toInt()
 
+    // ── [수정 A] 애니메이션 진행률 ──
+    val animatedRate by animateFloatAsState(
+        targetValue = safeRate,
+        animationSpec = tween(durationMillis = 800),
+        label = "reviewRateAnim"
+    )
+
     LoorveCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -384,23 +399,67 @@ private fun HomeReviewRateCard(
                     modifier = Modifier.fillMaxWidth(0.85f)
                 )
             }
-            // ✅ 수정: Box → Column으로 교체하여 레이블 겹침 버그 해결
+
+            // ── [수정 A] 원형 프로그레스바 영역 ──
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(start = 12.dp)
             ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(80.dp)
+                ) {
+                    Canvas(modifier = Modifier.size(80.dp)) {
+                        val strokeWidth = 8.dp.toPx()
+                        val inset = strokeWidth / 2f
+                        val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
+
+                        // 외부 트랙 링
+                        drawArc(
+                            color = Primary.copy(alpha = 0.15f),
+                            startAngle = 0f,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            topLeft = Offset(inset, inset),
+                            size = arcSize,
+                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                        )
+
+                        // 진행 Arc (Gradient)
+                        if (animatedRate > 0f) {
+                            val gradientBrush = Brush.sweepGradient(
+                                colors = listOf(GradientStart, GradientEnd),
+                                center = Offset(size.width / 2f, size.height / 2f)
+                            )
+                            drawArc(
+                                brush = gradientBrush,
+                                startAngle = -90f,
+                                sweepAngle = 360f * animatedRate,
+                                useCenter = false,
+                                topLeft = Offset(inset, inset),
+                                size = arcSize,
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                            )
+                        }
+                    }
+
+                    // 원 중앙 퍼센트 텍스트
+                    Text(
+                        text = "$percent%",
+                        fontWeight = FontWeight.Bold,
+                        color = Primary,
+                        fontSize = 22.sp
+                    )
+                }
+
+                Spacer(Modifier.height(6.dp))
+
+                // 원 하단 레이블
                 Text(
                     text = "전체 복습률",
                     style = LoorveTypography.labelSmall,
                     color = OnSurfaceVariant
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "$percent%",
-                    style = LoorveTypography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Primary,
-                    fontSize = 32.sp
                 )
             }
         }
@@ -531,7 +590,6 @@ private fun HomeScheduleCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(4.dp))
-                // ✅ 수정: 예상 시간 텍스트 추가
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
