@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,9 +28,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.ExperimentalTextApi
@@ -48,7 +51,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.compose.ui.geometry.Size
 import com.google.firebase.auth.FirebaseAuth
 import com.loorve.presentation.calendar.ReviewCalendarScreen
 import com.loorve.presentation.exam.ExamSettingScreen
@@ -116,16 +118,40 @@ private fun SplashScreen(
         end = Offset(Float.POSITIVE_INFINITY, 0f)
     )
 
-    // 인디케이터 펄스 애니메이션
+    // ── 애니메이션 정의 ──────────────────────────────────────────
     val infiniteTransition = rememberInfiniteTransition(label = "splashProgress")
-    val progressAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
+
+    // 1) 원형 스피너 회전각 (0 → 360, 1.2초 1회전)
+    val sweepRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "sweepRotation"
+    )
+
+    // 2) 외부 트랙 링 펄스 scale (1.0 → 1.08 → 1.0)
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.08f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 900, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "progressAlpha"
+        label = "pulseScale"
+    )
+
+    // 3) 중앙 "..." 점 페이드 인/아웃
+    val dotsAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 700, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dotsAlpha"
     )
 
     // 배경 radial gradient 오버레이 브러시 (중앙 라벤더 빛 → 투명)
@@ -175,15 +201,65 @@ private fun SplashScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .size(32.dp)
-                    .graphicsLayer(alpha = progressAlpha),
-                color = Primary,
-                strokeWidth = 3.dp,
-                strokeCap = StrokeCap.Round,
-                trackColor = Color.Transparent
-            )
+            // ── 그라디언트 원형 로딩바 (Canvas) ──────────────────
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(100.dp)
+            ) {
+                // 외부 트랙 링 (펄스 scale 적용)
+                Canvas(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale)
+                ) {
+                    val strokeWidth = 8.dp.toPx()
+                    val inset = strokeWidth / 2f
+                    drawArc(
+                        color = Primary.copy(alpha = 0.15f),
+                        startAngle = 0f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = Offset(inset, inset),
+                        size = Size(size.width - strokeWidth, size.height - strokeWidth),
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                    )
+                }
+
+                // 그라디언트 진행 링 (회전 스피너)
+                Canvas(modifier = Modifier.size(100.dp)) {
+                    val strokeWidth = 8.dp.toPx()
+                    val inset = strokeWidth / 2f
+                    val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
+                    val gradientBrushArc = Brush.sweepGradient(
+                        colors = listOf(
+                            GradientStart.copy(alpha = 0f),
+                            GradientStart,
+                            GradientEnd
+                        ),
+                        center = Offset(size.width / 2f, size.height / 2f)
+                    )
+                    rotate(degrees = sweepRotation, pivot = center) {
+                        drawArc(
+                            brush = gradientBrushArc,
+                            startAngle = -90f,
+                            sweepAngle = 270f,
+                            useCenter = false,
+                            topLeft = Offset(inset, inset),
+                            size = arcSize,
+                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                        )
+                    }
+                }
+
+                // 중앙 "..." 점 3개 (페이드 인/아웃)
+                Text(
+                    text = "···",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Primary.copy(alpha = dotsAlpha),
+                    textAlign = TextAlign.Center
+                )
+            }
+            // ── 그라디언트 원형 로딩바 끝 ──────────────────────────
 
             Spacer(modifier = Modifier.height(16.dp))
 
