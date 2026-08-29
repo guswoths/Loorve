@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -64,6 +65,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.firebase.auth.FirebaseAuth
+import com.loorve.presentation.calendar.AddReviewBlockScreen
 import com.loorve.presentation.calendar.ReviewCalendarScreen
 import com.loorve.presentation.exam.ExamSettingScreen
 import com.loorve.presentation.home.HomeScreen
@@ -98,6 +100,7 @@ sealed class Screen(val route: String) {
     }
 
     object Calendar : Screen("calendar")
+    object AddReviewBlock : Screen("add_review_block")
     object NotificationTimeSetting : Screen("notification_time_setting")
     object MyPage : Screen("my_page")
     object BatteryOptimizationGuide : Screen("battery_optimization_guide")
@@ -346,7 +349,7 @@ fun LoorveNavHost(
             )
         }
 
-        // ── [수정 B] Screen.Home — Scaffold + 하단 네비게이션 바 추가 ──
+        // ── Screen.Home — Scaffold + 하단 네비게이션 바 (탭 전환 방식으로 변경) ──
         composable(Screen.Home.route) {
             val context = LocalContext.current
             val lifecycleOwner = LocalLifecycleOwner.current
@@ -383,11 +386,8 @@ fun LoorveNavHost(
                             NavigationBarItem(
                                 selected = isSelected,
                                 onClick = {
-                                    when (item.index) {
-                                        0 -> selectedTabIndex = 0 // 홈: 현재 화면 유지
-                                        1 -> navController.navigate(Screen.Calendar.route)
-                                        2 -> navController.navigate(Screen.MyPage.route)
-                                    }
+                                    // 탭 클릭 시 navigate 대신 selectedTabIndex 전환
+                                    selectedTabIndex = item.index
                                 },
                                 icon = {
                                     Row(
@@ -407,7 +407,7 @@ fun LoorveNavHost(
                                         )
                                     }
                                 },
-                                label = null, // Row 커스텀 레이아웃 사용으로 기본 label 비활성
+                                label = null,
                                 colors = NavigationBarItemDefaults.colors(
                                     indicatorColor = Primary.copy(alpha = 0.1f)
                                 )
@@ -416,20 +416,42 @@ fun LoorveNavHost(
                     }
                 }
             ) { innerPadding ->
-                // innerPadding은 HomeScreen 내부 Scaffold에 이미 처리되므로
-                // Box로 감싸 전달 (HomeScreen 자체 Scaffold가 padding 처리함)
-                Box(modifier = Modifier.size(innerPadding.calculateBottomPadding())) // 하단 패딩 예약
-                HomeScreen(
-                    onNavigateToMyPage = {
-                        navController.navigate(Screen.MyPage.route)
-                    },
-                    onNavigateToExamSetting = {
-                        navController.navigate(Screen.ExamSetting.route)
-                    },
-                    onNavigateToProgressDetail = { progressId ->
-                        navController.navigate(Screen.ProgressDetail.createRoute(progressId))
+                // selectedTabIndex에 따라 content 영역 전환
+                Box(modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                ) {
+                    when (selectedTabIndex) {
+                        0 -> HomeScreen(
+                            onNavigateToMyPage = {
+                                navController.navigate(Screen.MyPage.route)
+                            },
+                            onNavigateToExamSetting = {
+                                navController.navigate(Screen.ExamSetting.route)
+                            },
+                            onNavigateToProgressDetail = { progressId ->
+                                navController.navigate(Screen.ProgressDetail.createRoute(progressId))
+                            }
+                        )
+                        1 -> ReviewCalendarScreen(
+                            onNavigateBack = null,
+                            onNavigateToAddBlock = {
+                                navController.navigate(Screen.AddReviewBlock.route)
+                            }
+                        )
+                        2 -> MyPageScreen(
+                            onBack = { selectedTabIndex = 0 },
+                            onNavigateToNotificationTimeSetting = {
+                                navController.navigate(Screen.NotificationTimeSetting.route)
+                            },
+                            onSignOut = {
+                                navController.navigate(Screen.Login.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        )
                     }
-                )
+                }
             }
         }
 
@@ -449,9 +471,20 @@ fun LoorveNavHost(
             )
         }
 
+        // 독립 라우트로도 유지 (딥링크 등 직접 접근 시 뒤로가기 표시)
         composable(Screen.Calendar.route) {
             ReviewCalendarScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAddBlock = {
+                    navController.navigate(Screen.AddReviewBlock.route)
+                }
+            )
+        }
+
+        composable(Screen.AddReviewBlock.route) {
+            AddReviewBlockScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onSaveSuccess = { navController.popBackStack() }
             )
         }
 

@@ -1,25 +1,33 @@
 // 경로: app/src/main/java/com/loorve/presentation/calendar/ReviewCalendarScreen.kt
 package com.loorve.presentation.calendar
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,14 +39,14 @@ import java.time.YearMonth
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewCalendarScreen(
-    onNavigateBack: () -> Unit = {},
+    // nullable로 변경: null이면 탭 진입, non-null이면 독립 라우트 진입
+    onNavigateBack: (() -> Unit)? = null,
+    onNavigateToAddBlock: () -> Unit = {},
     viewModel: ReviewCalendarViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // [추가] 배너 광고 표시 여부 상태 — BannerAdView의 onAdFailed 콜백으로 갱신
-    // 광고 실패 시 false로 전환 → SelectedDateSchedulePanel의 contentPadding 동적 조정
     var isBannerVisible by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
@@ -60,13 +68,16 @@ fun ReviewCalendarScreen(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("복습 캘린더") },
+                title = { Text("복습") },  // "복습 캘린더" → "복습"으로 변경
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "뒤로가기"
-                        )
+                    // onNavigateBack이 null이 아닐 때만 뒤로가기 아이콘 표시
+                    if (onNavigateBack != null) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "뒤로가기"
+                            )
+                        }
                     }
                 }
             )
@@ -110,7 +121,6 @@ fun ReviewCalendarScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-            // [수정] isBannerVisible 전달 → contentPadding 동적 조정
             SelectedDateSchedulePanel(
                 selectedDate       = uiState.selectedDate,
                 schedules          = uiState.selectedDateSchedules,
@@ -118,17 +128,69 @@ fun ReviewCalendarScreen(
                 onToggleCompletion = { scheduleId, current ->
                     viewModel.toggleReviewCompletion(scheduleId, current)
                 },
-                isBannerVisible = isBannerVisible,
-                modifier        = Modifier.weight(1f)
+                isBannerVisible    = isBannerVisible,
+                onNavigateToAddBlock = onNavigateToAddBlock,
+                modifier           = Modifier.weight(1f)
             )
 
-            // AdMob 배너 광고 — Column 최하단 고정
-            // [수정] onAdFailed 콜백으로 isBannerVisible 상태 갱신
-            // 광고 실패 시 BannerAdView가 Compose tree에서 제거되고,
-            // SelectedDateSchedulePanel의 contentPadding이 16dp로 축소됨
             BannerAdView(
                 modifier   = Modifier.fillMaxWidth(),
                 onAdFailed = { isBannerVisible = false }
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AddBlockDashedCard — 복습 블록이 없거나 추가 버튼으로 사용되는 점선 카드
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+fun AddBlockDashedCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    dashWidth: Dp = 8.dp,
+    gapWidth: Dp = 6.dp,
+    strokeWidth: Dp = 1.5.dp,
+    cornerRadius: Dp = 12.dp
+) {
+    val borderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(100.dp)
+            .drawBehind {
+                val dash = dashWidth.toPx()
+                val gap  = gapWidth.toPx()
+                val sw   = strokeWidth.toPx()
+                val cr   = cornerRadius.toPx()
+                drawRoundRect(
+                    color       = borderColor,
+                    cornerRadius = CornerRadius(cr, cr),
+                    style = Stroke(
+                        width      = sw,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, gap), 0f)
+                    )
+                )
+            }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector        = Icons.Outlined.Add,
+                contentDescription = "복습블록 추가",
+                tint               = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier           = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text  = "복습블록 추가",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
         }
     }
@@ -339,7 +401,8 @@ private fun SelectedDateSchedulePanel(
     schedules: List<ReviewSchedule>,
     onCompleteSchedule: (String) -> Unit,
     onToggleCompletion: (String, Boolean) -> Unit,
-    isBannerVisible: Boolean,   // [추가] 광고 표시 여부 → contentPadding 동적 결정
+    isBannerVisible: Boolean,
+    onNavigateToAddBlock: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val title = if (selectedDate != null) {
@@ -358,33 +421,31 @@ private fun SelectedDateSchedulePanel(
         if (selectedDate == null) return@Column
 
         if (schedules.isEmpty()) {
-            Box(
-                modifier         = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text  = "이 날은 복습이 없어요 \uD83D\uDE0A",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            // 복습 블록이 없을 때 점선 추가 블록 표시
+            AddBlockDashedCard(
+                onClick  = onNavigateToAddBlock,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                // [수정] 광고 표시 여부에 따라 bottom padding 동적 적용
-                // isBannerVisible = true  → 66dp (배너 높이 ~50dp + 여백 16dp)
-                // isBannerVisible = false → 16dp (광고 실패 시 불필요한 공백 제거)
                 contentPadding = PaddingValues(
                     bottom = if (isBannerVisible) 66.dp else 16.dp
                 )
             ) {
+                // 생성된 복습 블록 목록 (요구사항 5: 항상 목록 먼저)
                 items(schedules) { schedule ->
                     ReviewScheduleItem(
                         schedule   = schedule,
                         onComplete = { onCompleteSchedule(schedule.reviewScheduleId) },
                         onToggle   = { onToggleCompletion(schedule.reviewScheduleId, schedule.isCompleted) }
+                    )
+                }
+                // 항상 목록 마지막에 점선 추가 블록 (요구사항 5)
+                item {
+                    AddBlockDashedCard(
+                        onClick  = onNavigateToAddBlock,
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
             }
