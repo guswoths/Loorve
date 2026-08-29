@@ -1,4 +1,6 @@
-// ProgressDetailScreen.kt 전체 수정본
+// 경로: app/src/main/java/com/loorve/presentation/progress/ProgressDetailScreen.kt
+// 전체 파일 — onBack → onNavigateBack 으로 변경
+
 package com.loorve.presentation.progress
 
 import androidx.compose.foundation.layout.*
@@ -18,11 +20,11 @@ import com.loorve.ui.theme.*
 @Composable
 fun ProgressDetailScreen(
     progressId: String,
-    onBack: () -> Unit,
+    onNavigateBack: () -> Unit,    // onBack → onNavigateBack 으로 통일
     viewModel: ProgressDetailViewModel = hiltViewModel()
 ) {
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-    LaunchedEffect(progressId) { viewModel.loadProgress(uid, progressId) }  // ✅ 수정
+    LaunchedEffect(progressId) { viewModel.loadProgress(uid, progressId) }
     val uiState by viewModel.uiState.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -31,13 +33,13 @@ fun ProgressDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        uiState.progress?.content ?: "",  // ✅ subjectName 없으므로 content 사용
+                        uiState.progress?.content ?: "",
                         style = LoorveTypography.titleMedium,
                         color = OnBackground
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onNavigateBack) {  // onBack → onNavigateBack
                         Icon(Icons.Default.ArrowBack, null, tint = OnBackground)
                     }
                 },
@@ -63,7 +65,7 @@ fun ProgressDetailScreen(
                             color = OnBackground
                         )
                         LoorveProgressBar(
-                            completed = progress.completedCount,  // ✅ 도메인 모델 실제 필드명
+                            completed = progress.completedCount,
                             total = progress.totalCount,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -124,8 +126,8 @@ fun ProgressDetailScreen(
             text = { Text("이 학습 기록을 삭제하시겠습니까?", color = OnSurface) },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.deleteProgress(uid, progressId)  // ✅ 수정
-                    onBack()
+                    viewModel.deleteProgress(uid, progressId)
+                    onNavigateBack()  // onBack() → onNavigateBack()
                 }) { Text("삭제", color = Error) }
             },
             dismissButton = {
