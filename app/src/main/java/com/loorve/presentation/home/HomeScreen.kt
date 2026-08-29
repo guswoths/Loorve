@@ -102,12 +102,12 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            // ── 1) 모티베이션 헤더 ──
+            // ── 1) 모티베이션 헤더 (유지) ──
             item {
                 HomeMotivationHeader()
             }
 
-            // ── 2) 복습률 카드 ──
+            // ── 2) 복습률 카드 (수정됨) ──
             item {
                 HomeReviewRateCard(
                     rate = uiState.weeklyCompletionRate,
@@ -116,24 +116,28 @@ fun HomeScreen(
                 )
             }
 
-            // ── 3) 미니 달력 ──
+            // ── [수정] 3) 복습 스케줄 블록 — LoorveCard 안에 포함 ──
             item {
-                SectionLabel("${LocalDate.now().monthValue}월 복습 스케줄")
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "점이 있는 날짜를 선택해 상세 일정을 확인하세요",
-                    style = LoorveTypography.labelSmall,
-                    color = OnSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                HomeMiniCalendar(
-                    selectedDate = selectedDate,
-                    scheduledDates = uiState.scheduledDates,
-                    onDateSelected = { selectedDate = it }
-                )
+                LoorveCard(modifier = Modifier.fillMaxWidth()) {
+                    Column {
+                        SectionLabel("${LocalDate.now().monthValue}월 복습 스케줄")
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "점이 있는 날짜를 선택해 상세 일정을 확인하세요",
+                            style = LoorveTypography.labelSmall,
+                            color = OnSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        HomeMiniCalendar(
+                            selectedDate = selectedDate,
+                            scheduledDates = uiState.scheduledDates,
+                            onDateSelected = { selectedDate = it }
+                        )
+                    }
+                }
             }
 
-            // ── 4) 선택 날짜의 복습 일정 카드 ──
+            // ── 4) 선택 날짜의 복습 일정 카드 (유지) ──
             val todaySchedules = uiState.progressList.filter { progress ->
                 try {
                     val d = java.time.Instant.ofEpochMilli(progress.createdAt)
@@ -171,7 +175,7 @@ fun HomeScreen(
                 }
             }
 
-            // ── 5) 오늘의 학습 입력 섹션 (기존 기능 유지) ──
+            // ── 5) 오늘의 학습 입력 섹션 (유지) ──
             item {
                 SectionLabel("오늘의 학습")
                 ProgressInputSection(
@@ -182,154 +186,9 @@ fun HomeScreen(
                 )
             }
 
-            // ── 6) 내 시험 목록 (기존 기능 유지) ──
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SectionLabel("내 시험")
-                    TextButton(onClick = onNavigateToExamSetting) {
-                        Text("+ 추가", color = Primary, style = LoorveTypography.bodyMedium)
-                    }
-                }
-            }
-
-            if (uiState.exams.isEmpty()) {
-                item {
-                    EmptyStateView(
-                        message = "등록된 시험이 없습니다",
-                        subMessage = "시험을 추가해 D-Day를 관리해보세요",
-                        actionLabel = "+ 시험 추가",
-                        onActionClick = onNavigateToExamSetting
-                    )
-                }
-            } else {
-                items(uiState.exams, key = { it.id }) { exam ->
-                    LoorveCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = exam.subjectName,
-                                    style = LoorveTypography.bodyLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OnBackground
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = run {
-                                        try {
-                                            val date = java.time.Instant.ofEpochMilli(exam.examDate)
-                                                .atZone(java.time.ZoneId.of("Asia/Seoul"))
-                                                .toLocalDate()
-                                            date.format(DateTimeFormatter.ofPattern("M월 d일"))
-                                        } catch (e: Exception) { "" }
-                                    },
-                                    style = LoorveTypography.labelMedium,
-                                    color = OnSurfaceVariant
-                                )
-                            }
-                            val daysLeft = run {
-                                try {
-                                    val examDate = java.time.Instant.ofEpochMilli(exam.examDate)
-                                        .atZone(java.time.ZoneId.of("Asia/Seoul"))
-                                        .toLocalDate()
-                                    java.time.temporal.ChronoUnit.DAYS
-                                        .between(LocalDate.now(), examDate).toInt()
-                                } catch (e: Exception) { -1 }
-                            }
-                            if (daysLeft >= 0) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Primary.copy(alpha = 0.1f)
-                                ) {
-                                    Text(
-                                        text = if (daysLeft == 0) "D-Day" else "D-$daysLeft",
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                        style = LoorveTypography.labelMedium,
-                                        color = Primary,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── 7) 학습 진도 기록 (기존 기능 유지) ──
-            item { SectionLabel("학습 진도 기록") }
-
-            if (uiState.progressList.isEmpty()) {
-                item {
-                    EmptyStateView(
-                        message = "아직 학습 기록이 없습니다",
-                        subMessage = "위 섹션에서 오늘의 학습을 기록해보세요"
-                    )
-                }
-            } else {
-                items(uiState.progressList, key = { it.id }) { progress ->
-                    val isCompleted = progress.completed > 0 && progress.completed >= progress.total
-                    LoorveCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onNavigateToProgressDetail(progress.id) }
-                    ) {
-                        Column {
-                            Text(
-                                text = progress.content,
-                                style = LoorveTypography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = OnBackground,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            LoorveProgressBar(
-                                completed = progress.completed,
-                                total = progress.total,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = progress.dateFormatted,
-                                    style = LoorveTypography.labelMedium,
-                                    color = OnSurfaceVariant
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = if (isCompleted)
-                                        Success.copy(alpha = 0.15f)
-                                    else
-                                        Tertiary.copy(alpha = 0.15f)
-                                ) {
-                                    Text(
-                                        text = if (isCompleted) "완료" else "진행 중",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                        style = LoorveTypography.labelMedium,
-                                        color = if (isCompleted) Success else Tertiary,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── 8) 하단 배너 광고 플레이스홀더 ──
-            item {
-                HomeBannerAd()
-            }
+            // ── [수정] 6) 내 시험 — 제거됨 ──
+            // ── [수정] 7) 학습 진도 기록 — 제거됨 ──
+            // ── [수정] 8) 배너 광고 — 제거됨 ──
         }
     }
 }
@@ -367,51 +226,60 @@ private fun HomeReviewRateCard(
     val safeRate = if (rate.isNaN() || rate < 0f) 0f else rate.coerceAtMost(1f)
     val percent = (safeRate * 100).toInt()
 
-    // ── [수정 A] 애니메이션 진행률 ──
     val animatedRate by animateFloatAsState(
         targetValue = safeRate,
         animationSpec = tween(durationMillis = 800),
         label = "reviewRateAnim"
     )
 
+    // ── [수정] Row → Column 레이아웃으로 변경 ──
     LoorveCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalAlignment = Alignment.Start
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "오늘의 문장",
-                    style = LoorveTypography.labelMedium,
-                    color = OnSurfaceVariant
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "이번 주 ${total}개 중 ${completed}개 완료",
-                    style = LoorveTypography.bodySmall,
-                    color = OnSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                LoorveProgressBar(
-                    completed = completed,
-                    total = if (total == 0) 1 else total,
-                    modifier = Modifier.fillMaxWidth(0.85f)
-                )
-            }
+            // ── [수정] ① 오늘의 문장 레이블 ──
+            Text(
+                text = "오늘의 문장",
+                style = LoorveTypography.labelMedium,
+                color = OnSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
 
-            // ── [수정 A] 원형 프로그레스바 영역 ──
+            // ── [수정] ① 오늘의 문장 실제 텍스트 추가 (placeholder) ──
+            Text(
+                text = "작게 자주, 오래 기억하라.",
+                style = LoorveTypography.bodyMedium,
+                color = OnBackground,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(12.dp))
+
+            // ── [수정] ① 이번 주 완료 텍스트 및 선형 진행바 유지 ──
+            Text(
+                text = "이번 주 ${total}개 중 ${completed}개 완료",
+                style = LoorveTypography.bodySmall,
+                color = OnSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            LoorveProgressBar(
+                completed = completed,
+                total = if (total == 0) 1 else total,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(20.dp))
+
+            // ── [수정] ② 원형 차트 — Column 중앙 배치, 120dp로 확대 ──
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(start = 12.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(80.dp)
+                    modifier = Modifier.size(120.dp) // ── [수정] 80dp → 120dp ──
                 ) {
-                    Canvas(modifier = Modifier.size(80.dp)) {
-                        val strokeWidth = 8.dp.toPx()
+                    Canvas(modifier = Modifier.size(120.dp)) {
+                        val strokeWidth = 10.dp.toPx() // ── [수정] 8dp → 10dp ──
                         val inset = strokeWidth / 2f
                         val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
 
@@ -444,18 +312,18 @@ private fun HomeReviewRateCard(
                         }
                     }
 
-                    // 원 중앙 퍼센트 텍스트
+                    // ── [수정] ② 원 중앙 퍼센트 텍스트 — 22sp → 28sp ──
                     Text(
                         text = "$percent%",
                         fontWeight = FontWeight.Bold,
                         color = Primary,
-                        fontSize = 22.sp
+                        fontSize = 28.sp // ── [수정] 22sp → 28sp ──
                     )
                 }
 
                 Spacer(Modifier.height(6.dp))
 
-                // 원 하단 레이블
+                // ── [수정] ② "전체 복습률" 레이블 중앙 배치 ──
                 Text(
                     text = "전체 복습률",
                     style = LoorveTypography.labelSmall,
@@ -479,84 +347,83 @@ private fun HomeMiniCalendar(
     val daysInMonth = yearMonth.lengthOfMonth()
     val dayLabels = listOf("일", "월", "화", "수", "목", "금", "토")
 
-    LoorveCard(modifier = Modifier.fillMaxWidth()) {
-        Column {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                dayLabels.forEach { label ->
-                    Text(
-                        text = label,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                        style = LoorveTypography.labelSmall,
-                        color = OnSurfaceVariant
-                    )
-                }
+    // ── [수정] ③ HomeMiniCalendar 내부 LoorveCard 제거 (부모 LoorveCard로 통합됨) ──
+    Column {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            dayLabels.forEach { label ->
+                Text(
+                    text = label,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = LoorveTypography.labelSmall,
+                    color = OnSurfaceVariant
+                )
             }
-            Spacer(Modifier.height(6.dp))
+        }
+        Spacer(Modifier.height(6.dp))
 
-            val totalCells = firstDayOfWeek + daysInMonth
-            val rows = (totalCells + 6) / 7
-            var day = 1
-            repeat(rows) { row ->
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    repeat(7) { col ->
-                        val cellIndex = row * 7 + col
-                        if (cellIndex < firstDayOfWeek || day > daysInMonth) {
-                            Box(modifier = Modifier.weight(1f).height(36.dp))
-                        } else {
-                            val currentDay = day
-                            val date = yearMonth.atDay(currentDay)
-                            val isSelected = date == selectedDate
-                            val isToday = date == today
-                            val hasSchedule = scheduledDates.contains(date)
-                            day++
+        val totalCells = firstDayOfWeek + daysInMonth
+        val rows = (totalCells + 6) / 7
+        var day = 1
+        repeat(rows) { row ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                repeat(7) { col ->
+                    val cellIndex = row * 7 + col
+                    if (cellIndex < firstDayOfWeek || day > daysInMonth) {
+                        Box(modifier = Modifier.weight(1f).height(36.dp))
+                    } else {
+                        val currentDay = day
+                        val date = yearMonth.atDay(currentDay)
+                        val isSelected = date == selectedDate
+                        val isToday = date == today
+                        val hasSchedule = scheduledDates.contains(date)
+                        day++
 
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(36.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        when {
-                                            isSelected -> Primary
-                                            isToday -> Primary.copy(alpha = 0.15f)
-                                            else -> Color.Transparent
-                                        }
-                                    )
-                                    .clickable { onDateSelected(date) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = "$currentDay",
-                                        style = LoorveTypography.labelMedium,
-                                        color = when {
-                                            isSelected -> Color.White
-                                            isToday -> Primary
-                                            else -> OnBackground
-                                        },
-                                        fontWeight = if (isSelected || isToday)
-                                            FontWeight.Bold else FontWeight.Normal
-                                    )
-                                    if (hasSchedule) {
-                                        Spacer(Modifier.height(1.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .size(4.dp)
-                                                .clip(CircleShape)
-                                                .background(
-                                                    if (isSelected) Color.White
-                                                    else Primary
-                                                )
-                                        )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    when {
+                                        isSelected -> Primary
+                                        isToday -> Primary.copy(alpha = 0.15f)
+                                        else -> Color.Transparent
                                     }
+                                )
+                                .clickable { onDateSelected(date) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "$currentDay",
+                                    style = LoorveTypography.labelMedium,
+                                    color = when {
+                                        isSelected -> Color.White
+                                        isToday -> Primary
+                                        else -> OnBackground
+                                    },
+                                    fontWeight = if (isSelected || isToday)
+                                        FontWeight.Bold else FontWeight.Normal
+                                )
+                                if (hasSchedule) {
+                                    Spacer(Modifier.height(1.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(4.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (isSelected) Color.White
+                                                else Primary
+                                            )
+                                    )
                                 }
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(2.dp))
             }
+            Spacer(Modifier.height(2.dp))
         }
     }
 }
@@ -621,25 +488,5 @@ private fun HomeScheduleCard(
                 Icon(Icons.Outlined.PlayArrow, contentDescription = "시작", tint = Color.White)
             }
         }
-    }
-}
-
-/** 배너 광고 플레이스홀더 */
-@Composable
-private fun HomeBannerAd() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(50.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Surface.copy(alpha = 0.5f))
-            .border(1.dp, OnSurfaceVariant.copy(alpha = 0.2f), RoundedCornerShape(8.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "배너 광고 320 × 50",
-            style = LoorveTypography.labelSmall,
-            color = OnSurfaceVariant.copy(alpha = 0.5f)
-        )
     }
 }
