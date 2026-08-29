@@ -26,32 +26,29 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         private const val TAG = "ReviewScheduleRepo"
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // ✅ uid 유효성 + 인증 상태 헬퍼 (모든 쓰기 함수 진입 시 호출)
-    // ─────────────────────────────────────────────────────────────
-    /**
-     * uid가 비어 있거나 현재 Firebase 인증 사용자와 불일치하면 예외를 던진다.
-     * - uid 빈값  → 로그인 정보 없음
-     * - currentUser null → 세션 만료 (재로그인 필요)
-     * - uid ≠ currentUser.uid → 위변조 시도 또는 계정 전환 버그
-     */
+    // ✅ 수정: 토큰 강제 갱신 후 uid 검증
     @Throws(IllegalStateException::class)
-    private fun requireValidAuth(uid: String) {
+    private suspend fun requireValidAuthWithRefresh(uid: String) {
         if (uid.isBlank()) {
             throw IllegalStateException("로그인 정보가 없습니다. uid가 비어 있습니다.")
         }
         val currentUser = FirebaseAuth.getInstance().currentUser
-        if (currentUser == null) {
-            throw IllegalStateException("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.")
-        }
+            ?: throw IllegalStateException("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.")
+
         if (currentUser.uid != uid) {
             throw IllegalStateException("인증 정보가 일치하지 않습니다. 다시 로그인해 주세요.")
         }
+
+        // ✅ 핵심: 토큰이 만료됐을 경우 강제 갱신 (forceRefresh = true)
+        // 이렇게 하면 Firestore가 갱신된 ID 토큰으로 재인증됨
+        try {
+            currentUser.getIdToken(true).await()
+        } catch (e: Exception) {
+            Log.w(TAG, "토큰 갱신 실패 (무시하고 진행): ${e.message}")
+            // 갱신 실패 시 기존 토큰으로 계속 진행 (네트워크 없을 때 오프라인 처리)
+        }
     }
 
-    /**
-     * FirebaseFirestoreException을 사람이 읽기 좋은 메시지로 변환한다.
-     */
     private fun FirebaseFirestoreException.toUserMessage(): String = when (code) {
         FirebaseFirestoreException.Code.PERMISSION_DENIED ->
             "저장에 실패했습니다: 권한이 없습니다. 로그인 상태를 확인해 주세요."
@@ -62,19 +59,12 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         else -> "Firestore 오류: ${message}"
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 내부 컬렉션 참조
-    // ─────────────────────────────────────────────────────────────
     private fun scheduleCollection(uid: String) =
         firestore.collection("users").document(uid).collection("reviewSchedules")
 
-    // ─────────────────────────────────────────────────────────────
-    // 쓰기 함수
-    // ─────────────────────────────────────────────────────────────
-
     override suspend fun createReviewSchedule(uid: String, schedule: ReviewSchedule): Result<Unit> {
         return try {
-            requireValidAuth(uid)                                           // ✅ uid 유효성 체크
+            requireValidAuthWithRefresh(uid)   // ✅ 토큰 갱신 포함
             scheduleCollection(uid).document(schedule.reviewScheduleId).set(schedule).await()
             Log.d(TAG, "createReviewSchedule 완료: uid=$uid, id=${schedule.reviewScheduleId}")
             Result.success(Unit)
@@ -95,7 +85,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         schedule: ReviewSchedule
     ): Result<Unit> {
         return try {
-            requireValidAuth(uid)                                           // ✅ uid 유효성 체크
+            requireValidAuthWithRefresh(uid)   // ✅ 토큰 갱신 포함
             firestore
                 .collection("users")
                 .document(uid)
@@ -119,7 +109,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
 
     override suspend fun saveReviewSchedules(uid: String, schedules: List<ReviewSchedule>): Result<Unit> {
         return try {
-            requireValidAuth(uid)                                           // ✅ uid 유효성 체크
+            requireValidAuthWithRefresh(uid)   // ✅ 토큰 갱신 포함
             val batch = firestore.batch()
             schedules.forEach { schedule ->
                 val ref = scheduleCollection(uid).document(schedule.reviewScheduleId)
@@ -144,7 +134,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         uid: String, scheduleId: String, isCompleted: Boolean
     ): Result<Unit> {
         return try {
-            requireValidAuth(uid)                                           // ✅ uid 유효성 체크
+            requireValidAuthWithRefresh(uid)   // ✅ 토큰 갱신 포함
             scheduleCollection(uid).document(scheduleId)
                 .update("isCompleted", isCompleted).await()
             Result.success(Unit)
@@ -165,7 +155,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
 
     override suspend fun deleteReviewSchedule(uid: String, scheduleId: String): Result<Unit> {
         return try {
-            requireValidAuth(uid)                                           // ✅ uid 유효성 체크
+            requireValidAuthWithRefresh(uid)   // ✅ 토큰 갱신 포함
             scheduleCollection(uid).document(scheduleId).delete().await()
             Log.d(TAG, "deleteReviewSchedule 완료: uid=$uid, scheduleId=$scheduleId")
             Result.success(Unit)
@@ -180,10 +170,6 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
-
-    // ─────────────────────────────────────────────────────────────
-    // 읽기 함수 (uid 체크 포함 — 방어적 적용)
-    // ─────────────────────────────────────────────────────────────
 
     override fun getReviewSchedulesByDateRange(
         uid: String, startDate: String, endDate: String
@@ -215,7 +201,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         )
 
     override fun getOverdueAndIncompleteSchedules(uid: String): Flow<List<ReviewSchedule>> =
-        emptyFlow() // TODO: 필요 시 구현
+        emptyFlow()
 
     override suspend fun getReviewScheduleById(
         uid: String,

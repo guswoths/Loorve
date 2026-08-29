@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ✅ 최상위 exams 컬렉션: 본인이 생성한 시험만 접근 허용
+    // ✅ 최상위 exams 컬렉션
     match /exams/{examId} {
       allow create: if request.auth != null
         && request.resource.data.createdBy == request.auth.uid;
@@ -10,7 +10,6 @@ service cloud.firestore {
       allow get, list: if request.auth != null
         && resource.data.createdBy == request.auth.uid;
 
-      // ✅ update 시 createdBy 필드 변조 방지
       allow update: if request.auth != null
         && resource.data.createdBy == request.auth.uid
         && request.resource.data.createdBy == resource.data.createdBy;
@@ -19,25 +18,25 @@ service cloud.firestore {
         && resource.data.createdBy == request.auth.uid;
     }
 
-    // ✅ 마이페이지용 사용자 프로필 문서: 본인만 읽기/쓰기 허용 (delete 제외)
+    // ✅ 사용자 문서
     match /users/{userId} {
       allow read, create, update: if request.auth != null
         && request.auth.uid == userId;
 
-      // ✅ progress 서브컬렉션: 본인 학습 진도 읽기/쓰기 허용
+      // ✅ progress 서브컬렉션
       match /progress/{progressId} {
         allow read, create, update, delete: if request.auth != null
           && request.auth.uid == userId;
       }
 
-      // ✅ reviewSchedules 서브컬렉션: 본인 복습 일정 읽기/쓰기 허용
+      // ✅ reviewSchedules 서브컬렉션
       match /reviewSchedules/{scheduleId} {
         allow read, create, update, delete: if request.auth != null
           && request.auth.uid == userId;
       }
 
-      // ✅ reviewBlocks 서브컬렉션: 본인 복습 블록 읽기/쓰기/삭제 허용
-      //    create 시 uid 필드가 요청자 uid와 일치해야 함 (데이터 위변조 방지)
+      // ✅ reviewBlocks 서브컬렉션
+      //    create 시 uid 필드가 요청자 uid와 일치해야 함
       match /reviewBlocks/{blockId} {
         allow read, update, delete: if request.auth != null
           && request.auth.uid == userId;
@@ -46,23 +45,25 @@ service cloud.firestore {
           && request.auth.uid == userId
           && request.resource.data.uid == request.auth.uid;
       }
+
+      // ✅ [추가] reviewBlocks 최상위 경로 실수 방어 — 코드에서 경로 오기재 시
+      // 아래를 추가하면 오진단에 도움이 됨 (임시 디버그용, 배포 전 제거)
+      // match /debug/{any} {
+      //   allow read, write: if request.auth != null;
+      // }
     }
 
-    // ✅ examResults 컬렉션: get/list 분리, update 시 userId 불변 보장
+    // ✅ examResults 컬렉션
     match /examResults/{resultId} {
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid;
 
-      // ✅ get: 단건 조회 - 본인만 허용
       allow get: if request.auth != null
         && resource.data.userId == request.auth.uid;
 
-      // ✅ list: 컬렉션 조회 - Firestore 쿼리 레벨에서 userId 필터 강제
-      //    클라이언트에서 반드시 .whereEqualTo("userId", uid) 쿼리를 사용해야 함
       allow list: if request.auth != null
         && request.auth.uid != null;
 
-      // ✅ update: userId 필드 변조 방지
       allow update: if request.auth != null
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == resource.data.userId;

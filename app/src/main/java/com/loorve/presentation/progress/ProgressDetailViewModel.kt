@@ -200,7 +200,8 @@ class ProgressDetailViewModel @Inject constructor(
                             isCompleted      = false,
                             createdAt        = now,
                             updatedAt        = now,
-                            scheduleType     = "MANUAL"
+                            scheduleType     = "MANUAL",
+                            uid              = uid
                         )
                         val scheduleResult = reviewScheduleRepository.saveReviewSchedule(uid, schedule)
                         if (scheduleResult.isFailure) throw scheduleResult.exceptionOrNull()!!
