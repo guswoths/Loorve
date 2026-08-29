@@ -4,13 +4,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Notifications
@@ -26,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +49,9 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+
+    // ── [수정 ④] 캘린더 표시 월을 별도 state로 분리 ──
+    var displayYearMonth by remember { mutableStateOf(YearMonth.now()) }
 
     LaunchedEffect(uiState.saveMessage) {
         uiState.saveMessage?.let {
@@ -107,7 +110,7 @@ fun HomeScreen(
                 HomeMotivationHeader()
             }
 
-            // ── 2) 복습률 카드 (수정됨) ──
+            // ── 2) 전체 복습률 카드 [수정 ①②: 오늘의 문장/주간 진행 바 제거 → 전체 복습률로 교체] ──
             item {
                 HomeReviewRateCard(
                     rate = uiState.weeklyCompletionRate,
@@ -116,22 +119,37 @@ fun HomeScreen(
                 )
             }
 
-            // ── [수정] 3) 복습 스케줄 블록 — LoorveCard 안에 포함 ──
+            // ── 3) 복습 스케줄 블록 [수정 ③④: 헤더 강조 + 스와이프 월 이동] ──
             item {
                 LoorveCard(modifier = Modifier.fillMaxWidth()) {
                     Column {
-                        SectionLabel("${LocalDate.now().monthValue}월 복습 스케줄")
-                        Spacer(Modifier.height(4.dp))
+                        // ── [수정 ③] 캘린더 헤더 강조 텍스트 ──
+                        Text(
+                            text = "${displayYearMonth.monthValue}월 복습 스케줄",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Primary,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
                         Text(
                             text = "점이 있는 날짜를 선택해 상세 일정을 확인하세요",
                             style = LoorveTypography.labelSmall,
                             color = OnSurfaceVariant
                         )
                         Spacer(Modifier.height(8.dp))
+
+                        // ── [수정 ④] 스와이프 제스처로 월 이동 ──
                         HomeMiniCalendar(
+                            displayYearMonth = displayYearMonth,
                             selectedDate = selectedDate,
                             scheduledDates = uiState.scheduledDates,
-                            onDateSelected = { selectedDate = it }
+                            onDateSelected = { selectedDate = it },
+                            onSwipeLeft = {
+                                displayYearMonth = displayYearMonth.plusMonths(1)
+                            },
+                            onSwipeRight = {
+                                displayYearMonth = displayYearMonth.minusMonths(1)
+                            }
                         )
                     }
                 }
@@ -185,15 +203,11 @@ fun HomeScreen(
                     }
                 )
             }
-
-            // ── [수정] 6) 내 시험 — 제거됨 ──
-            // ── [수정] 7) 학습 진도 기록 — 제거됨 ──
-            // ── [수정] 8) 배너 광고 — 제거됨 ──
         }
     }
 }
 
-/** 모티베이션 헤더 */
+/** 모티베이션 헤더 (유지) */
 @Composable
 private fun HomeMotivationHeader() {
     Column(
@@ -216,7 +230,12 @@ private fun HomeMotivationHeader() {
     }
 }
 
-/** 이번 주 복습률 카드 */
+/**
+ * [수정 ①②] 전체 복습률 카드
+ * - "오늘의 문장" 레이블 및 문장 텍스트 제거
+ * - "이번 주 N개 중 N개 완료" 텍스트 및 LoorveProgressBar 제거
+ * - 원형 차트 + "전체 복습률" 퍼센트만 표시
+ */
 @Composable
 private fun HomeReviewRateCard(
     rate: Float,
@@ -232,123 +251,119 @@ private fun HomeReviewRateCard(
         label = "reviewRateAnim"
     )
 
-    // ── [수정] Row → Column 레이아웃으로 변경 ──
     LoorveCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.Start
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ── [수정] ① 오늘의 문장 레이블 ──
+            // ── [수정 ①] "전체 복습률" 헤더 텍스트 ──
             Text(
-                text = "오늘의 문장",
+                text = "전체 복습률",
                 style = LoorveTypography.labelMedium,
                 color = OnSurfaceVariant
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // ── [수정] ① 오늘의 문장 실제 텍스트 추가 (placeholder) ──
-            Text(
-                text = "작게 자주, 오래 기억하라.",
-                style = LoorveTypography.bodyMedium,
-                color = OnBackground,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(12.dp))
-
-            // ── [수정] ① 이번 주 완료 텍스트 및 선형 진행바 유지 ──
-            Text(
-                text = "이번 주 ${total}개 중 ${completed}개 완료",
-                style = LoorveTypography.bodySmall,
-                color = OnSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            LoorveProgressBar(
-                completed = completed,
-                total = if (total == 0) 1 else total,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(20.dp))
-
-            // ── [수정] ② 원형 차트 — Column 중앙 배치, 120dp로 확대 ──
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+            // ── [수정 ②] 원형 차트 ──
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(120.dp)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(120.dp) // ── [수정] 80dp → 120dp ──
-                ) {
-                    Canvas(modifier = Modifier.size(120.dp)) {
-                        val strokeWidth = 10.dp.toPx() // ── [수정] 8dp → 10dp ──
-                        val inset = strokeWidth / 2f
-                        val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
+                Canvas(modifier = Modifier.size(120.dp)) {
+                    val strokeWidth = 10.dp.toPx()
+                    val inset = strokeWidth / 2f
+                    val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
 
-                        // 외부 트랙 링
+                    drawArc(
+                        color = Primary.copy(alpha = 0.15f),
+                        startAngle = 0f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = Offset(inset, inset),
+                        size = arcSize,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                    )
+
+                    if (animatedRate > 0f) {
+                        val gradientBrush = Brush.sweepGradient(
+                            colors = listOf(GradientStart, GradientEnd),
+                            center = Offset(size.width / 2f, size.height / 2f)
+                        )
                         drawArc(
-                            color = Primary.copy(alpha = 0.15f),
-                            startAngle = 0f,
-                            sweepAngle = 360f,
+                            brush = gradientBrush,
+                            startAngle = -90f,
+                            sweepAngle = 360f * animatedRate,
                             useCenter = false,
                             topLeft = Offset(inset, inset),
                             size = arcSize,
                             style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                         )
-
-                        // 진행 Arc (Gradient)
-                        if (animatedRate > 0f) {
-                            val gradientBrush = Brush.sweepGradient(
-                                colors = listOf(GradientStart, GradientEnd),
-                                center = Offset(size.width / 2f, size.height / 2f)
-                            )
-                            drawArc(
-                                brush = gradientBrush,
-                                startAngle = -90f,
-                                sweepAngle = 360f * animatedRate,
-                                useCenter = false,
-                                topLeft = Offset(inset, inset),
-                                size = arcSize,
-                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                            )
-                        }
                     }
-
-                    // ── [수정] ② 원 중앙 퍼센트 텍스트 — 22sp → 28sp ──
-                    Text(
-                        text = "$percent%",
-                        fontWeight = FontWeight.Bold,
-                        color = Primary,
-                        fontSize = 28.sp // ── [수정] 22sp → 28sp ──
-                    )
                 }
 
-                Spacer(Modifier.height(6.dp))
-
-                // ── [수정] ② "전체 복습률" 레이블 중앙 배치 ──
+                // ── [수정 ①] 퍼센트 숫자 표시 ──
                 Text(
-                    text = "전체 복습률",
-                    style = LoorveTypography.labelSmall,
-                    color = OnSurfaceVariant
+                    text = "$percent%",
+                    fontWeight = FontWeight.Bold,
+                    color = Primary,
+                    fontSize = 28.sp
                 )
             }
+
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "전체 복습률",
+                style = LoorveTypography.labelSmall,
+                color = OnSurfaceVariant
+            )
         }
     }
 }
 
-/** 미니 달력 */
+/**
+ * [수정 ③④] 미니 달력
+ * - displayYearMonth 파라미터 추가 → 표시 월을 외부에서 제어
+ * - onSwipeLeft / onSwipeRight 콜백으로 월 이동
+ * - 헤더 강조는 호출부(LoorveCard Column)에서 처리
+ */
 @Composable
 private fun HomeMiniCalendar(
+    displayYearMonth: YearMonth,
     selectedDate: LocalDate,
     scheduledDates: Set<LocalDate>,
-    onDateSelected: (LocalDate) -> Unit
+    onDateSelected: (LocalDate) -> Unit,
+    onSwipeLeft: () -> Unit,
+    onSwipeRight: () -> Unit
 ) {
     val today = LocalDate.now()
-    val yearMonth = YearMonth.of(selectedDate.year, selectedDate.month)
-    val firstDayOfWeek = yearMonth.atDay(1).dayOfWeek.value % 7
-    val daysInMonth = yearMonth.lengthOfMonth()
+    val firstDayOfWeek = displayYearMonth.atDay(1).dayOfWeek.value % 7
+    val daysInMonth = displayYearMonth.lengthOfMonth()
     val dayLabels = listOf("일", "월", "화", "수", "목", "금", "토")
 
-    // ── [수정] ③ HomeMiniCalendar 내부 LoorveCard 제거 (부모 LoorveCard로 통합됨) ──
-    Column {
+    // 스와이프 감지 임계값 (px)
+    val swipeThreshold = 50f
+    var dragAccumulator by remember { mutableStateOf(0f) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(displayYearMonth) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragAccumulator = 0f },
+                    onDragEnd = {
+                        when {
+                            dragAccumulator < -swipeThreshold -> onSwipeLeft()
+                            dragAccumulator > swipeThreshold  -> onSwipeRight()
+                        }
+                        dragAccumulator = 0f
+                    },
+                    onHorizontalDrag = { _, dragAmount ->
+                        dragAccumulator += dragAmount
+                    }
+                )
+            }
+    ) {
+        // 요일 헤더
         Row(modifier = Modifier.fillMaxWidth()) {
             dayLabels.forEach { label ->
                 Text(
@@ -373,7 +388,7 @@ private fun HomeMiniCalendar(
                         Box(modifier = Modifier.weight(1f).height(36.dp))
                     } else {
                         val currentDay = day
-                        val date = yearMonth.atDay(currentDay)
+                        val date = displayYearMonth.atDay(currentDay)
                         val isSelected = date == selectedDate
                         val isToday = date == today
                         val hasSchedule = scheduledDates.contains(date)
@@ -413,8 +428,7 @@ private fun HomeMiniCalendar(
                                             .size(4.dp)
                                             .clip(CircleShape)
                                             .background(
-                                                if (isSelected) Color.White
-                                                else Primary
+                                                if (isSelected) Color.White else Primary
                                             )
                                     )
                                 }
@@ -428,7 +442,7 @@ private fun HomeMiniCalendar(
     }
 }
 
-/** 오늘 복습 일정 카드 */
+/** 복습 일정 카드 (유지) */
 @Composable
 private fun HomeScheduleCard(
     subjectName: String,
