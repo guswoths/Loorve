@@ -18,5 +18,6 @@ data class ReviewSchedule(
     val completedAt: Long? = null,
     val reviewRound: Int = 1,          // 1차, 2차, 3차 복습 회차
     val title: String = "",
-    val createdAt: Long = 0L
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L           // ✅ 핵심 추가: SaveProgressAndScheduleUseCase에서 사용
 )
