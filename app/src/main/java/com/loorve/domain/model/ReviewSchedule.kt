@@ -19,5 +19,6 @@ data class ReviewSchedule(
     val reviewRound: Int = 1,          // 1차, 2차, 3차 복습 회차
     val title: String = "",
     val createdAt: Long = 0L,
-    val updatedAt: Long = 0L           // ✅ 핵심 추가: SaveProgressAndScheduleUseCase에서 사용
+    val updatedAt: Long = 0L,          // ✅ SaveProgressAndScheduleUseCase에서 사용
+    val scheduleType: String = "FORGETTING_CURVE"  // ✅ 추가: "FORGETTING_CURVE" | "MANUAL"
 )
