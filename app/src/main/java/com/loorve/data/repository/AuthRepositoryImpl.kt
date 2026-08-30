@@ -1,3 +1,4 @@
+// 경로: app/src/main/java/com/loorve/data/repository/AuthRepositoryImpl.kt
 package com.loorve.data.repository
 
 import android.content.Context
@@ -73,19 +74,16 @@ class AuthRepositoryImpl @Inject constructor(
 
     // ─────────────────────────────────────────────────────────────
     // 로그아웃 — 로그인 방식 무관하게 항상 credential 초기화
-    // (재로그인 시 계정 선택 팝업 반드시 표시)
     // ─────────────────────────────────────────────────────────────
     override suspend fun signOut(): Result<Unit> {
         return try {
             val currentUser = firebaseAuth.currentUser
-
             try {
                 val credentialManager = CredentialManager.create(context)
                 credentialManager.clearCredentialState(ClearCredentialStateRequest())
             } catch (e: Exception) {
                 Log.w(TAG, "clearCredentialState 실패 (계속 진행): ${e.message}")
             }
-
             firebaseAuth.signOut()
             Log.d(TAG, "signOut 완료 (uid=${currentUser?.uid})")
             Result.success(Unit)
@@ -118,6 +116,14 @@ class AuthRepositoryImpl @Inject constructor(
                 .get().await()
             scheduleDocs.documents.forEach { it.reference.delete().await() }
             Log.d(TAG, "reviewSchedules 삭제 완료 (uid=$uid, count=${scheduleDocs.size()})")
+
+            // ✅ [원인3 수정] reviewBlocks 서브컬렉션 삭제 추가 (기존 누락)
+            val reviewBlockDocs = firestore
+                .collection("users").document(uid)
+                .collection("reviewBlocks")
+                .get().await()
+            reviewBlockDocs.documents.forEach { it.reference.delete().await() }
+            Log.d(TAG, "reviewBlocks 삭제 완료 (uid=$uid, count=${reviewBlockDocs.size()})")
 
             val examDocs = firestore
                 .collection("exams")
@@ -174,28 +180,22 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun launchGoogleSignIn(activityContext: Context): Result<Pair<User, Boolean>> {
         return try {
             val credentialManager = CredentialManager.create(activityContext)
-
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
                 .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
                 .setAutoSelectEnabled(false)
                 .build()
-
             val request = GetCredentialRequest.Builder()
                 .addCredentialOption(googleIdOption)
                 .build()
-
             val credentialResponse = credentialManager.getCredential(
                 request = request,
                 context = activityContext
             )
-
             val googleIdTokenCredential = GoogleIdTokenCredential
                 .createFrom(credentialResponse.credential.data)
             val idToken = googleIdTokenCredential.idToken
-
             signInWithGoogle(idToken)
-
         } catch (e: GetCredentialException) {
             Log.w(TAG, "Credential 취소 또는 실패: ${e.type}", e)
             Result.failure(Exception("CANCELLED"))
@@ -224,12 +224,41 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     // ─────────────────────────────────────────────────────────────
+    // ✅ [원인3 수정] 앱 재시작 후 users 문서 누락 시 복구용 public 함수
+    // — 로그인 후 초기 진입 시 ViewModel 등에서 호출하여 문서 존재를 보장
+    // ─────────────────────────────────────────────────────────────
+    suspend fun ensureUserDocument(): Result<Unit> {
+        val user = firebaseAuth.currentUser
+            ?: return Result.failure(Exception("로그인 상태가 아닙니다."))
+        return try {
+            val docRef = firestore.collection("users").document(user.uid)
+            val snapshot = docRef.get().await()
+            if (!snapshot.exists()) {
+                Log.w(TAG, "users 문서 누락 감지 → 복구 생성 (uid=${user.uid})")
+                val data = mapOf(
+                    "uid"         to user.uid,
+                    "email"       to (user.email ?: ""),
+                    "displayName" to (user.displayName ?: user.email?.substringBefore("@") ?: "사용자"),
+                    "photoUrl"    to (user.photoUrl?.toString()),
+                    "createdAt"   to FieldValue.serverTimestamp(),
+                    "lastLoginAt" to FieldValue.serverTimestamp()
+                )
+                docRef.set(data, SetOptions.merge()).await()
+                Log.d(TAG, "users 문서 복구 완료 (uid=${user.uid})")
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "ensureUserDocument 실패 (uid=${user.uid})", e)
+            Result.failure(e)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────
 
     /**
      * @return isNewUser — true: Firestore 문서 신규 생성, false: 기존 문서 업데이트
-     * Firestore 오류 발생 시 false를 반환해 기존 사용자로 안전하게 처리
      */
     private suspend fun createOrUpdateUserDocument(user: User): Boolean {
         return try {

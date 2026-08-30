@@ -14,13 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.loorve.ui.component.BannerAdView
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -29,11 +27,9 @@ import java.time.format.DateTimeFormatter
 fun AddReviewBlockScreen(
     onNavigateBack: () -> Unit,
     onSaveSuccess: () -> Unit = {},
-    // ReviewCalendarViewModel을 주입받아 저장 후 reload 호출
     reviewCalendarViewModel: ReviewCalendarViewModel = hiltViewModel()
 ) {
     var examName by remember { mutableStateOf("") }
-    // String → Long? 으로 타입 변경 (DatePicker 선택 결과 millis)
     var examDateMillis by remember { mutableStateOf<Long?>(null) }
     var selectedCycleOption by remember { mutableStateOf(0) }
 
@@ -43,7 +39,14 @@ fun AddReviewBlockScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    // 표시용 날짜 문자열 (선택 전: placeholder, 선택 후: "YYYY년 MM월 DD일")
+    // ✅ [원인2 수정] FirebaseAuth 직접 호출 제거 → ViewModel StateFlow 구독
+    val currentUid by reviewCalendarViewModel.currentUid.collectAsState()
+
+    // 화면 진입 시 토큰 갱신 (백그라운드 복귀 후 만료 방지)
+    LaunchedEffect(Unit) {
+        reviewCalendarViewModel.refreshUid()
+    }
+
     val examDateDisplay = examDateMillis?.let { millis ->
         Instant.ofEpochMilli(millis)
             .atZone(ZoneId.of("Asia/Seoul"))
@@ -51,12 +54,10 @@ fun AddReviewBlockScreen(
             .format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일"))
     }
 
-    // DatePicker 상태
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = examDateMillis
     )
 
-    // DatePickerDialog 표시
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -97,10 +98,11 @@ fun AddReviewBlockScreen(
             Column {
                 Button(
                     onClick = {
-                        // 입력값 검증
-                        val uid = FirebaseAuth.getInstance().currentUser?.uid
+                        // ✅ [원인2 수정] ViewModel StateFlow에서 uid 사용
+                        val uid = currentUid
                         if (uid == null) {
                             coroutineScope.launch {
+                                reviewCalendarViewModel.refreshUid() // 재시도 트리거
                                 snackbarHostState.showSnackbar("로그인 정보가 없습니다. 다시 로그인해 주세요.")
                             }
                             return@Button
@@ -118,7 +120,6 @@ fun AddReviewBlockScreen(
                             return@Button
                         }
 
-                        // Firestore 저장
                         coroutineScope.launch {
                             isLoading = true
                             try {
@@ -126,29 +127,31 @@ fun AddReviewBlockScreen(
                                     .atZone(ZoneId.of("Asia/Seoul"))
                                     .toLocalDate()
 
-                                val data = hashMapOf(
-                                    "examName"           to examName.trim(),
-                                    "examDate"           to examDateLocal.toString(), // "YYYY-MM-DD"
-                                    "examDateMillis"     to examDateMillis,
-                                    "cycleOption"        to selectedCycleOption,     // 0=에빙하우스, 1=직접세팅
-                                    "createdAt"          to System.currentTimeMillis(),
-                                    "uid"                to uid
-                                )
-
-                                // 보안: users/{uid}/reviewBlocks/{autoId}
-                                FirebaseFirestore.getInstance()
+                                // ✅ [원인1 수정] blockId를 미리 생성해 데이터 필드에 포함
+                                // — .add() 대신 .document().set() 사용으로 blockId 확보
+                                val docRef = FirebaseFirestore.getInstance()
                                     .collection("users")
                                     .document(uid)
                                     .collection("reviewBlocks")
-                                    .add(data)
-                                    .await()
+                                    .document() // auto-ID 미리 생성
 
-                                // 저장 완료 → 캘린더 뷰 갱신 후 복귀
+                                val data = hashMapOf(
+                                    "blockId"        to docRef.id,          // ✅ hasAll(['blockId',...]) 충족
+                                    "examName"       to examName.trim(),
+                                    "examDate"       to examDateLocal.toString(),
+                                    "examDateMillis" to examDateMillis,
+                                    "cycleOption"    to selectedCycleOption,
+                                    "createdAt"      to System.currentTimeMillis(),
+                                    "uid"            to uid                  // ✅ uid 필드도 포함
+                                )
+
+                                docRef.set(data).await()                     // ✅ set()으로 저장
+
                                 reviewCalendarViewModel.reloadCurrentMonth()
                                 onSaveSuccess()
                             } catch (e: Exception) {
                                 snackbarHostState.showSnackbar(
-                                    message = "저장에 실패했습니다: ${e.message ?: "알 수 없는 오류"}",
+                                    message  = "저장에 실패했습니다: ${e.message ?: "알 수 없는 오류"}",
                                     duration = SnackbarDuration.Long
                                 )
                             } finally {
@@ -165,8 +168,8 @@ fun AddReviewBlockScreen(
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color    = MaterialTheme.colorScheme.onPrimary,
+                            modifier    = Modifier.size(20.dp),
+                            color       = MaterialTheme.colorScheme.onPrimary,
                             strokeWidth = 2.dp
                         )
                     } else {
@@ -227,7 +230,6 @@ fun AddReviewBlockScreen(
                 }
             }
 
-            // 시험 이름 입력
             OutlinedTextField(
                 value         = examName,
                 onValueChange = { examName = it },
@@ -237,7 +239,6 @@ fun AddReviewBlockScreen(
                 singleLine    = true
             )
 
-            // 시험 종료일 — 읽기전용 필드 + 캘린더 아이콘 클릭으로 DatePickerDialog 오픈
             OutlinedTextField(
                 value         = examDateDisplay ?: "",
                 onValueChange = { /* 읽기 전용 */ },
@@ -256,7 +257,6 @@ fun AddReviewBlockScreen(
                 }
             )
 
-            // 복습 주기 선택
             Text(
                 text  = "복습 주기",
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
