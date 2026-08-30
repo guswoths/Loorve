@@ -1,7 +1,7 @@
+// 경로: app/src/main/java/com/loorve/domain/usecase/CreateReviewBlockUseCase.kt
 package com.loorve.domain.usecase
 
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.WriteBatch
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
 import java.time.LocalDate
@@ -31,8 +31,10 @@ class CreateReviewBlockUseCase @Inject constructor(
 
             val zoneId = ZoneId.of("Asia/Seoul")
             val today = LocalDate.now(zoneId)
+
+            // ✅ FIX #1: DatePicker는 UTC 자정 기준 밀리초 반환 → UTC 기준 파싱
             val examDate = Instant.ofEpochMilli(request.examDateMillis)
-                .atZone(zoneId)
+                .atZone(ZoneId.of("UTC"))
                 .toLocalDate()
 
             require(!examDate.isBefore(today)) {
@@ -118,7 +120,6 @@ class CreateReviewBlockUseCase @Inject constructor(
                     val ratio = daysUntilExam.toDouble() / 30.0
                     (interval * ratio).toLong().coerceAtLeast(1L)
                 }
-
                 today.plusDays(scaledInterval).coerceAtMost(examDate)
             }
             .distinct()

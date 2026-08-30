@@ -83,6 +83,7 @@ fun AddReviewBlockScreen(
         when (val state = uiState) {
             is ReviewBlockUiState.Success -> {
                 reviewBlockViewModel.resetState()
+                reviewCalendarViewModel.reloadCurrentMonth() // ← 추가: 목록 즉시 갱신
                 onSaveSuccess()
             }
 
@@ -133,6 +134,7 @@ fun AddReviewBlockScreen(
     }
 
     val isLoading = uiState is ReviewBlockUiState.Loading
+    val isUidReady by reviewCalendarViewModel.isUidReady.collectAsState()
 
     Scaffold(
         snackbarHost = {
@@ -195,7 +197,7 @@ fun AddReviewBlockScreen(
                             }
                         }
                     },
-                    enabled = !isLoading,
+                    enabled = !isLoading && isUidReady,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
