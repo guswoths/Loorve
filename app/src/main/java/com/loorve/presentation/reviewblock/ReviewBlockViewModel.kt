@@ -49,6 +49,7 @@ class ReviewBlockViewModel @Inject constructor(
             ).onSuccess {
                 _uiState.value = ReviewBlockUiState.Success
             }.onFailure { throwable ->
+                android.util.Log.e("ReviewBlockVM", "createReviewBlock failed", throwable)
                 _uiState.value = ReviewBlockUiState.Error(
                     throwable.message ?: "복습 블록 생성에 실패했습니다."
                 )

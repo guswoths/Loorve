@@ -62,7 +62,11 @@ import kotlinx.coroutines.launch
 fun AddReviewBlockScreen(
     onNavigateBack: () -> Unit,
     onSaveSuccess: () -> Unit,
-    reviewCalendarViewModel: ReviewCalendarViewModel = hiltViewModel(),
+    // ✅ FIX: ReviewCalendarViewModel 주입 제거 — UID는 ReviewBlockViewModel 자체에서 관리하거나
+    //         상위 화면 ViewModel을 navBackStackEntry 공유 범위로 넘겨야 함.
+    //         현재는 UID를 AddReviewBlockViewModel로 분리하거나,
+    //         하위 호환을 위해 uid를 직접 파라미터로 전달받는 방식으로 변경
+    currentUid: String?,                         // ← 상위(CalendarScreen)에서 전달
     reviewBlockViewModel: ReviewBlockViewModel = hiltViewModel()
 ) {
     var examName by remember { mutableStateOf("") }
@@ -72,21 +76,15 @@ fun AddReviewBlockScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    val currentUid by reviewCalendarViewModel.currentUid.collectAsState()
     val uiState by reviewBlockViewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        reviewCalendarViewModel.refreshUid()
-    }
-
+    // ✅ FIX: Success 시 resetState() 후 onSaveSuccess() — reloadCurrentMonth는 상위에서 처리
     LaunchedEffect(uiState) {
         when (val state = uiState) {
             is ReviewBlockUiState.Success -> {
                 reviewBlockViewModel.resetState()
-                reviewCalendarViewModel.reloadCurrentMonth() // ← 추가: 목록 즉시 갱신
-                onSaveSuccess()
+                onSaveSuccess() // 상위 CalendarScreen에서 reloadCurrentMonth() 호출
             }
-
             is ReviewBlockUiState.Error -> {
                 snackbarHostState.showSnackbar(
                     message = "저장에 실패했습니다: ${state.message}",
@@ -94,7 +92,6 @@ fun AddReviewBlockScreen(
                 )
                 reviewBlockViewModel.resetState()
             }
-
             else -> Unit
         }
     }
@@ -119,14 +116,10 @@ fun AddReviewBlockScreen(
                         examDateMillis = datePickerState.selectedDateMillis
                         showDatePicker = false
                     }
-                ) {
-                    Text("확인")
-                }
+                ) { Text("확인") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("취소")
-                }
+                TextButton(onClick = { showDatePicker = false }) { Text("취소") }
             }
         ) {
             DatePicker(state = datePickerState)
@@ -134,22 +127,15 @@ fun AddReviewBlockScreen(
     }
 
     val isLoading = uiState is ReviewBlockUiState.Loading
-    val isUidReady by reviewCalendarViewModel.isUidReady.collectAsState()
+    val isUidReady = !currentUid.isNullOrBlank() // ✅ 상위에서 받은 uid 기준
 
     Scaffold(
-        snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState)
-        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = {
-                    Text("복습 블록 생성하기")
-                },
+                title = { Text("복습 블록 생성하기") },
                 navigationIcon = {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        enabled = !isLoading
-                    ) {
+                    IconButton(onClick = onNavigateBack, enabled = !isLoading) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "뒤로가기"
@@ -163,29 +149,24 @@ fun AddReviewBlockScreen(
                 Button(
                     onClick = {
                         val uid = currentUid
-
                         when {
                             uid.isNullOrBlank() -> {
                                 coroutineScope.launch {
-                                    reviewCalendarViewModel.refreshUid()
                                     snackbarHostState.showSnackbar(
                                         message = "로그인 정보를 확인 중입니다. 잠시 후 다시 시도해주세요."
                                     )
                                 }
                             }
-
                             examName.isBlank() -> {
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar("시험 이름을 입력해주세요.")
                                 }
                             }
-
                             examDateMillis == null -> {
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar("시험 종료일을 선택해주세요.")
                                 }
                             }
-
                             else -> {
                                 val safeExamDateMillis = examDateMillis ?: return@Button
                                 reviewBlockViewModel.createReviewBlock(
@@ -219,10 +200,7 @@ fun AddReviewBlockScreen(
                         )
                     }
                 }
-
-                BannerAdView(
-                    modifier = Modifier.fillMaxWidth()
-                )
+                BannerAdView(modifier = Modifier.fillMaxWidth())
             }
         }
     ) { paddingValues ->
@@ -235,13 +213,11 @@ fun AddReviewBlockScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(modifier = Modifier.height(4.dp))
-
             Text(
                 text = "시험 정보와 복습 주기를 정하면 복습 일정이 자동 생성됩니다.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer
@@ -249,29 +225,18 @@ fun AddReviewBlockScreen(
                 shape = MaterialTheme.shapes.medium
             ) {
                 Row(
-                    modifier = Modifier.padding(
-                        horizontal = 16.dp,
-                        vertical = 12.dp
-                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    Text(
-                        text = "💡",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 1.dp, end = 8.dp)
-                    )
-
+                    Text(text = "💡", style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 1.dp, end = 8.dp))
                     Column {
                         Text(
                             text = "블록 생성 전 확인",
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
-
                         Spacer(modifier = Modifier.height(4.dp))
-
                         Text(
                             text = "시험일까지 남은 기간에 맞춰 복습 간격이 자동으로 조정됩니다.",
                             style = MaterialTheme.typography.bodySmall,
@@ -280,152 +245,82 @@ fun AddReviewBlockScreen(
                     }
                 }
             }
-
             OutlinedTextField(
                 value = examName,
                 onValueChange = { examName = it },
-                label = {
-                    Text("시험 이름")
-                },
-                placeholder = {
-                    Text("한국사능력검정 심화")
-                },
+                label = { Text("시험 이름") },
+                placeholder = { Text("한국사능력검정 심화") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 isError = examName.isBlank() && isLoading
             )
-
             OutlinedTextField(
                 value = examDateDisplay.orEmpty(),
                 onValueChange = {},
-                label = {
-                    Text("시험 종료일")
-                },
-                placeholder = {
-                    Text("시험 종료일을 선택해주세요")
-                },
+                label = { Text("시험 종료일") },
+                placeholder = { Text("시험 종료일을 선택해주세요") },
                 modifier = Modifier.fillMaxWidth(),
                 readOnly = true,
                 singleLine = true,
                 trailingIcon = {
-                    IconButton(
-                        onClick = { showDatePicker = true },
-                        enabled = !isLoading
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.CalendarToday,
-                            contentDescription = "날짜 선택"
-                        )
+                    IconButton(onClick = { showDatePicker = true }, enabled = !isLoading) {
+                        Icon(imageVector = Icons.Outlined.CalendarToday, contentDescription = "날짜 선택")
                     }
                 }
             )
-
             Text(
                 text = "복습 주기",
-                style = MaterialTheme.typography.titleSmall.copy(
-                    fontWeight = FontWeight.SemiBold
-                )
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
             )
-
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (selectedCycleOption == 0) {
+                    containerColor = if (selectedCycleOption == 0)
                         MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surface
-                    }
+                    else MaterialTheme.colorScheme.surface
                 ),
                 shape = MaterialTheme.shapes.medium
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RadioButton(
-                        selected = selectedCycleOption == 0,
-                        onClick = {
-                            selectedCycleOption = 0
-                        },
-                        enabled = !isLoading
-                    )
-
+                    RadioButton(selected = selectedCycleOption == 0, onClick = { selectedCycleOption = 0 }, enabled = !isLoading)
                     Spacer(modifier = Modifier.width(8.dp))
-
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "에빙하우스 망각주기",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        )
-
-                        Text(
-                            text = "1일 · 3일 · 7일 · 14일 · 30일 자동 배치",
+                        Text(text = "에빙하우스 망각주기",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                        Text(text = "1일 · 3일 · 7일 · 14일 · 30일 자동 배치",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
-
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (selectedCycleOption == 1) {
+                    containerColor = if (selectedCycleOption == 1)
                         MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surface
-                    }
+                    else MaterialTheme.colorScheme.surface
                 ),
                 shape = MaterialTheme.shapes.medium
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RadioButton(
-                        selected = selectedCycleOption == 1,
-                        onClick = {
-                            selectedCycleOption = 1
-                        },
-                        enabled = !isLoading
-                    )
-
+                    RadioButton(selected = selectedCycleOption == 1, onClick = { selectedCycleOption = 1 }, enabled = !isLoading)
                     Spacer(modifier = Modifier.width(8.dp))
-
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "직접 세팅",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        )
-
-                        Text(
-                            text = "기본 복습 간격 1일 · 3일 · 7일 자동 배치",
+                        Text(text = "직접 세팅",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                        Text(text = "기본 복습 간격 1일 · 3일 · 7일 자동 배치",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
-
             Spacer(modifier = Modifier.height(8.dp))
-        }
-    }
-
-    LaunchedEffect(
-        key1 = examName,
-        key2 = examDateMillis,
-        key3 = currentUid
-    ) {
-        if (uiState is ReviewBlockUiState.Idle) {
-            return@LaunchedEffect
         }
     }
 }
