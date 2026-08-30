@@ -21,6 +21,8 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import com.loorve.domain.model.ReviewBlock
+import com.loorve.domain.repository.ReviewBlockRepository
 
 data class ReviewCalendarUiState(
     val displayYearMonth: YearMonth = YearMonth.now(),
@@ -28,13 +30,16 @@ data class ReviewCalendarUiState(
     val selectedDate: LocalDate? = null,
     val selectedDateSchedules: List<ReviewSchedule> = emptyList(),
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val reviewBlocks: List<ReviewBlock> = emptyList(),        // 추가
+    val isBlocksLoading: Boolean = false                      // 추가
 )
 
 @HiltViewModel
 class ReviewCalendarViewModel @Inject constructor(
     private val reviewScheduleRepository: ReviewScheduleRepository,
-    private val updateReviewCompletionUseCase: UpdateReviewCompletionUseCase
+    private val updateReviewCompletionUseCase: UpdateReviewCompletionUseCase,
+    private val reviewBlockRepository: ReviewBlockRepository   // 추가
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewCalendarUiState())
@@ -62,10 +67,10 @@ class ReviewCalendarViewModel @Inject constructor(
             user?.getIdToken(true)?.await()
             user?.uid
         }.getOrElse {
-            // 네트워크 오류 등 토큰 갱신 실패 시 캐시 uid 사용 (로그인 자체는 유효)
             user?.uid
         }
         _isUidReady.value = (_currentUid.value != null)
+        _currentUid.value?.let { uid -> loadReviewBlocks(uid) }  // 추가
     }
 
     fun onMonthChanged(yearMonth: YearMonth) {
@@ -122,6 +127,25 @@ class ReviewCalendarViewModel @Inject constructor(
     fun reloadCurrentMonth() {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         loadSchedulesForMonth(_uiState.value.displayYearMonth)
+    }
+
+    fun loadReviewBlocks(uid: String) {
+        if (uid.isBlank()) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBlocksLoading = true) }
+            reviewBlockRepository.getReviewBlocks(uid)
+                .onSuccess { blocks ->
+                    _uiState.update { it.copy(reviewBlocks = blocks, isBlocksLoading = false) }
+                }
+                .onFailure { e ->
+                    _uiState.update {
+                        it.copy(
+                            isBlocksLoading = false,
+                            errorMessage = e.message ?: "복습 블록을 불러오지 못했습니다."
+                        )
+                    }
+                }
+        }
     }
 
     private fun loadSchedulesForMonth(yearMonth: YearMonth) {

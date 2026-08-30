@@ -64,7 +64,7 @@ fun AddReviewBlockScreen(
     onSaveSuccess: () -> Unit,
     reviewBlockViewModel: ReviewBlockViewModel = hiltViewModel()
 ) {
-    val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+    val currentUid = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid }
     var examName by remember { mutableStateOf("") }
     var examDateMillis by remember { mutableStateOf<Long?>(null) }
     var selectedCycleOption by remember { mutableStateOf(0) }
