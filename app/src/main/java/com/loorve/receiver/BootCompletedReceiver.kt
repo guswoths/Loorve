@@ -74,19 +74,19 @@ class BootCompletedReceiver : BroadcastReceiver() {
                         schedules.forEach { schedule ->
                             try {
                                 val scheduleResult = reviewAlarmScheduler.scheduleReviewAlarm(
-                                    reviewScheduleId = schedule.reviewScheduleId,
+                                    reviewScheduleId = schedule.scheduleId,  // ✅ 수정
                                     triggerAtMillis = schedule.reviewDate
                                 )
                                 Log.d(
                                     TAG,
-                                    "알람 재등록: id=${schedule.reviewScheduleId}, " +
+                                    "알람 재등록: id=${schedule.scheduleId}, " +  // ✅ 수정
                                             "reviewDate=${schedule.reviewDate}, result=$scheduleResult"
                                 )
                             } catch (e: Exception) {
                                 // 개별 알람 실패가 전체를 중단하지 않도록 개별 예외 처리
                                 Log.e(
                                     TAG,
-                                    "알람 재등록 실패: id=${schedule.reviewScheduleId}, " +
+                                    "알람 재등록 실패: id=${schedule.scheduleId}, " +  // ✅ 수정
                                             "error=${e.message}"
                                 )
                             }
