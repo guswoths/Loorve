@@ -1,4 +1,3 @@
-// app/src/main/java/com/loorve/data/repository/ReviewBlockRepositoryImpl.kt
 package com.loorve.data.repository
 
 import com.google.firebase.firestore.FirebaseFirestore
@@ -11,14 +10,13 @@ class ReviewBlockRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : ReviewBlockRepository {
 
-    // ✅ 파라미터 타입을 ReviewBlock으로 수정
     override suspend fun saveReviewBlock(reviewBlock: ReviewBlock): Result<Unit> {
         return runCatching {
             firestore
                 .collection("users")
                 .document(reviewBlock.uid)
                 .collection("reviewBlocks")
-                .document(reviewBlock.reviewBlockId)
+                .document(reviewBlock.blockId)  // ✅ reviewBlockId → blockId 로 수정
                 .set(reviewBlock)
                 .await()
         }
