@@ -35,7 +35,6 @@ fun ExamSettingScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy년 MM월 dd일") }
 
-    // ──────── ONE-SHOT 이벤트 (기존 로직 유지) ────────
     var navigated by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -57,7 +56,6 @@ fun ExamSettingScreen(
         }
     }
 
-    // ──────── 시험일 DatePickerDialog (기존 로직 유지) ────────
     val examCalendar = remember { Calendar.getInstance() }
     val examDatePickerDialog = DatePickerDialog(
         context,
@@ -71,7 +69,6 @@ fun ExamSettingScreen(
         examCalendar.get(Calendar.DAY_OF_MONTH)
     )
 
-    // ──────── 학습 종료일 DatePickerDialog (기존 로직 유지) ────────
     val studyEndCalendar = remember { Calendar.getInstance() }
     val studyEndDatePickerDialog = DatePickerDialog(
         context,
@@ -85,7 +82,7 @@ fun ExamSettingScreen(
         studyEndCalendar.get(Calendar.DAY_OF_MONTH)
     )
 
-    // 에빙하우스/직접설정 선택 상태 (UI 전용, 로직 무변경)
+    // 에빙하우스/직접설정 선택 상태 (UI 전용)
     var useEbbinghaus by remember { mutableStateOf(true) }
 
     Box(
@@ -101,7 +98,6 @@ fun ExamSettingScreen(
                 .padding(top = 48.dp, bottom = 100.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // ── 헤더 ──
             Text(
                 text = "복습 블록 생성하기",
                 style = LoorveTypography.headlineMedium.copy(fontWeight = FontWeight.Bold),
@@ -113,7 +109,6 @@ fun ExamSettingScreen(
                 color = OnSurfaceVariant
             )
 
-            // ── 블록 생성 안내 카드 ──
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = Surface,
@@ -136,7 +131,6 @@ fun ExamSettingScreen(
                 }
             }
 
-            // ── 과목명 입력 ──
             OutlinedTextField(
                 value = uiState.subjectName,
                 onValueChange = { viewModel.onSubjectNameChange(it) },
@@ -155,24 +149,17 @@ fun ExamSettingScreen(
                 )
             )
 
-            // ── 시험일 선택 ──
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "시험 종료일",
-                    style = LoorveTypography.labelMedium,
-                    color = OnSurfaceVariant
-                )
+                Text(text = "시험 종료일", style = LoorveTypography.labelMedium, color = OnSurfaceVariant)
                 OutlinedButton(
                     onClick = { examDatePickerDialog.show() },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (uiState.examDate != 0L) Primary else SurfaceVariant
+                        1.dp, if (uiState.examDate != 0L) Primary else SurfaceVariant
                     ),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Surface,
-                        contentColor = OnBackground
+                        containerColor = Surface, contentColor = OnBackground
                     )
                 ) {
                     val displayText = if (uiState.examDate != 0L) {
@@ -180,34 +167,22 @@ fun ExamSettingScreen(
                             .atZone(ZoneId.of("Asia/Seoul"))
                             .toLocalDate()
                             .format(dateFormatter)
-                    } else {
-                        "날짜 선택"
-                    }
-                    Text(
-                        text = displayText,
-                        color = if (uiState.examDate != 0L) OnBackground else OnSurfaceVariant
-                    )
+                    } else { "날짜 선택" }
+                    Text(text = displayText, color = if (uiState.examDate != 0L) OnBackground else OnSurfaceVariant)
                 }
             }
 
-            // ── 학습 종료일 선택 ──
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "학습 종료일 (선택사항)",
-                    style = LoorveTypography.labelMedium,
-                    color = OnSurfaceVariant
-                )
+                Text(text = "학습 종료일 (선택사항)", style = LoorveTypography.labelMedium, color = OnSurfaceVariant)
                 OutlinedButton(
                     onClick = { studyEndDatePickerDialog.show() },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (uiState.studyEndDate != 0L) Primary else SurfaceVariant
+                        1.dp, if (uiState.studyEndDate != 0L) Primary else SurfaceVariant
                     ),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Surface,
-                        contentColor = OnBackground
+                        containerColor = Surface, contentColor = OnBackground
                     )
                 ) {
                     val displayText = if (uiState.studyEndDate != 0L) {
@@ -215,24 +190,14 @@ fun ExamSettingScreen(
                             .atZone(ZoneId.of("Asia/Seoul"))
                             .toLocalDate()
                             .format(dateFormatter)
-                    } else {
-                        "날짜 선택"
-                    }
-                    Text(
-                        text = displayText,
-                        color = if (uiState.studyEndDate != 0L) OnBackground else OnSurfaceVariant
-                    )
+                    } else { "날짜 선택" }
+                    Text(text = displayText, color = if (uiState.studyEndDate != 0L) OnBackground else OnSurfaceVariant)
                 }
                 uiState.studyEndDateError?.let { errorMsg ->
-                    Text(
-                        text = errorMsg,
-                        style = LoorveTypography.bodySmall,
-                        color = Error
-                    )
+                    Text(text = errorMsg, style = LoorveTypography.bodySmall, color = Error)
                 }
             }
 
-            // ── 복습 주기 선택 (에빙하우스 / 직접설정) ──
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = Surface,
@@ -242,14 +207,11 @@ fun ExamSettingScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // 에빙하우스 옵션
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (useEbbinghaus) Primary.copy(alpha = 0.08f) else Color.Transparent
-                            )
+                            .background(if (useEbbinghaus) Primary.copy(alpha = 0.08f) else Color.Transparent)
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -275,14 +237,11 @@ fun ExamSettingScreen(
 
                     Divider(color = SurfaceVariant, thickness = 0.5.dp)
 
-                    // 직접 설정 옵션
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (!useEbbinghaus) Primary.copy(alpha = 0.08f) else Color.Transparent
-                            )
+                            .background(if (!useEbbinghaus) Primary.copy(alpha = 0.08f) else Color.Transparent)
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -308,12 +267,11 @@ fun ExamSettingScreen(
                 }
             }
 
-            // ── D-Day 표시 (기존 로직 유지, 스타일만 변경) ──
             if (uiState.dDayText.isNotEmpty()) {
                 val dDayColor = when {
-                    uiState.dDayText == "D-Day"        -> Error
-                    uiState.dDayText.startsWith("D+")  -> OnSurfaceVariant
-                    else                                -> Primary
+                    uiState.dDayText == "D-Day"       -> Error
+                    uiState.dDayText.startsWith("D+") -> OnSurfaceVariant
+                    else                               -> Primary
                 }
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -339,7 +297,6 @@ fun ExamSettingScreen(
                 }
             }
 
-            // ── 배너 광고 플레이스홀더 ──
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -356,7 +313,6 @@ fun ExamSettingScreen(
                 )
             }
 
-            // ── 저장 버튼 ──
             GradientButton(
                 text = "저장",
                 onClick = { viewModel.saveExam() },
