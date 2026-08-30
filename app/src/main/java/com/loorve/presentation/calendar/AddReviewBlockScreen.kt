@@ -62,13 +62,9 @@ import kotlinx.coroutines.launch
 fun AddReviewBlockScreen(
     onNavigateBack: () -> Unit,
     onSaveSuccess: () -> Unit,
-    // ✅ FIX: ReviewCalendarViewModel 주입 제거 — UID는 ReviewBlockViewModel 자체에서 관리하거나
-    //         상위 화면 ViewModel을 navBackStackEntry 공유 범위로 넘겨야 함.
-    //         현재는 UID를 AddReviewBlockViewModel로 분리하거나,
-    //         하위 호환을 위해 uid를 직접 파라미터로 전달받는 방식으로 변경
-    currentUid: String?,                         // ← 상위(CalendarScreen)에서 전달
     reviewBlockViewModel: ReviewBlockViewModel = hiltViewModel()
 ) {
+    val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
     var examName by remember { mutableStateOf("") }
     var examDateMillis by remember { mutableStateOf<Long?>(null) }
     var selectedCycleOption by remember { mutableStateOf(0) }
