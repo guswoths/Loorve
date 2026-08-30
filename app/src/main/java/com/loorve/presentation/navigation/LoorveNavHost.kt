@@ -1,4 +1,3 @@
-// 경로: app/src/main/java/com/loorve/presentation/navigation/LoorveNavHost.kt
 package com.loorve.presentation.navigation
 
 import android.os.PowerManager
@@ -84,7 +83,6 @@ import com.loorve.ui.theme.OnSurfaceVariant
 import com.loorve.ui.theme.Primary
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
-
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -228,6 +226,7 @@ private fun SplashScreen(
                 ) {
                     val strokeWidth = 8.dp.toPx()
                     val inset = strokeWidth / 2f
+
                     drawArc(
                         color = Primary.copy(alpha = 0.15f),
                         startAngle = 0f,
@@ -243,6 +242,7 @@ private fun SplashScreen(
                     val strokeWidth = 8.dp.toPx()
                     val inset = strokeWidth / 2f
                     val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
+
                     val gradientBrushArc = Brush.sweepGradient(
                         colors = listOf(
                             GradientStart.copy(alpha = 0f),
@@ -251,6 +251,7 @@ private fun SplashScreen(
                         ),
                         center = Offset(size.width / 2f, size.height / 2f)
                     )
+
                     rotate(degrees = sweepRotation, pivot = center) {
                         drawArc(
                             brush = gradientBrushArc,
@@ -300,8 +301,11 @@ fun LoorveNavHost(
                     } else {
                         Screen.Login.route
                     }
+
                     navController.navigate(destination) {
-                        popUpTo(Screen.Splash.route) { inclusive = true }
+                        popUpTo(Screen.Splash.route) {
+                            inclusive = true
+                        }
                     }
                 }
             )
@@ -310,9 +314,16 @@ fun LoorveNavHost(
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = { isNewUser ->
-                    val destination = if (isNewUser) Screen.Onboarding.route else Screen.Home.route
+                    val destination = if (isNewUser) {
+                        Screen.Onboarding.route
+                    } else {
+                        Screen.Home.route
+                    }
+
                     navController.navigate(destination) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+                        popUpTo(Screen.Login.route) {
+                            inclusive = true
+                        }
                     }
                 }
             )
@@ -322,7 +333,9 @@ fun LoorveNavHost(
             OnboardingScreen(
                 onFinished = {
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        popUpTo(Screen.Onboarding.route) {
+                            inclusive = true
+                        }
                     }
                 }
             )
@@ -332,7 +345,9 @@ fun LoorveNavHost(
             ExamSettingScreen(
                 onSaveSuccess = {
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.ExamSetting.route) { inclusive = true }
+                        popUpTo(Screen.ExamSetting.route) {
+                            inclusive = true
+                        }
                     }
                 }
             )
@@ -345,6 +360,7 @@ fun LoorveNavHost(
                 .collectAsStateWithLifecycle()
 
             var batteryGuideShown by remember { mutableStateOf(false) }
+            var selectedTabIndex by remember { mutableStateOf(0) }
 
             // ⛔ 기능 금지 구역 — 절대 수정 금지
             LaunchedEffect(lifecycleState) {
@@ -361,16 +377,13 @@ fun LoorveNavHost(
                 }
             }
 
-            var selectedTabIndex by remember { mutableStateOf(0) }
-
             Scaffold(
                 containerColor = Background,
                 bottomBar = {
-                    NavigationBar(
-                        containerColor = Background
-                    ) {
+                    NavigationBar(containerColor = Background) {
                         bottomNavItems.forEach { item ->
                             val isSelected = selectedTabIndex == item.index
+
                             NavigationBarItem(
                                 selected = isSelected,
                                 onClick = { selectedTabIndex = item.index },
@@ -378,8 +391,11 @@ fun LoorveNavHost(
                                     Row(
                                         modifier = Modifier
                                             .background(
-                                                color = if (isSelected) Primary.copy(alpha = 0.1f)
-                                                else Color.Transparent,
+                                                color = if (isSelected) {
+                                                    Primary.copy(alpha = 0.1f)
+                                                } else {
+                                                    Color.Transparent
+                                                },
                                                 shape = RoundedCornerShape(50)
                                             )
                                             .padding(horizontal = 12.dp, vertical = 6.dp),
@@ -390,12 +406,18 @@ fun LoorveNavHost(
                                             contentDescription = item.label,
                                             tint = if (isSelected) Primary else OnSurfaceVariant
                                         )
+
                                         Spacer(modifier = Modifier.width(4.dp))
+
                                         Text(
                                             text = item.label,
                                             color = if (isSelected) Primary else OnSurfaceVariant,
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            fontWeight = if (isSelected) {
+                                                FontWeight.Bold
+                                            } else {
+                                                FontWeight.Normal
+                                            }
                                         )
                                     }
                                 },
@@ -422,27 +444,40 @@ fun LoorveNavHost(
                                 navController.navigate(Screen.ExamSetting.route)
                             },
                             onNavigateToProgressDetail = { progressId ->
-                                navController.navigate(Screen.ProgressDetail.createRoute(progressId))
+                                navController.navigate(
+                                    Screen.ProgressDetail.createRoute(progressId)
+                                )
                             }
                         )
+
                         1 -> ReviewCalendarScreen(
                             onNavigateBack = { },
                             onNavigateToAddReviewBlock = {
                                 navController.navigate(Screen.AddReviewBlock.route)
                             }
                         )
-                        2 -> MyPageScreen(
-                            currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
-                            onBack = { selectedTabIndex = 0 },
-                            onNavigateToNotificationTimeSetting = {
-                                navController.navigate(Screen.NotificationTimeSetting.route)
-                            },
-                            onSignOut = {
-                                navController.navigate(Screen.Login.route) {
-                                    popUpTo(0) { inclusive = true }
+
+                        2 -> {
+                            val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+                                ?: return@Box
+
+                            MyPageScreen(
+                                currentUid = currentUid,
+                                onBack = {
+                                    selectedTabIndex = 0
+                                },
+                                onNavigateToNotificationTimeSetting = {
+                                    navController.navigate(Screen.NotificationTimeSetting.route)
+                                },
+                                onSignOut = {
+                                    navController.navigate(Screen.Login.route) {
+                                        popUpTo(0) {
+                                            inclusive = true
+                                        }
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
@@ -451,7 +486,9 @@ fun LoorveNavHost(
         composable(
             route = Screen.ProgressDetail.route,
             arguments = listOf(
-                navArgument("progressId") { type = NavType.StringType }
+                navArgument("progressId") {
+                    type = NavType.StringType
+                }
             )
         ) { backStackEntry ->
             val progressId = backStackEntry.arguments
@@ -460,13 +497,17 @@ fun LoorveNavHost(
 
             ProgressDetailScreen(
                 progressId = progressId,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(Screen.Calendar.route) {
             ReviewCalendarScreen(
-                onNavigateBack = { navController.popBackStack() },
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
                 onNavigateToAddReviewBlock = {
                     navController.navigate(Screen.AddReviewBlock.route)
                 }
@@ -475,34 +516,51 @@ fun LoorveNavHost(
 
         composable(Screen.AddReviewBlock.route) {
             AddReviewBlockScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onSaveSuccess = { navController.popBackStack() }
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onSaveSuccess = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(Screen.BatteryOptimizationGuide.route) {
             BatteryOptimizationGuideScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onSkip = { navController.popBackStack() }
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onSkip = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(Screen.NotificationPermission.route) {
             NotificationPermissionRoute(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(Screen.MyPage.route) {
+            val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+                ?: return@composable
+
             MyPageScreen(
-                currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
-                onBack = { navController.popBackStack() },
+                currentUid = currentUid,
+                onBack = {
+                    navController.popBackStack()
+                },
                 onNavigateToNotificationTimeSetting = {
                     navController.navigate(Screen.NotificationTimeSetting.route)
                 },
                 onSignOut = {
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(0) { inclusive = true }
+                        popUpTo(0) {
+                            inclusive = true
+                        }
                     }
                 }
             )
@@ -510,7 +568,9 @@ fun LoorveNavHost(
 
         composable(Screen.NotificationTimeSetting.route) {
             NotificationTimeSettingScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
             )
         }
     }
