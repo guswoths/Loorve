@@ -12,11 +12,18 @@ class ReviewBlockRepositoryImpl @Inject constructor(
 
     override suspend fun saveReviewBlock(reviewBlock: ReviewBlock): Result<Unit> {
         return runCatching {
-            // ✅ @DocumentId 필드가 직렬화에서 제외되는 문제 해결:
-            // ReviewBlock 객체 대신 명시적 HashMap으로 저장하여
-            // Firestore Rules의 hasAll(['blockId', 'uid', 'createdAt'])를 충족
+            require(reviewBlock.uid.isNotBlank()) { "uid가 비어있습니다." }
+
+            // blockId가 비어있을 경우 Firestore에서 새 ID 자동 생성
+            val docId = reviewBlock.blockId.ifBlank {
+                firestore.collection("users")
+                    .document(reviewBlock.uid)
+                    .collection("reviewBlocks")
+                    .document().id
+            }
+
             val data = hashMapOf(
-                "blockId"     to reviewBlock.blockId,
+                "blockId"     to docId,
                 "uid"         to reviewBlock.uid,
                 "date"        to reviewBlock.date,
                 "title"       to reviewBlock.title,
@@ -30,7 +37,7 @@ class ReviewBlockRepositoryImpl @Inject constructor(
                 .collection("users")
                 .document(reviewBlock.uid)
                 .collection("reviewBlocks")
-                .document(reviewBlock.blockId)
+                .document(docId)
                 .set(data)
                 .await()
         }
@@ -44,12 +51,18 @@ class ReviewBlockRepositoryImpl @Inject constructor(
                 .collection("reviewBlocks")
                 .get()
                 .await()
-                .toObjects(ReviewBlock::class.java)
+                .documents
+                .mapNotNull { snapshot ->
+                    // @DocumentId 제거 후 snapshot.id를 blockId에 수동 할당
+                    snapshot.toObject(ReviewBlock::class.java)
+                        ?.copy(blockId = snapshot.id)
+                }
         }
     }
 
     override suspend fun deleteReviewBlock(uid: String, reviewBlockId: String): Result<Unit> {
         return runCatching {
+            require(reviewBlockId.isNotBlank()) { "reviewBlockId가 비어있습니다." }
             firestore
                 .collection("users")
                 .document(uid)
