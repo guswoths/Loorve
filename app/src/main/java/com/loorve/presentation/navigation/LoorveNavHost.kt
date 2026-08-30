@@ -388,7 +388,6 @@ fun LoorveNavHost(
                                 selected = isSelected,
                                 onClick = { selectedTabIndex = item.index },
                                 icon = {
-                                    // 커스텀 인디케이터: 콘텐츠 크기에 맞춘 pill 형태 배경
                                     Row(
                                         modifier = Modifier
                                             .background(
@@ -414,7 +413,6 @@ fun LoorveNavHost(
                                     }
                                 },
                                 label = null,
-                                // 기본 wide indicator 완전 제거 → 커스텀 배경으로 대체
                                 colors = NavigationBarItemDefaults.colors(
                                     indicatorColor = Color.Transparent
                                 )
@@ -446,7 +444,6 @@ fun LoorveNavHost(
                                 navController.navigate(Screen.AddReviewBlock.route)
                             }
                         )
-
                         2 -> MyPageScreen(
                             onBack = { selectedTabIndex = 0 },
                             onNavigateToNotificationTimeSetting = {
@@ -457,6 +454,7 @@ fun LoorveNavHost(
                                     popUpTo(0) { inclusive = true }
                                 }
                             }
+                            // ✅ currentUid 파라미터 제거 — MyPageScreen 시그니처에 존재하지 않음
                         )
                     }
                 }
@@ -487,6 +485,7 @@ fun LoorveNavHost(
                 }
             )
         }
+
         composable(Screen.AddReviewBlock.route) {
             AddReviewBlockScreen(
                 onNavigateBack = { navController.popBackStack() },
@@ -518,6 +517,7 @@ fun LoorveNavHost(
                         popUpTo(0) { inclusive = true }
                     }
                 }
+                // ✅ currentUid 파라미터 제거 — MyPageScreen 시그니처에 존재하지 않음
             )
         }
 
