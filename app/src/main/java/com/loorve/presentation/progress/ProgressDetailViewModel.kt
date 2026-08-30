@@ -1,293 +1,247 @@
 package com.loorve.presentation.progress
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.domain.model.Progress
 import com.loorve.domain.model.ReviewSchedule
 import com.loorve.domain.repository.ProgressRepository
 import com.loorve.domain.repository.ReviewScheduleRepository
-import com.loorve.domain.usecase.ForgettingCurveScheduler
-import com.loorve.domain.usecase.SaveProgressAndScheduleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.UUID
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.UUID
-import javax.inject.Inject
-
-// ✅ 신규 추가: 복습 스케줄 설정 모드
-enum class ReviewScheduleMode {
-    FORGETTING_CURVE,  // 망각곡선 자동 설정 (D+1, D+3, D+7, D+14, D+30)
-    MANUAL             // 직접 입력
-}
 
 data class ProgressDetailUiState(
+    val isLoading: Boolean = false,
     val progress: Progress? = null,
-    val isLoading: Boolean = true,
-    val isEditMode: Boolean = false,
     val errorMessage: String? = null,
-    val saveResult: Boolean? = null,
-    val deleteResult: Boolean? = null,
-    val isDirty: Boolean = false,
-    val initialSnapshot: Progress? = null,
-    val generatedReviewDates: List<java.time.LocalDate> = emptyList(),
-    // ✅ 신규 추가
-    val reviewScheduleMode: ReviewScheduleMode = ReviewScheduleMode.FORGETTING_CURVE,
-    val manualReviewDateTime: Long? = null,   // epoch ms, 직접 입력 시 사용
-    val successMessage: String? = null        // Snackbar 메시지 분기용
+    val isDeleted: Boolean = false
 )
 
 @HiltViewModel
 class ProgressDetailViewModel @Inject constructor(
+    private val firebaseAuth: FirebaseAuth,
     private val progressRepository: ProgressRepository,
-    private val saveProgressAndScheduleUseCase: SaveProgressAndScheduleUseCase,
     private val reviewScheduleRepository: ReviewScheduleRepository,
-    private val alarmScheduler: ReviewAlarmScheduler
+    private val reviewAlarmScheduler: ReviewAlarmScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProgressDetailUiState())
     val uiState: StateFlow<ProgressDetailUiState> = _uiState.asStateFlow()
 
-    fun loadProgress(uid: String, progressId: String) {
+    fun loadProgress(progressId: String) {
+        val uid = firebaseAuth.currentUser?.uid
+        if (uid.isNullOrBlank()) {
+            _uiState.value = ProgressDetailUiState(
+                errorMessage = "로그인 정보를 찾을 수 없습니다."
+            )
+            return
+        }
+
+        if (progressId.isBlank()) {
+            _uiState.value = ProgressDetailUiState(
+                errorMessage = "진도 ID가 올바르지 않습니다."
+            )
+            return
+        }
+
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val result = progressRepository.getProgressById(uid, progressId)
-            if (result.isSuccess) {
-                _uiState.update { it.copy(isLoading = false, progress = result.getOrNull()) }
-            } else {
-                _uiState.update {
-                    it.copy(
-                        isLoading    = false,
-                        errorMessage = result.exceptionOrNull()?.message ?: "불러오지 못했습니다."
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null
+            )
+
+            progressRepository.getProgressById(uid, progressId)
+                .onSuccess { progress ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        progress = progress
+                    )
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = throwable.message ?: "진도를 불러오지 못했습니다."
+                    )
+                }
+        }
+    }
+
+    fun saveProgressWithReviewSchedules(
+        progress: Progress,
+        reviewDates: List<Long>
+    ) {
+        val uid = firebaseAuth.currentUser?.uid
+        if (uid.isNullOrBlank()) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "로그인 정보를 찾을 수 없습니다."
+            )
+            return
+        }
+
+        if (progress.progressId.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "진도 ID가 올바르지 않습니다."
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null
+            )
+
+            val progressResult = progressRepository.saveProgress(
+                uid = uid,
+                progress = progress
+            )
+
+            if (progressResult.isFailure) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = progressResult.exceptionOrNull()?.message
+                        ?: "진도 저장에 실패했습니다."
+                )
+                return@launch
+            }
+
+            val now = System.currentTimeMillis()
+
+            reviewDates.forEachIndexed { index, reviewDate ->
+                val schedule = ReviewSchedule(
+                    scheduleId = UUID.randomUUID().toString(),
+                    blockId = "",
+                    userId = uid,
+                    originProgressId = progress.progressId,
+                    title = progress.title,
+                    reviewDate = reviewDate,
+                    reviewDateText = "",
+                    reviewOrder = index + 1,
+                    scheduleType = "EBBINGHAUS",
+                    isCompleted = false,
+                    createdAt = now,
+                    updatedAt = now
+                )
+
+                val scheduleResult = reviewScheduleRepository.saveReviewSchedule(
+                    reviewSchedule = schedule
+                )
+
+                if (scheduleResult.isSuccess) {
+                    reviewAlarmScheduler.scheduleReviewAlarm(
+                        reviewScheduleId = schedule.scheduleId,
+                        triggerAtMillis = schedule.reviewDate
                     )
                 }
             }
-        }
-    }
 
-    fun enterEditMode() {
-        _uiState.update {
-            it.copy(
-                isEditMode      = true,
-                initialSnapshot = it.progress,
-                isDirty         = false
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                progress = progress
             )
         }
     }
 
-    fun exitEditMode() {
-        _uiState.update {
-            it.copy(
-                isEditMode           = false,
-                isDirty              = false,
-                initialSnapshot      = null,
-                reviewScheduleMode   = ReviewScheduleMode.FORGETTING_CURVE,
-                manualReviewDateTime = null
+    fun deleteProgress(progressId: String) {
+        val uid = firebaseAuth.currentUser?.uid
+        if (uid.isNullOrBlank()) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "로그인 정보를 찾을 수 없습니다."
             )
-        }
-    }
-
-    // ✅ 신규 추가: 복습 스케줄 모드 변경
-    fun onReviewScheduleModeChanged(mode: ReviewScheduleMode) {
-        _uiState.update { it.copy(reviewScheduleMode = mode, manualReviewDateTime = null) }
-    }
-
-    // ✅ 신규 추가: 직접 입력 일시 변경
-    fun onManualReviewDateTimeChanged(epochMs: Long) {
-        _uiState.update { it.copy(manualReviewDateTime = epochMs) }
-    }
-
-    fun saveProgress(uid: String, updatedProgress: Progress) {
-        val current = _uiState.value.progress ?: run {
-            Log.w(TAG, "saveProgress 호출됐지만 현재 progress 상태가 null입니다.")
-            _uiState.update { it.copy(saveResult = false, errorMessage = "저장할 데이터가 없습니다.") }
             return
         }
 
-        if (uid.isBlank()) {
-            Log.e(TAG, "saveProgress 실패: uid가 비어 있습니다.")
-            _uiState.update { it.copy(saveResult = false, errorMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요.") }
+        if (progressId.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "진도 ID가 올바르지 않습니다."
+            )
             return
         }
-
-        if (updatedProgress.content.isBlank()) {
-            Log.w(TAG, "saveProgress 실패: content가 비어 있습니다.")
-            _uiState.update { it.copy(saveResult = false, errorMessage = "학습 내용을 입력해주세요.") }
-            return
-        }
-
-        val mode = _uiState.value.reviewScheduleMode
-
-        // ✅ 보안: MANUAL 모드일 때 과거 시각 차단
-        if (mode == ReviewScheduleMode.MANUAL) {
-            val manualMs = _uiState.value.manualReviewDateTime
-            if (manualMs == null) {
-                _uiState.update { it.copy(saveResult = false, errorMessage = "복습 예정 일시를 선택해주세요.") }
-                return
-            }
-            if (manualMs <= System.currentTimeMillis()) {
-                _uiState.update { it.copy(saveResult = false, errorMessage = "복습 예정 시각은 현재 시각 이후여야 합니다.") }
-                return
-            }
-        }
-
-        val merged = current.copy(
-            content        = updatedProgress.content,
-            completedCount = updatedProgress.completedCount,
-            totalCount     = updatedProgress.totalCount,
-            isCompleted    = updatedProgress.isCompleted
-        )
 
         viewModelScope.launch {
-            when (mode) {
-                // ─── 기존 로직 유지 ───
-                ReviewScheduleMode.FORGETTING_CURVE -> {
-                    val result = saveProgressAndScheduleUseCase(uid, merged)
-                    if (result.isSuccess) {
-                        val progressDate = Instant.ofEpochMilli(
-                            if (merged.createdAt > 0L) merged.createdAt else System.currentTimeMillis()
-                        ).atZone(ZoneId.of("Asia/Seoul")).toLocalDate()
-                        ForgettingCurveScheduler.generateReviewDates(progressDate)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null
+            )
 
-                        _uiState.update {
-                            it.copy(
-                                progress        = merged,
-                                isLoading       = false,
-                                isEditMode      = false,
-                                saveResult      = true,
-                                successMessage  = "복습 일정 5개가 생성되었습니다 📅",
-                                errorMessage    = null,
-                                isDirty         = false,
-                                initialSnapshot = null
-                            )
-                        }
-                    } else {
-                        val errMsg = result.exceptionOrNull()?.message ?: "저장 중 알 수 없는 오류가 발생했습니다."
-                        Log.e(TAG, "saveProgress 실패: $errMsg")
-                        _uiState.update {
-                            it.copy(
-                                isLoading    = false,
-                                saveResult   = false,
-                                errorMessage = errMsg
-                            )
-                        }
-                    }
-                }
-
-                // ─── 신규: 직접 입력 모드 ───
-                ReviewScheduleMode.MANUAL -> {
-                    val manualMs = _uiState.value.manualReviewDateTime!!
-                    runCatching {
-                        // ① Progress 저장
-                        val progressResult = progressRepository.saveProgress(uid, merged)
-                        if (progressResult.isFailure) throw progressResult.exceptionOrNull()!!
-
-                        // ② ReviewSchedule 1개 생성 및 저장
-                        val scheduleId = UUID.randomUUID().toString()
-                        val now = System.currentTimeMillis()
-                        val schedule = ReviewSchedule(
-                            reviewScheduleId = scheduleId,
-                            originProgressId = merged.progressId,  // ✅ 실제 필드명 사용
-                            reviewDate       = manualMs,
-                            reviewRound      = 1,
-                            isCompleted      = false,
-                            createdAt        = now,
-                            updatedAt        = now,
-                            scheduleType     = "MANUAL",
-                            uid              = uid
-                        )
-                        val scheduleResult = reviewScheduleRepository.saveReviewSchedule(uid, schedule)
-                        if (scheduleResult.isFailure) throw scheduleResult.exceptionOrNull()!!
-
-                        // ③ 알람 등록
-                        alarmScheduler.scheduleReviewAlarm(scheduleId, manualMs)
-                    }.onSuccess {
-                        val displayTime = Instant.ofEpochMilli(manualMs)
-                            .atZone(ZoneId.of("Asia/Seoul"))
-                            .format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 HH:mm"))
-                        val msg = "복습 알람이 설정되었습니다 ⏰ ($displayTime)"
-
-                        _uiState.update {
-                            it.copy(
-                                progress             = merged,
-                                isLoading            = false,
-                                isEditMode           = false,
-                                saveResult           = true,
-                                successMessage       = msg,
-                                errorMessage         = null,
-                                isDirty              = false,
-                                initialSnapshot      = null,
-                                reviewScheduleMode   = ReviewScheduleMode.FORGETTING_CURVE,
-                                manualReviewDateTime = null
-                            )
-                        }
-                    }.onFailure { e ->
-                        Log.e(TAG, "saveProgress(MANUAL) 실패: ${e.message}")
-                        _uiState.update {
-                            it.copy(
-                                isLoading    = false,
-                                saveResult   = false,
-                                errorMessage = e.message ?: "저장 중 오류가 발생했습니다."
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fun deleteProgress(uid: String, progressId: String) {
-        if (uid.isBlank() || progressId.isBlank()) {
-            _uiState.update { it.copy(deleteResult = false) }
-            return
-        }
-        viewModelScope.launch {
+            /*
+             * 1. 이 진도와 연결된 복습 일정 조회
+             * 2. 연결된 알람 취소
+             * 3. Firestore 복습 일정 삭제
+             * 4. 마지막으로 원본 진도 삭제
+             *
+             * 진도 삭제에 성공했는데 일정만 남는 고아 데이터를 줄이기 위해
+             * 복습 일정 정리를 먼저 수행한다.
+             */
             val schedulesResult = reviewScheduleRepository
-                .getReviewSchedulesByProgressId(uid, progressId)
-            if (schedulesResult.isSuccess) {
-                schedulesResult.getOrNull()?.forEach { schedule ->
-                    alarmScheduler.cancelReviewAlarm(schedule.reviewScheduleId)
-                }
-            } else {
-                Log.w(TAG, "deleteProgress 알람 취소 실패 — 스케줄 조회 오류: " +
-                        "${schedulesResult.exceptionOrNull()?.message}")
+                .getReviewSchedulesByProgressId(
+                    uid = uid,
+                    progressId = progressId
+                )
+
+            if (schedulesResult.isFailure) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = schedulesResult.exceptionOrNull()?.message
+                        ?: "연결된 복습 일정을 조회하지 못했습니다."
+                )
+                return@launch
             }
 
-            val result = progressRepository.deleteProgress(uid, progressId)
-            _uiState.update { it.copy(deleteResult = result.isSuccess) }
+            val schedules = schedulesResult.getOrDefault(emptyList())
+
+            schedules.forEach { schedule ->
+                reviewAlarmScheduler.cancelReviewAlarm(schedule.scheduleId)
+
+                val deleteScheduleResult = reviewScheduleRepository
+                    .deleteReviewSchedule(
+                        uid = uid,
+                        scheduleId = schedule.scheduleId
+                    )
+
+                if (deleteScheduleResult.isFailure) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = deleteScheduleResult.exceptionOrNull()?.message
+                            ?: "연결된 복습 일정 삭제에 실패했습니다."
+                    )
+                    return@launch
+                }
+            }
+
+            val deleteProgressResult = progressRepository.deleteProgress(
+                uid = uid,
+                progressId = progressId
+            )
+
+            deleteProgressResult
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        progress = null,
+                        isDeleted = true
+                    )
+                }
+                .onFailure { throwable ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = throwable.message ?: "진도 삭제에 실패했습니다."
+                    )
+                }
         }
     }
 
-    fun consumeSaveResult() {
-        _uiState.update { it.copy(saveResult = null, successMessage = null) }
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(errorMessage = null)
     }
 
-    fun consumeDeleteResult() {
-        _uiState.update { it.copy(deleteResult = null) }
-    }
-
-    fun onEditChanged(
-        content: String,
-        completedCount: String,
-        totalCount: String,
-        isCompleted: Boolean
-    ) {
-        val snap = _uiState.value.initialSnapshot ?: return
-        val dirty = snap.content != content ||
-                snap.completedCount.toString() != completedCount ||
-                snap.totalCount.toString() != totalCount ||
-                snap.isCompleted != isCompleted
-        _uiState.update { it.copy(isDirty = dirty) }
-    }
-
-    companion object {
-        private const val TAG = "ProgressDetailViewModel"
+    fun consumeDeletionEvent() {
+        _uiState.value = _uiState.value.copy(isDeleted = false)
     }
 }
