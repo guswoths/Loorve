@@ -1,5 +1,4 @@
 // 경로: app/src/main/java/com/loorve/presentation/progress/ProgressDetailScreen.kt
-// 전체 파일 — onBack → onNavigateBack 으로 변경
 
 package com.loorve.presentation.progress
 
@@ -12,7 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.google.firebase.auth.FirebaseAuth
 import com.loorve.ui.component.*
 import com.loorve.ui.theme.*
 
@@ -20,13 +18,21 @@ import com.loorve.ui.theme.*
 @Composable
 fun ProgressDetailScreen(
     progressId: String,
-    onNavigateBack: () -> Unit,    // onBack → onNavigateBack 으로 통일
+    onNavigateBack: () -> Unit,
     viewModel: ProgressDetailViewModel = hiltViewModel()
 ) {
-    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-    LaunchedEffect(progressId) { viewModel.loadProgress(uid, progressId) }
+    // uid는 ViewModel 내부에서 FirebaseAuth로 처리 — Screen에서 전달 불필요
+    LaunchedEffect(progressId) { viewModel.loadProgress(progressId) }
     val uiState by viewModel.uiState.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // 삭제 완료 시 자동으로 뒤로가기
+    LaunchedEffect(uiState.isDeleted) {
+        if (uiState.isDeleted) {
+            viewModel.consumeDeletionEvent()
+            onNavigateBack()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -39,7 +45,7 @@ fun ProgressDetailScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {  // onBack → onNavigateBack
+                    IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, null, tint = OnBackground)
                     }
                 },
@@ -126,8 +132,8 @@ fun ProgressDetailScreen(
             text = { Text("이 학습 기록을 삭제하시겠습니까?", color = OnSurface) },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.deleteProgress(uid, progressId)
-                    onNavigateBack()  // onBack() → onNavigateBack()
+                    showDeleteDialog = false
+                    viewModel.deleteProgress(progressId)  // ✅ uid 파라미터 제거
                 }) { Text("삭제", color = Error) }
             },
             dismissButton = {

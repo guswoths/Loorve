@@ -119,7 +119,7 @@ class ProgressDetailViewModel @Inject constructor(
                     blockId = "",
                     userId = uid,
                     originProgressId = progress.progressId,
-                    title = progress.title,
+                    title = progress.content,  // ← 'title' → 'content' 로 수정
                     reviewDate = reviewDate,
                     reviewDateText = "",
                     reviewOrder = index + 1,
