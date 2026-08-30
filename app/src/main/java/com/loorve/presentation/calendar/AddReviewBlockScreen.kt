@@ -1,3 +1,4 @@
+// 경로: app/src/main/java/com/loorve/presentation/calendar/AddReviewBlockScreen.kt
 package com.loorve.presentation.calendar
 
 import androidx.compose.foundation.layout.Arrangement
@@ -37,9 +38,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -161,8 +164,9 @@ fun AddReviewBlockScreen(
 
                         when {
                             uid.isNullOrBlank() -> {
-                                reviewCalendarViewModel.refreshUid()
+                                // ✅ refreshUid()를 coroutineScope.launch 안으로 이동
                                 coroutineScope.launch {
+                                    reviewCalendarViewModel.refreshUid()
                                     snackbarHostState.showSnackbar(
                                         message = "로그인 정보를 확인 중입니다. 잠시 후 다시 시도해주세요."
                                     )
