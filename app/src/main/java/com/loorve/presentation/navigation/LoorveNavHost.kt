@@ -86,9 +86,6 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 
 
-// ────────────────────────────────────────────────────────────────
-// Screen Route 정의
-// ────────────────────────────────────────────────────────────────
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Onboarding : Screen("onboarding")
@@ -108,9 +105,6 @@ sealed class Screen(val route: String) {
     object NotificationPermission : Screen("notification_permission")
 }
 
-// ────────────────────────────────────────────────────────────────
-// 하단 탭 데이터 클래스
-// ────────────────────────────────────────────────────────────────
 private data class BottomNavItem(
     val label: String,
     val icon: ImageVector,
@@ -123,9 +117,6 @@ private val bottomNavItems = listOf(
     BottomNavItem("설정", Icons.Outlined.Settings, 2)
 )
 
-// ────────────────────────────────────────────────────────────────
-// SplashScreen
-// ────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalTextApi::class)
 @Composable
 private fun SplashScreen(
@@ -293,9 +284,6 @@ private fun SplashScreen(
     }
 }
 
-// ────────────────────────────────────────────────────────────────
-// LoorveNavHost
-// ────────────────────────────────────────────────────────────────
 @Composable
 fun LoorveNavHost(
     navController: NavHostController = rememberNavController()
@@ -350,7 +338,6 @@ fun LoorveNavHost(
             )
         }
 
-        // ── Screen.Home — Scaffold + 하단 네비게이션 바 ──
         composable(Screen.Home.route) {
             val context = LocalContext.current
             val lifecycleOwner = LocalLifecycleOwner.current
@@ -439,12 +426,13 @@ fun LoorveNavHost(
                             }
                         )
                         1 -> ReviewCalendarScreen(
-                            onNavigateBack = { /* 탭 내 임베드이므로 뒤로가기 무동작 */ },
+                            onNavigateBack = { },
                             onNavigateToAddReviewBlock = {
                                 navController.navigate(Screen.AddReviewBlock.route)
                             }
                         )
                         2 -> MyPageScreen(
+                            currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
                             onBack = { selectedTabIndex = 0 },
                             onNavigateToNotificationTimeSetting = {
                                 navController.navigate(Screen.NotificationTimeSetting.route)
@@ -454,7 +442,6 @@ fun LoorveNavHost(
                                     popUpTo(0) { inclusive = true }
                                 }
                             }
-                            // ✅ currentUid 파라미터 제거 — MyPageScreen 시그니처에 존재하지 않음
                         )
                     }
                 }
@@ -508,6 +495,7 @@ fun LoorveNavHost(
 
         composable(Screen.MyPage.route) {
             MyPageScreen(
+                currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
                 onBack = { navController.popBackStack() },
                 onNavigateToNotificationTimeSetting = {
                     navController.navigate(Screen.NotificationTimeSetting.route)
@@ -517,7 +505,6 @@ fun LoorveNavHost(
                         popUpTo(0) { inclusive = true }
                     }
                 }
-                // ✅ currentUid 파라미터 제거 — MyPageScreen 시그니처에 존재하지 않음
             )
         }
 
