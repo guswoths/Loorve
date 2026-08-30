@@ -458,11 +458,7 @@ fun LoorveNavHost(
                         )
 
                         2 -> {
-                            val currentUid = FirebaseAuth.getInstance().currentUser?.uid
-                                ?: return@Box
-
                             MyPageScreen(
-                                currentUid = currentUid,
                                 onBack = {
                                     selectedTabIndex = 0
                                 },
@@ -545,11 +541,7 @@ fun LoorveNavHost(
         }
 
         composable(Screen.MyPage.route) {
-            val currentUid = FirebaseAuth.getInstance().currentUser?.uid
-                ?: return@composable
-
             MyPageScreen(
-                currentUid = currentUid,
                 onBack = {
                     navController.popBackStack()
                 },
