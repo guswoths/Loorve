@@ -1,6 +1,8 @@
 // 경로: app/src/main/java/com/loorve/presentation/calendar/AddReviewBlockScreen.kt
 package com.loorve.presentation.calendar
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,9 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.rememberScrollState
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.verticalScroll
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -164,7 +164,6 @@ fun AddReviewBlockScreen(
 
                         when {
                             uid.isNullOrBlank() -> {
-                                // ✅ refreshUid()를 coroutineScope.launch 안으로 이동
                                 coroutineScope.launch {
                                     reviewCalendarViewModel.refreshUid()
                                     snackbarHostState.showSnackbar(
@@ -186,10 +185,11 @@ fun AddReviewBlockScreen(
                             }
 
                             else -> {
+                                val safeExamDateMillis = examDateMillis ?: return@Button
                                 reviewBlockViewModel.createReviewBlock(
                                     uid = uid,
                                     examName = examName.trim(),
-                                    examDateMillis = examDateMillis,
+                                    examDateMillis = safeExamDateMillis,
                                     cycleOption = selectedCycleOption
                                 )
                             }
