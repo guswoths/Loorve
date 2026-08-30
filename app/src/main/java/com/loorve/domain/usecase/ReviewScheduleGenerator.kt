@@ -6,44 +6,80 @@ import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
 
-/**
- * 진도 입력(studyDate) 기반 ReviewSchedule 객체 생성 UseCase.
- * ForgettingCurveScheduler를 사용하는 조합 레이어.
- */
 class ReviewScheduleGenerator @Inject constructor() {
 
-    companion object {
-        private val KST = ZoneId.of("Asia/Seoul")
-    }
+    private val zoneId = ZoneId.of("Asia/Seoul")
 
     /**
-     * @param originProgressId  원본 진도 ID
-     * @param studyDate         학습 완료일 (LocalDate)
-     * @param studyEndDate      학습 종료일 (null이면 기존 동작 유지, 최대 5회차 생성)
-     * @return ReviewSchedule 리스트 (studyEndDate 적용 시 5개 미만 가능)
+     * 에빙하우스 기본 복습 간격을 기준으로 복습 일정을 생성합니다.
+     *
+     * @param userId Firebase Authentication UID
+     * @param blockId 이 일정들이 속하는 복습 블록 ID
+     * @param title 복습할 시험/학습 항목 이름
+     * @param startDate 복습 시작 날짜
+     * @param examDate 시험일. 이 날짜를 넘는 일정은 생성하지 않습니다.
+     * @param cycleOption 0: 에빙하우스(1, 3, 7, 14, 30일), 1: 기본(1, 3, 7일)
      */
-    fun generate(
-        originProgressId: String,
-        studyDate: LocalDate,
-        studyEndDate: LocalDate? = null      // 추가
+    operator fun invoke(
+        userId: String,
+        blockId: String,
+        title: String,
+        startDate: LocalDate,
+        examDate: LocalDate,
+        cycleOption: Int
     ): List<ReviewSchedule> {
-        require(originProgressId.isNotBlank()) { "originProgressId는 비어 있을 수 없습니다." }
+        require(userId.isNotBlank()) {
+            "사용자 ID가 비어 있습니다."
+        }
+
+        require(blockId.isNotBlank()) {
+            "복습 블록 ID가 비어 있습니다."
+        }
+
+        require(title.isNotBlank()) {
+            "복습 제목이 비어 있습니다."
+        }
+
+        require(!examDate.isBefore(startDate)) {
+            "시험일은 복습 시작일보다 빠를 수 없습니다."
+        }
+
+        val reviewIntervals = when (cycleOption) {
+            1 -> listOf(1L, 3L, 7L)
+            else -> listOf(1L, 3L, 7L, 14L, 30L)
+        }
 
         val now = System.currentTimeMillis()
-        return ForgettingCurveScheduler.generateReviewDates(studyDate, studyEndDate)
+
+        return reviewIntervals
+            .map { interval ->
+                startDate.plusDays(interval)
+            }
+            .filter { reviewDate ->
+                !reviewDate.isAfter(examDate)
+            }
+            .distinct()
+            .sorted()
             .mapIndexed { index, reviewDate ->
-                val reviewDateMs = reviewDate
-                    .atStartOfDay(KST)
-                    .toInstant()
-                    .toEpochMilli()
                 ReviewSchedule(
-                    reviewScheduleId = UUID.randomUUID().toString(),
-                    originProgressId = originProgressId,
-                    reviewDate       = reviewDateMs,
-                    reviewRound      = index + 1,
-                    isCompleted      = false,
-                    createdAt        = now,
-                    updatedAt        = now
+                    scheduleId = UUID.randomUUID().toString(),
+                    blockId = blockId,
+                    userId = userId,
+                    title = title.trim(),
+                    reviewDate = reviewDate
+                        .atStartOfDay(zoneId)
+                        .toInstant()
+                        .toEpochMilli(),
+                    reviewDateText = reviewDate.toString(),
+                    reviewOrder = index + 1,
+                    scheduleType = if (cycleOption == 0) {
+                        "EBBINGHAUS"
+                    } else {
+                        "CUSTOM"
+                    },
+                    isCompleted = false,
+                    createdAt = now,
+                    updatedAt = now
                 )
             }
     }
