@@ -32,9 +32,9 @@ class CreateReviewBlockUseCase @Inject constructor(
             val zoneId = ZoneId.of("Asia/Seoul")
             val today = LocalDate.now(zoneId)
 
-            // ✅ FIX #1: DatePicker는 UTC 자정 기준 밀리초 반환 → UTC 기준 파싱
+            // DatePicker는 UTC 자정 기준 밀리초 반환 → KST 기준으로 파싱해야 날짜가 일치함
             val examDate = Instant.ofEpochMilli(request.examDateMillis)
-                .atZone(ZoneId.of("UTC"))
+                .atZone(zoneId)   // ZoneId.of("UTC") → zoneId (Asia/Seoul) 로 변경
                 .toLocalDate()
 
             require(!examDate.isBefore(today)) {
