@@ -469,8 +469,7 @@ fun LoorveNavHost(
                                     navController.navigate(Screen.Login.route) {
                                         popUpTo(0) { inclusive = true }
                                     }
-                                },
-                                currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                                }
                             )
                         }
                     }
@@ -549,8 +548,7 @@ fun LoorveNavHost(
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
                     }
-                },
-                currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                }
             )
         }
 
