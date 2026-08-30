@@ -441,12 +441,12 @@ fun LoorveNavHost(
                             }
                         )
                         1 -> ReviewCalendarScreen(
-                            onNavigateBack = null,
-                            isEmbedded = true,
-                            onNavigateToAddBlock = {
+                            onNavigateBack = { /* 탭 내 임베드이므로 뒤로가기 무동작 */ },
+                            onNavigateToAddReviewBlock = {
                                 navController.navigate(Screen.AddReviewBlock.route)
                             }
                         )
+
                         2 -> MyPageScreen(
                             onBack = { selectedTabIndex = 0 },
                             onNavigateToNotificationTimeSetting = {
@@ -482,12 +482,11 @@ fun LoorveNavHost(
         composable(Screen.Calendar.route) {
             ReviewCalendarScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToAddBlock = {
+                onNavigateToAddReviewBlock = {
                     navController.navigate(Screen.AddReviewBlock.route)
                 }
             )
         }
-
         composable(Screen.AddReviewBlock.route) {
             AddReviewBlockScreen(
                 onNavigateBack = { navController.popBackStack() },

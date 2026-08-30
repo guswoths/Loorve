@@ -1,4 +1,3 @@
-// app/src/main/java/com/loorve/domain/usecase/SaveProgressAndScheduleUseCase.kt
 package com.loorve.domain.usecase
 
 import android.util.Log
@@ -58,18 +57,20 @@ class SaveProgressAndScheduleUseCase @Inject constructor(
                     .toInstant()
                     .toEpochMilli()
 
+                // ✅ 수정: 실제 ReviewSchedule 필드명으로 통일
                 val schedule = ReviewSchedule(
-                    reviewScheduleId = UUID.randomUUID().toString(),
+                    scheduleId       = UUID.randomUUID().toString(),
+                    userId           = uid,
                     originProgressId = progress.progressId,
                     reviewDate       = reviewDateMs,
-                    reviewRound      = index + 1,
+                    reviewOrder      = index + 1,
                     isCompleted      = false,
                     createdAt        = now,
-                    updatedAt        = now,
-                    uid              = uid   // ✅ 핵심 수정: uid 필드 주입
+                    updatedAt        = now
                 )
 
-                val scheduleResult = reviewScheduleRepository.createReviewSchedule(uid, schedule)
+                // ✅ 수정: 인터페이스에 있는 메서드명으로 변경
+                val scheduleResult = reviewScheduleRepository.saveReviewSchedule(uid, schedule)
                 if (scheduleResult.isFailure) {
                     Log.w(TAG, "복습 일정 저장 실패 (round=${index + 1}): " +
                             "${scheduleResult.exceptionOrNull()?.message}")
@@ -77,14 +78,14 @@ class SaveProgressAndScheduleUseCase @Inject constructor(
                 }
 
                 val alarmResult = alarmScheduler.scheduleReviewAlarm(
-                    reviewScheduleId = schedule.reviewScheduleId,
+                    reviewScheduleId = schedule.scheduleId,
                     triggerAtMillis  = reviewDateMs
                 )
                 when (alarmResult) {
                     ReviewAlarmScheduler.ScheduleResult.FAILED ->
-                        Log.w(TAG, "알람 예약 실패 (FAILED): id=${schedule.reviewScheduleId}")
+                        Log.w(TAG, "알람 예약 실패 (FAILED): id=${schedule.scheduleId}")
                     ReviewAlarmScheduler.ScheduleResult.FALLBACK_INEXACT ->
-                        Log.w(TAG, "알람 비정확 폴백 (FALLBACK_INEXACT): id=${schedule.reviewScheduleId}")
+                        Log.w(TAG, "알람 비정확 폴백 (FALLBACK_INEXACT): id=${schedule.scheduleId}")
                     ReviewAlarmScheduler.ScheduleResult.EXACT ->
                         Unit
                 }

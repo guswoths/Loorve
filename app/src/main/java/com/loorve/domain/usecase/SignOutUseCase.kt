@@ -1,4 +1,3 @@
-// 경로: app/src/main/java/com/loorve/domain/usecase/SignOutUseCase.kt
 package com.loorve.domain.usecase
 
 import android.util.Log
@@ -20,25 +19,23 @@ class SignOutUseCase @Inject constructor(
         return try {
             val uid = firebaseAuth.currentUser?.uid
 
-            // 1. 등록된 알람 전체 취소 (uid 기반으로 일정 ID 조회 후 취소)
             if (uid != null) {
                 val now = System.currentTimeMillis()
+                // ✅ 수정: 추가된 인터페이스 메서드 사용
                 reviewScheduleRepository.getUpcomingIncompleteSchedules(uid, now)
                     .onSuccess { schedules ->
-                        reviewAlarmScheduler.cancelAll(schedules.map { it.reviewScheduleId })
+                        // ✅ 수정: scheduleId 필드명 통일
+                        reviewAlarmScheduler.cancelAll(schedules.map { it.scheduleId })
                         Log.d(TAG, "알람 ${schedules.size}건 취소 완료 (uid=$uid)")
                     }
                     .onFailure { e ->
-                        // ✅ 추가: 알람 취소 실패 시 로그 기록 (로그아웃은 계속 진행)
                         Log.w(TAG, "알람 취소 스케줄 조회 실패 (계속 진행): ${e.message}")
                     }
             }
 
-            // 2. 알림 시간 DataStore 초기화
             notificationTimePreferences.clearAll()
             Log.d(TAG, "NotificationTimePreferences clearAll 완료")
 
-            // 3. Firebase signOut (Google Credential revoke 포함)
             authRepository.signOut()
 
         } catch (e: Exception) {
