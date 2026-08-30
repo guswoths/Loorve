@@ -11,15 +11,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
@@ -41,18 +38,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.domain.model.ReviewSchedule
 import com.loorve.ui.component.BannerAdView
-import java.time.Instant
 import java.time.LocalDate
-import java.time.YearMonth
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -65,14 +57,11 @@ fun ReviewCalendarScreen(
 ) {
     val uiState by reviewCalendarViewModel.uiState.collectAsState()
 
-    /*
-     * 화면 진입 시 현재 월의 reviewSchedules를 읽습니다.
-     * AddReviewBlockScreen 성공 후 popBackStack()으로 이 화면에 돌아오면
-     * NavBackStackEntry가 다시 활성화되는 구조에서 재조회가 필요할 수 있습니다.
-     */
+    // 화면 진입 시 오늘 날짜로 자동 고정 및 데이터 로드
     LaunchedEffect(Unit) {
         reviewCalendarViewModel.refreshUid()
         reviewCalendarViewModel.loadCurrentMonth()
+        reviewCalendarViewModel.onDateSelected(LocalDate.now())
     }
 
     uiState.errorMessage?.let { message ->
@@ -131,29 +120,6 @@ fun ReviewCalendarScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            CalendarHeader(
-                yearMonth = uiState.displayYearMonth,
-                onPreviousMonth = {
-                    reviewCalendarViewModel.onMonthChanged(
-                        uiState.displayYearMonth.minusMonths(1)
-                    )
-                },
-                onNextMonth = {
-                    reviewCalendarViewModel.onMonthChanged(
-                        uiState.displayYearMonth.plusMonths(1)
-                    )
-                }
-            )
-
-            ReviewMonthCalendar(
-                yearMonth = uiState.displayYearMonth,
-                schedulesMap = uiState.schedulesMap,
-                selectedDate = uiState.selectedDate,
-                onDateSelected = reviewCalendarViewModel::onDateSelected
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
             if (uiState.isLoading) {
                 Box(
                     modifier = Modifier
@@ -180,163 +146,6 @@ fun ReviewCalendarScreen(
 }
 
 @Composable
-private fun CalendarHeader(
-    yearMonth: YearMonth,
-    onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit
-) {
-    val formatter = DateTimeFormatter.ofPattern(
-        "yyyy년 M월",
-        Locale.KOREAN
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onPreviousMonth) {
-            Icon(
-                imageVector = Icons.Default.ChevronLeft,
-                contentDescription = "이전 달"
-            )
-        }
-
-        Text(
-            text = yearMonth.format(formatter),
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Bold
-            )
-        )
-
-        IconButton(onClick = onNextMonth) {
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = "다음 달"
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReviewMonthCalendar(
-    yearMonth: YearMonth,
-    schedulesMap: Map<LocalDate, List<ReviewSchedule>>,
-    selectedDate: LocalDate?,
-    onDateSelected: (LocalDate) -> Unit
-) {
-    val firstDay = yearMonth.atDay(1)
-    val firstDayOffset = firstDay.dayOfWeek.value % 7
-    val daysInMonth = yearMonth.lengthOfMonth()
-    val totalCellCount = firstDayOffset + daysInMonth
-    val rowCount = (totalCellCount + 6) / 7
-
-    Column(
-        modifier = Modifier.padding(horizontal = 16.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("일", "월", "화", "수", "목", "금", "토").forEach { dayLabel ->
-                Text(
-                    text = dayLabel,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        repeat(rowCount) { rowIndex ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-            ) {
-                repeat(7) { columnIndex ->
-                    val cellIndex = rowIndex * 7 + columnIndex
-                    val dayOfMonth = cellIndex - firstDayOffset + 1
-
-                    if (dayOfMonth !in 1..daysInMonth) {
-                        Box(
-                            modifier = Modifier.weight(1f)
-                        )
-                    } else {
-                        val date = yearMonth.atDay(dayOfMonth)
-                        val schedules = schedulesMap[date].orEmpty()
-                        val isSelected = date == selectedDate
-
-                        CalendarDayCell(
-                            date = date,
-                            scheduleCount = schedules.size,
-                            hasIncompleteSchedule = schedules.any { !it.isCompleted },
-                            isSelected = isSelected,
-                            onClick = {
-                                onDateSelected(date)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CalendarDayCell(
-    date: LocalDate,
-    scheduleCount: Int,
-    hasIncompleteSchedule: Boolean,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val backgroundColor = when {
-        isSelected -> MaterialTheme.colorScheme.primaryContainer
-        scheduleCount > 0 -> MaterialTheme.colorScheme.secondaryContainer
-        else -> Color.Transparent
-    }
-
-    Box(
-        modifier = Modifier
-            .weight(1f)
-            .padding(2.dp)
-            .clip(MaterialTheme.shapes.small)
-            .background(backgroundColor)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-            )
-
-            if (scheduleCount > 0) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 3.dp)
-                        .size(6.dp)
-                        .clip(MaterialTheme.shapes.extraLarge)
-                        .background(
-                            if (hasIncompleteSchedule) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.outline
-                            }
-                        )
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun ReviewScheduleList(
     selectedDate: LocalDate?,
     schedules: List<ReviewSchedule>,
@@ -348,17 +157,12 @@ private fun ReviewScheduleList(
         Text(
             text = selectedDate?.format(
                 DateTimeFormatter.ofPattern("M월 d일 복습", Locale.KOREAN)
-            ) ?: "날짜를 선택해주세요",
+            ) ?: "날짜 정보 없음",
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             style = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold
             )
         )
-
-        if (selectedDate == null) {
-            EmptyScheduleMessage("캘린더에서 날짜를 선택하면 복습 일정을 볼 수 있습니다.")
-            return
-        }
 
         if (schedules.isEmpty()) {
             EmptyScheduleMessage("선택한 날짜에는 예정된 복습이 없습니다.")
