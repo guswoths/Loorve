@@ -40,33 +40,36 @@ class ReviewCalendarViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ReviewCalendarUiState())
     val uiState: StateFlow<ReviewCalendarUiState> = _uiState.asStateFlow()
 
-    // ✅ [원인2 수정] Auth UID를 ViewModel에서 StateFlow로 관리
-    // — 앱 백그라운드 복귀 시 토큰 만료 문제 방지
     private val _currentUid = MutableStateFlow<String?>(null)
     val currentUid: StateFlow<String?> = _currentUid.asStateFlow()
+
+    // ✅ [원인3 추가] uid 로딩 완료 여부를 UI에서 구독 가능하게 노출
+    private val _isUidReady = MutableStateFlow(false)
+    val isUidReady: StateFlow<Boolean> = _isUidReady.asStateFlow()
 
     private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     private var loadJob: Job? = null
 
     init {
-        // ViewModel 생성 시 즉시 토큰 검증 + uid 갱신
         refreshUid()
     }
 
     /**
-     * ✅ [원인2 수정] getIdToken(false)로 현재 토큰 유효성 확인 후 uid 갱신.
-     * — 토큰 만료 시 Firebase가 자동으로 갱신한 뒤 uid 반환.
-     * — AddReviewBlockScreen 버튼 클릭 전 호출하면 만료 토큰 문제 예방.
+     * ✅ [원인3 수정] getIdToken(true)로 강제 갱신하여 만료 토큰 문제 완전 해소.
+     * - false → 캐시 토큰 사용 (만료 가능성 있음)
+     * - true  → 항상 서버에서 새 토큰 발급 (느리지만 확실)
+     * 블록 생성 버튼 클릭 전 호출하면 PERMISSION_DENIED 예방.
      */
     fun refreshUid() {
         viewModelScope.launch {
+            _isUidReady.value = false
             val user = FirebaseAuth.getInstance().currentUser
             _currentUid.value = runCatching {
-                user?.getIdToken(false)?.await() // 토큰 유효성 검증 (만료 시 자동 갱신)
+                // ✅ forceRefresh=true 로 변경: 만료 토큰으로 인한 권한 거부 완전 차단
+                user?.getIdToken(true)?.await()
                 user?.uid
-            }.getOrElse {
-                null // 토큰 갱신 실패 시 null → UI에서 재로그인 유도
-            }
+            }.getOrElse { null }
+            _isUidReady.value = true
         }
     }
 
@@ -86,22 +89,18 @@ class ReviewCalendarViewModel @Inject constructor(
     }
 
     fun onCompleteSchedule(scheduleId: String) {
-        // ✅ [원인2 수정] uid를 _currentUid StateFlow에서 가져옴
         val uid = _currentUid.value ?: return
         viewModelScope.launch {
             val result = reviewScheduleRepository.completeReviewSchedule(uid, scheduleId)
             if (result.isFailure) {
                 _uiState.update {
-                    it.copy(
-                        errorMessage = result.exceptionOrNull()?.message ?: "복습 완료 처리에 실패했습니다."
-                    )
+                    it.copy(errorMessage = result.exceptionOrNull()?.message ?: "복습 완료 처리에 실패했습니다.")
                 }
             }
         }
     }
 
     fun toggleReviewCompletion(scheduleId: String, currentState: Boolean) {
-        // ✅ [원인2 수정] uid를 _currentUid StateFlow에서 가져옴
         val uid = _currentUid.value ?: return
         viewModelScope.launch {
             val result = updateReviewCompletionUseCase(
@@ -111,9 +110,7 @@ class ReviewCalendarViewModel @Inject constructor(
             )
             if (result.isFailure) {
                 _uiState.update {
-                    it.copy(
-                        errorMessage = result.exceptionOrNull()?.message ?: "복습 상태 변경에 실패했습니다."
-                    )
+                    it.copy(errorMessage = result.exceptionOrNull()?.message ?: "복습 상태 변경에 실패했습니다.")
                 }
             }
         }
@@ -127,23 +124,15 @@ class ReviewCalendarViewModel @Inject constructor(
         loadSchedulesForMonth(_uiState.value.displayYearMonth)
     }
 
-    /**
-     * 복습 블록 생성 후 popBackStack으로 복귀 시 호출.
-     * 현재 월 스케줄을 Firestore에서 강제 재로드.
-     */
     fun reloadCurrentMonth() {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         loadSchedulesForMonth(_uiState.value.displayYearMonth)
     }
 
     private fun loadSchedulesForMonth(yearMonth: YearMonth) {
-        // ✅ [원인2 수정] _currentUid StateFlow에서 uid 사용
         val uid = _currentUid.value ?: run {
             _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    errorMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요."
-                )
+                it.copy(isLoading = false, errorMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요.")
             }
             return
         }
@@ -157,10 +146,7 @@ class ReviewCalendarViewModel @Inject constructor(
                 .getReviewSchedulesByDateRange(uid, startDate, endDate)
                 .catch { exception ->
                     _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = exception.message ?: "일정을 불러오지 못했습니다."
-                        )
+                        it.copy(isLoading = false, errorMessage = exception.message ?: "일정을 불러오지 못했습니다.")
                     }
                 }
                 .collectLatest { schedules ->
@@ -170,11 +156,7 @@ class ReviewCalendarViewModel @Inject constructor(
                             .toLocalDate()
                     }
                     val selectedDate = _uiState.value.selectedDate
-                    val selectedDateSchedules = if (selectedDate != null) {
-                        schedulesMap[selectedDate] ?: emptyList()
-                    } else {
-                        emptyList()
-                    }
+                    val selectedDateSchedules = if (selectedDate != null) schedulesMap[selectedDate] ?: emptyList() else emptyList()
                     _uiState.update {
                         it.copy(
                             isLoading = false,

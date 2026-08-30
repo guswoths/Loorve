@@ -12,12 +12,26 @@ class ReviewBlockRepositoryImpl @Inject constructor(
 
     override suspend fun saveReviewBlock(reviewBlock: ReviewBlock): Result<Unit> {
         return runCatching {
+            // ✅ @DocumentId 필드가 직렬화에서 제외되는 문제 해결:
+            // ReviewBlock 객체 대신 명시적 HashMap으로 저장하여
+            // Firestore Rules의 hasAll(['blockId', 'uid', 'createdAt'])를 충족
+            val data = hashMapOf(
+                "blockId"     to reviewBlock.blockId,
+                "uid"         to reviewBlock.uid,
+                "date"        to reviewBlock.date,
+                "title"       to reviewBlock.title,
+                "description" to reviewBlock.description,
+                "isCompleted" to reviewBlock.isCompleted,
+                "createdAt"   to reviewBlock.createdAt,
+                "updatedAt"   to reviewBlock.updatedAt
+            )
+
             firestore
                 .collection("users")
                 .document(reviewBlock.uid)
                 .collection("reviewBlocks")
-                .document(reviewBlock.blockId)  // ✅ reviewBlockId → blockId 로 수정
-                .set(reviewBlock)
+                .document(reviewBlock.blockId)
+                .set(data)
                 .await()
         }
     }
