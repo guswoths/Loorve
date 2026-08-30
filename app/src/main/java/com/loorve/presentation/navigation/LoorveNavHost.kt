@@ -467,11 +467,10 @@ fun LoorveNavHost(
                                 },
                                 onSignOut = {
                                     navController.navigate(Screen.Login.route) {
-                                        popUpTo(0) {
-                                            inclusive = true
-                                        }
+                                        popUpTo(0) { inclusive = true }
                                     }
-                                }
+                                },
+                                currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
                             )
                         }
                     }
@@ -542,19 +541,16 @@ fun LoorveNavHost(
 
         composable(Screen.MyPage.route) {
             MyPageScreen(
-                onBack = {
-                    navController.popBackStack()
-                },
+                onBack = { navController.popBackStack() },
                 onNavigateToNotificationTimeSetting = {
                     navController.navigate(Screen.NotificationTimeSetting.route)
                 },
                 onSignOut = {
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(0) {
-                            inclusive = true
-                        }
+                        popUpTo(0) { inclusive = true }
                     }
-                }
+                },
+                currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
             )
         }
 
