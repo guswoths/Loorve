@@ -75,8 +75,11 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
 
                 val schedules = snapshot?.documents.orEmpty()
                     .mapNotNull { document ->
-                        document.toObject(ReviewSchedule::class.java)
+                        runCatching {
+                            document.toObject(ReviewSchedule::class.java)
+                        }.getOrNull()  // 개별 문서 파싱 실패 시 해당 항목만 제외, 앱 크래시 방지
                     }
+                    .filter { it.scheduleId.isNotBlank() }  // 빈 scheduleId 데이터 제외
 
                 trySend(schedules)
             }

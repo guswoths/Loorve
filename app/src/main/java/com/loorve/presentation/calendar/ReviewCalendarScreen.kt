@@ -57,10 +57,10 @@ fun ReviewCalendarScreen(
 ) {
     val uiState by reviewCalendarViewModel.uiState.collectAsState()
 
-    // 화면 진입 시 오늘 날짜로 자동 고정 및 데이터 로드
+    // refreshUid()가 suspend fun이므로 순차 실행 보장
     LaunchedEffect(Unit) {
-        reviewCalendarViewModel.refreshUid()
-        reviewCalendarViewModel.loadCurrentMonth()
+        reviewCalendarViewModel.refreshUid()          // ✅ suspend — 완료될 때까지 대기
+        reviewCalendarViewModel.loadCurrentMonth()    // ✅ uid 세팅 후 안전하게 호출
         reviewCalendarViewModel.onDateSelected(LocalDate.now())
     }
 

@@ -43,34 +43,29 @@ class ReviewCalendarViewModel @Inject constructor(
     private val _currentUid = MutableStateFlow<String?>(null)
     val currentUid: StateFlow<String?> = _currentUid.asStateFlow()
 
-    // ✅ [원인3 추가] uid 로딩 완료 여부를 UI에서 구독 가능하게 노출
     private val _isUidReady = MutableStateFlow(false)
     val isUidReady: StateFlow<Boolean> = _isUidReady.asStateFlow()
 
     private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     private var loadJob: Job? = null
 
-    init {
-        refreshUid()
-    }
+    // ✅ init 블록 제거 — Screen의 LaunchedEffect에서 suspend refreshUid() 호출로 통일
 
     /**
-     * ✅ [원인3 수정] getIdToken(true)로 강제 갱신하여 만료 토큰 문제 완전 해소.
-     * - false → 캐시 토큰 사용 (만료 가능성 있음)
-     * - true  → 항상 서버에서 새 토큰 발급 (느리지만 확실)
-     * 블록 생성 버튼 클릭 전 호출하면 PERMISSION_DENIED 예방.
+     * suspend fun으로 변경하여 호출부(LaunchedEffect)에서 완료를 기다릴 수 있도록 함.
+     * 토큰 갱신 실패 시 캐시 uid 폴백으로 네트워크 오류와 로그인 오류를 구분.
      */
-    fun refreshUid() {
-        viewModelScope.launch {
-            _isUidReady.value = false
-            val user = FirebaseAuth.getInstance().currentUser
-            _currentUid.value = runCatching {
-                // ✅ forceRefresh=true 로 변경: 만료 토큰으로 인한 권한 거부 완전 차단
-                user?.getIdToken(true)?.await()
-                user?.uid
-            }.getOrElse { null }
-            _isUidReady.value = true
+    suspend fun refreshUid() {
+        _isUidReady.value = false
+        val user = FirebaseAuth.getInstance().currentUser
+        _currentUid.value = runCatching {
+            user?.getIdToken(true)?.await()
+            user?.uid
+        }.getOrElse {
+            // 네트워크 오류 등 토큰 갱신 실패 시 캐시 uid 사용 (로그인 자체는 유효)
+            user?.uid
         }
+        _isUidReady.value = (_currentUid.value != null)
     }
 
     fun onMonthChanged(yearMonth: YearMonth) {
@@ -130,10 +125,10 @@ class ReviewCalendarViewModel @Inject constructor(
     }
 
     private fun loadSchedulesForMonth(yearMonth: YearMonth) {
-        val uid = _currentUid.value ?: run {
-            _uiState.update {
-                it.copy(isLoading = false, errorMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요.")
-            }
+        val uid = _currentUid.value
+        if (uid.isNullOrBlank()) {
+            // uid 미준비 상태 — 로딩 유지, 에러 미표시 (Screen에서 순차 호출로 정상 처리)
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             return
         }
 
