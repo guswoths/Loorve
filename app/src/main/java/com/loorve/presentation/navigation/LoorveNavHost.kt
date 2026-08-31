@@ -83,6 +83,7 @@ import com.loorve.ui.theme.OnSurfaceVariant
 import com.loorve.ui.theme.Primary
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
+import com.loorve.presentation.reviewblock.ReviewBlockDetailScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -101,7 +102,10 @@ sealed class Screen(val route: String) {
     object MyPage : Screen("my_page")
     object BatteryOptimizationGuide : Screen("battery_optimization_guide")
     object NotificationPermission : Screen("notification_permission")
-}
+
+    object ReviewBlockDetail : Screen("reviewBlockDetail/{blockId}") {
+        fun createRoute(blockId: String): String = "reviewBlockDetail/$blockId"
+    }
 
 private data class BottomNavItem(
     val label: String,
@@ -444,9 +448,10 @@ fun LoorveNavHost(
                                 navController.navigate(Screen.ExamSetting.route)
                             },
                             onNavigateToProgressDetail = { progressId ->
-                                navController.navigate(
-                                    Screen.ProgressDetail.createRoute(progressId)
-                                )
+                                navController.navigate(Screen.ProgressDetail.createRoute(progressId))
+                            },
+                            onNavigateToReviewBlockDetail = { blockId ->   // ✅ 추가
+                                navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId))
                             }
                         )
 
@@ -549,6 +554,22 @@ fun LoorveNavHost(
                         popUpTo(0) { inclusive = true }
                     }
                 }
+            )
+        }
+
+        composable(
+            route = Screen.ReviewBlockDetail.route,
+            arguments = listOf(
+                navArgument("blockId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val blockId = backStackEntry.arguments?.getString("blockId")
+                ?: return@composable
+
+            ReviewBlockDetailScreen(
+                blockId = blockId,
+                block = null,     // TODO: HomeViewModel 또는 별도 ViewModel에서 block 조회 후 전달
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
