@@ -1,14 +1,5 @@
 package com.loorve.domain.model
 
-/**
- * 특정 날짜에 표시할 복습 블록입니다.
- * Firestore 역직렬화를 위해 모든 필드에 기본값을 지정합니다.
- *
- * ⚠️ @DocumentId 제거:
- * 하위 컬렉션(users/{uid}/reviewBlocks/)에서 toObjects() 역직렬화 시
- * "blockId was found from document" 충돌이 발생하므로 제거.
- * blockId는 Repository에서 snapshot.id로 수동 할당합니다.
- */
 data class ReviewBlock(
     val blockId: String = "",
     val uid: String = "",
@@ -16,6 +7,12 @@ data class ReviewBlock(
     val title: String = "",
     val description: String = "",
     val isCompleted: Boolean = false,
+    // ── 신규 추가 필드 ──
+    val examDate: Long = 0L,          // 시험일 epoch ms
+    val prepStartDate: Long = 0L,     // 준비 시작일 epoch ms (= 블록 생성일 기본값)
+    val dailyCap: Int = 5,            // 하루 최대 복습 노출 수
+    val examName: String = "",        // 시험명 (기존 title 이중화 방지용)
+    // ──────────────────
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 )
