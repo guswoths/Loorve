@@ -154,7 +154,7 @@ fun ReviewScheduleList(
                     onComplete = onComplete
                 )
             }
-            item { Divider(modifier = Modifier.padding(vertical = 8.dp)) }
+            item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
         }
 
         // 일반 예정 일정
