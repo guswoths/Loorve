@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material3.*
@@ -26,9 +27,12 @@ import com.loorve.domain.model.StudyRecord
 import com.loorve.ui.component.LoorveCard
 import com.loorve.ui.theme.*
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.*
 
-// ── 메인 화면 (NEW) ──────────────────────────────────────────
+// ── 메인 화면 ──────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewBlockDetailScreen(
@@ -127,12 +131,15 @@ fun ReviewBlockDetailScreen(
             // ── 학습 진도 입력 섹션 ──
             item {
                 StudyProgressInputSection(
-                    onSave = { content ->
+                    // ✅ 시그니처 변경: (date, title, content)
+                    onSave = { learningDateMillis, title, content ->
                         viewModel.saveProgress(
                             uid = uid,
                             blockId = blockId,
-                            examId = blockId,   // examId = blockId로 단순화 (필요 시 분리)
+                            examId = blockId,
+                            title = title,
                             content = content,
+                            learningDateMillis = learningDateMillis,
                             examDateMillis = examDateMillis,
                             prepStartDateMillis = prepStartDateMillis,
                             dailyCap = dailyCap
@@ -181,27 +188,134 @@ fun RecommendedCompletionCard(
     }
 }
 
-// ── 진도 입력 섹션 ─────────────────────────────────────────────
+// ── 진도 입력 섹션 (개선) ──────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StudyProgressInputSection(onSave: (String) -> Unit, isLoading: Boolean, modifier: Modifier = Modifier) {
-    var inputText by remember { mutableStateOf("") }
+fun StudyProgressInputSection(
+    // ✅ 시그니처 변경: date(Long), title(String), content(String)
+    onSave: (learningDateMillis: Long, title: String, content: String) -> Unit,
+    isLoading: Boolean,
+    modifier: Modifier = Modifier
+) {
+    // ── 상태 ──
+    var titleText by remember { mutableStateOf("") }
+    var contentText by remember { mutableStateOf("") }
+
+    // 날짜: KST 오늘 자정 epoch ms 기본값
+    val kstZone = remember { ZoneId.of("Asia/Seoul") }
+    val todayMillis = remember {
+        LocalDate.now(kstZone).atStartOfDay(kstZone).toInstant().toEpochMilli()
+    }
+    var selectedDateMillis by remember { mutableLongStateOf(todayMillis) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val displayDateText = remember(selectedDateMillis) {
+        SimpleDateFormat("yyyy년 MM월 dd일 (E)", Locale.KOREA)
+            .format(Date(selectedDateMillis))
+    }
+
+    // 저장 버튼 활성화: 제목 OR 내용 중 하나라도 입력
+    val canSave = (titleText.isNotBlank() || contentText.isNotBlank()) && !isLoading
+
+    // ── DatePickerDialog ──
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDateMillis
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { utcMs ->
+                        // UTC 자정(ms) → KST 자정(ms) 변환
+                        val localDate = Instant.ofEpochMilli(utcMs)
+                            .atZone(ZoneId.of("UTC")).toLocalDate()
+                        selectedDateMillis = localDate.atStartOfDay(kstZone)
+                            .toInstant().toEpochMilli()
+                    }
+                    showDatePicker = false
+                }) { Text("확인") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("취소") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // ── UI ──
     Column(modifier = modifier.padding(16.dp)) {
-        Text(text = "오늘 학습 진도", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "오늘 학습 진도",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // ① 날짜 선택 버튼
+        OutlinedButton(
+            onClick = { showDatePicker = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = "학습 날짜 선택: $displayDateText" },
+            enabled = !isLoading
+        ) {
+            Icon(
+                imageVector = Icons.Default.CalendarMonth,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text = displayDateText, style = MaterialTheme.typography.bodyMedium)
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // ② 제목 입력
         OutlinedTextField(
-            value = inputText,
-            onValueChange = { inputText = it },
-            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "오늘 학습한 진도를 입력하세요" },
-            placeholder = { Text("예: 1장~3장, 수학 미분 단원") },
+            value = titleText,
+            onValueChange = { titleText = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = "학습 제목 입력" },
+            label = { Text("학습 제목") },
+            placeholder = { Text("예: 수학 미분 1단원") },
+            singleLine = true,
+            enabled = !isLoading
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // ③ 내용 입력 (기존 유지, label/placeholder만 명확화)
+        OutlinedTextField(
+            value = contentText,
+            onValueChange = { contentText = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = "학습 내용 입력" },
             label = { Text("학습 내용") },
+            placeholder = { Text("예: 미분의 정의, 극한 개념 복습 완료") },
             maxLines = 4,
             enabled = !isLoading
         )
+
         Spacer(modifier = Modifier.height(12.dp))
+
+        // ④ 저장 버튼
         Button(
-            onClick = { if (inputText.isNotBlank()) { onSave(inputText.trim()); inputText = "" } },
-            modifier = Modifier.align(Alignment.End).semantics { contentDescription = "학습 진도 저장 버튼" },
-            enabled = inputText.isNotBlank() && !isLoading
+            onClick = {
+                if (canSave) {
+                    onSave(selectedDateMillis, titleText.trim(), contentText.trim())
+                    titleText = ""
+                    contentText = ""
+                    // 날짜는 저장 후에도 선택값 유지 (UX 편의)
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.End)
+                .semantics { contentDescription = "학습 진도 저장 버튼" },
+            enabled = canSave
         ) {
             if (isLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             else Text("저장하고 복습 일정 생성")
@@ -258,9 +372,7 @@ fun ReviewScheduleItemCard(
         else -> Triple(MaterialTheme.colorScheme.surface, "", "예정된 복습 항목")
     }
 
-    // ✅ isAtRisk: completionRate < 0.6인 항목 (StudyRecord 참조 필요 시 ViewModel에서 계산)
-    // 여기서는 item에 직접 노출할 수 없어 title/content 기준으로 표기 — 필요 시 item에 isAtRisk 필드 추가 요망
-    val isCompressed = item.compressedReview   // ✅ [압축 복습] 뱃지용
+    val isCompressed = item.compressedReview
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
@@ -270,7 +382,6 @@ fun ReviewScheduleItemCard(
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = dateText, style = MaterialTheme.typography.labelSmall)
-                // ✅ [압축 복습] 뱃지
                 if (isCompressed) {
                     Surface(
                         color = Color(0xFF1565C0).copy(alpha = 0.12f),
@@ -297,7 +408,6 @@ fun ReviewScheduleItemCard(
                 }
             }
 
-            // ✅ PENDING 포함 모든 미완료 항목에 버튼 표시
             if (item.status != ReviewStatus.COMPLETED) {
                 Column {
                     TextButton(

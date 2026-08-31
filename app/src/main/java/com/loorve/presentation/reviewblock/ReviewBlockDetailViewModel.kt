@@ -55,7 +55,6 @@ class ReviewBlockDetailViewModel @Inject constructor(
             val overdueResult = ReviewScheduler.handleOverdue(today, allSchedules)
             val updatedSchedules = overdueResult.updatedItems
 
-            // 변경된 OVERDUE 항목을 Firestore에 반영
             overdueResult.overdueQueue.forEach { item ->
                 scheduleRepository.updateScheduleItem(uid, item)
             }
@@ -73,7 +72,9 @@ class ReviewBlockDetailViewModel @Inject constructor(
         uid: String,
         blockId: String,
         examId: String,
+        title: String,                  // ✅ 추가
         content: String,
+        learningDateMillis: Long,       // ✅ 추가 (UI에서 선택한 날짜)
         examDateMillis: Long,
         prepStartDateMillis: Long,
         dailyCap: Int = 5
@@ -87,8 +88,9 @@ class ReviewBlockDetailViewModel @Inject constructor(
                     uid = uid,
                     blockId = blockId,
                     examId = examId,
+                    title = title,                      // ✅ 전달
                     content = content,
-                    learningDateMillis = System.currentTimeMillis(),
+                    learningDateMillis = learningDateMillis,  // ✅ UI 선택값 사용
                     examDateMillis = examDateMillis,
                     prepStartDateMillis = prepStartDateMillis,
                     dailyCap = dailyCap
@@ -122,7 +124,6 @@ class ReviewBlockDetailViewModel @Inject constructor(
 
             scheduleRepository.updateScheduleItem(uid, completeResult.updatedItem)
 
-            // 다음 일정이 있으면 새 PENDING 아이템 추가
             completeResult.nextReviewDate?.let { nextDate ->
                 val nextItem = item.copy(
                     id = "${item.studyRecordId}_r${item.reviewOrder + 1}",

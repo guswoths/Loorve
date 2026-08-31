@@ -5,7 +5,6 @@ import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.domain.review.ReviewScheduler
 import com.loorve.domain.review.toLocalDate
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -15,6 +14,7 @@ data class SaveStudyProgressRequest(
     val uid: String,
     val blockId: String,
     val examId: String,
+    val title: String = "",          // ✅ 추가: 사용자 입력 제목
     val content: String,
     val learningDateMillis: Long,
     val examDateMillis: Long,
@@ -37,12 +37,14 @@ class SaveStudyProgressUseCase @Inject constructor(
             }
 
             val studyRecordId = UUID.randomUUID().toString()
-            val titlePreview = request.content.take(20)
+            // ✅ 사용자 입력 title 우선, 없으면 content 앞 20자 폴백
+            val resolvedTitle = request.title.trim().ifBlank { request.content.take(20) }
+
             val scheduleResult = ReviewScheduler.generateSchedule(
                 learningDate = learningDate,
                 examDate = examDate,
                 studyRecordId = studyRecordId,
-                title = titlePreview,
+                title = resolvedTitle,
                 blockId = request.blockId,
                 uid = request.uid,
                 prepStartDate = prepStart
@@ -53,7 +55,7 @@ class SaveStudyProgressUseCase @Inject constructor(
                 uid = request.uid,
                 blockId = request.blockId,
                 examId = request.examId,
-                title = titlePreview,
+                title = resolvedTitle,          // ✅ resolvedTitle 사용
                 content = request.content,
                 learningDate = request.learningDateMillis,
                 examDate = request.examDateMillis,
