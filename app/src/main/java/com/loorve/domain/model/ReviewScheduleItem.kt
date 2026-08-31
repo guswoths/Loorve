@@ -17,8 +17,8 @@ data class ReviewScheduleItem(
     val previousGapDays: Long = 1L,
     val overdueDays: Long = 0L,
     val compressedReview: Boolean = false,
-    val completionResult: CompletionResult? = null,
-    val completedAt: Long? = null,
     val createdAt: Long = 0L,
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    val completionResult: CompletionResult? = null,
+    val completedAt: Long? = null
 )

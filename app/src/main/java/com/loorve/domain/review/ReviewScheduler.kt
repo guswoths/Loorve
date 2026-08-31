@@ -119,6 +119,7 @@ object ReviewScheduler {
                 } else {
                     ChronoUnit.DAYS.between(scheduleDates[index - 1], date)
                 }.coerceAtLeast(1L),
+                overdueDays = 0L,       // ← 추가
                 compressedReview = if (isLast) compressedReview else false,
                 createdAt = nowMillis,
                 updatedAt = nowMillis
@@ -341,13 +342,13 @@ object ReviewScheduler {
     // ──────────────────────────────────────────────────────
     // B-12~13. 완료율 계산 및 AT_RISK 판정
     // ──────────────────────────────────────────────────────
-    fun completionRate(completedCount: Int, plannedCount: Int): Double {
-        if (plannedCount <= 0) return 0.0
-        return completedCount.toDouble() / plannedCount.toDouble()
+    fun completionRate(totalCount: Int, completedCount: Int): Double {
+        if (totalCount <= 0) return 0.0
+        return completedCount.toDouble() / totalCount.toDouble()
     }
 
-    fun isAtRisk(completedCount: Int, plannedCount: Int): Boolean =
-        completionRate(completedCount, plannedCount) < 0.6
+    fun isAtRisk(daysUntilExam: Int, overdueCount: Int): Boolean =
+        overdueCount > 0 && daysUntilExam < overdueCount
 
     // ──────────────────────────────────────────────────────
     // 내부 유틸
