@@ -31,8 +31,11 @@ data class ReviewCalendarUiState(
     val selectedDateSchedules: List<ReviewSchedule> = emptyList(),
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val reviewBlocks: List<ReviewBlock> = emptyList(),        // 추가
-    val isBlocksLoading: Boolean = false                      // 추가
+    val reviewBlocks: List<ReviewBlock> = emptyList(),
+    val isBlocksLoading: Boolean = false,
+    val selectedBlock: ReviewBlock? = null,   // 클릭된 블록 (바텀시트용)
+    val showBlockDetail: Boolean = false,      // 바텀시트 표시 여부
+    val isDeleting: Boolean = false            // 삭제 진행 중 여부
 )
 
 @HiltViewModel
@@ -142,6 +145,40 @@ class ReviewCalendarViewModel @Inject constructor(
                         it.copy(
                             isBlocksLoading = false,
                             errorMessage = e.message ?: "복습 블록을 불러오지 못했습니다."
+                        )
+                    }
+                }
+        }
+    }
+
+    fun onBlockClicked(block: ReviewBlock) {
+        _uiState.update { it.copy(selectedBlock = block, showBlockDetail = true) }
+    }
+
+    fun onDismissBlockDetail() {
+        _uiState.update { it.copy(selectedBlock = null, showBlockDetail = false) }
+    }
+
+    fun deleteReviewBlock(blockId: String) {
+        val uid = _currentUid.value ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDeleting = true) }
+            reviewBlockRepository.deleteReviewBlock(uid, blockId)
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            isDeleting = false,
+                            showBlockDetail = false,
+                            selectedBlock = null
+                        )
+                    }
+                    loadReviewBlocks(uid)
+                }
+                .onFailure { e ->
+                    _uiState.update {
+                        it.copy(
+                            isDeleting = false,
+                            errorMessage = e.message ?: "삭제에 실패했습니다."
                         )
                     }
                 }
