@@ -17,6 +17,7 @@ data class StudyRecordDto(
     val stage: Int = 0,
     val successCount: Int = 0,
     val stability: Double = 1.0,
+    val completionRate: Double = 0.0,
     val plannedReviewCount: Int = 0,
     val completedReviewCount: Int = 0,
     val isAtRisk: Boolean = false,
@@ -24,12 +25,20 @@ data class StudyRecordDto(
     val updatedAt: Timestamp? = null
 ) {
     fun toDomain(): StudyRecord = StudyRecord(
-        id = id, uid = uid, blockId = blockId, examId = examId,
-        title = title, content = content,
-        learningDate = learningDate, examDate = examDate,
+        id = id,
+        uid = uid,
+        blockId = blockId,
+        examId = examId,
+        title = title,
+        content = content,
+        learningDate = learningDate,
+        examDate = examDate,
         prepStartDate = prepStartDate,
         recommendedCompletionDate = recommendedCompletionDate,
-        stage = stage, successCount = successCount, stability = stability,
+        stage = stage,
+        successCount = successCount,
+        stability = stability,
+        completionRate = completionRate,
         plannedReviewCount = plannedReviewCount,
         completedReviewCount = completedReviewCount,
         isAtRisk = isAtRisk,
@@ -39,14 +48,22 @@ data class StudyRecordDto(
 }
 
 fun StudyRecord.toDto(): StudyRecordDto = StudyRecordDto(
-    id = id, uid = uid, blockId = blockId, examId = examId,
-    title = title, content = content,
-    learningDate = learningDate, examDate = examDate,
+    id = id,
+    uid = uid,
+    blockId = blockId,
+    examId = examId,
+    title = title,
+    content = content,
+    learningDate = learningDate,
+    examDate = examDate,
     prepStartDate = prepStartDate,
     recommendedCompletionDate = recommendedCompletionDate,
-    stage = stage, successCount = successCount, stability = stability,
+    stage = stage,
+    successCount = successCount,
+    stability = stability,
+    completionRate = completionRate,
     plannedReviewCount = plannedReviewCount,
     completedReviewCount = completedReviewCount,
     isAtRisk = isAtRisk
-    // createdAt/updatedAt: Firestore에서 FieldValue.serverTimestamp() 사용
+    // createdAt/updatedAt: Firestore에서 FieldValue.serverTimestamp()
 )

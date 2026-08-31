@@ -45,11 +45,10 @@ class StudyRecordRepositoryImpl @Inject constructor(
             "stage" to dto.stage,
             "successCount" to dto.successCount,
             "stability" to dto.stability,
+            "completionRate" to dto.completionRate,
             "plannedReviewCount" to dto.plannedReviewCount,
             "completedReviewCount" to dto.completedReviewCount,
             "isAtRisk" to dto.isAtRisk,
-            "completionRate" to dto.completionRate,
-            // 서버 시간 우선 사용
             "createdAt" to if (record.id.isBlank()) FieldValue.serverTimestamp()
             else FieldValue.serverTimestamp(),
             "updatedAt" to FieldValue.serverTimestamp()
