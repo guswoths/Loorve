@@ -3,8 +3,10 @@ package com.loorve.presentation.reviewblock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loorve.domain.model.CompletionResult
+import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.StudyRecord
+import com.loorve.domain.repository.ReviewBlockRepository
 import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.domain.review.ReviewScheduler
@@ -27,25 +29,40 @@ data class ReviewBlockDetailUiState(
     val recommendedCompletionDate: Long? = null,
     val reviewOverloadWarning: Boolean = false,
     val errorMessage: String? = null,
-    val savedSuccess: Boolean = false
+    val savedSuccess: Boolean = false,
+    // ✅ [포인트 4] ReviewBlock 정보를 ViewModel이 직접 보유
+    val reviewBlock: ReviewBlock? = null
 )
 
 @HiltViewModel
 class ReviewBlockDetailViewModel @Inject constructor(
     private val saveStudyProgressUseCase: SaveStudyProgressUseCase,
     private val studyRecordRepository: StudyRecordRepository,
-    private val scheduleRepository: ReviewScheduleItemRepository
+    private val scheduleRepository: ReviewScheduleItemRepository,
+    // ✅ [포인트 4] ReviewBlockRepository 추가
+    private val reviewBlockRepository: ReviewBlockRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewBlockDetailUiState())
     val uiState: StateFlow<ReviewBlockDetailUiState> = _uiState.asStateFlow()
 
-    fun loadBlockData(uid: String, blockId: String) {
+    /**
+     * ✅ [포인트 4] externalBlock: NavHost에서 전달된 block 객체.
+     * null인 경우(현재 NavHost는 null 전달) Firestore에서 직접 조회.
+     */
+    fun loadBlockData(uid: String, blockId: String, externalBlock: ReviewBlock? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
 
+            // ✅ externalBlock이 null이면 Repository에서 직접 조회
+            val resolvedBlock = externalBlock
+                ?: reviewBlockRepository.getReviewBlocks(uid)
+                    .getOrDefault(emptyList())
+                    .firstOrNull { it.blockId == blockId }
+
             val records = studyRecordRepository.getStudyRecords(uid, blockId)
                 .getOrDefault(emptyList())
+
             val allSchedules = records.flatMap { record ->
                 scheduleRepository.getSchedulesByStudyRecord(uid, record.id)
                     .getOrDefault(emptyList())
@@ -61,6 +78,8 @@ class ReviewBlockDetailViewModel @Inject constructor(
 
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
+                // ✅ [포인트 4] 조회한 block을 UiState에 저장
+                reviewBlock = resolvedBlock,
                 studyRecords = records,
                 scheduleItems = updatedSchedules,
                 overdueItems = overdueResult.overdueQueue
@@ -72,14 +91,23 @@ class ReviewBlockDetailViewModel @Inject constructor(
         uid: String,
         blockId: String,
         examId: String,
-        title: String,                  // ✅ 추가
+        title: String,
         content: String,
-        learningDateMillis: Long,       // ✅ 추가 (UI에서 선택한 날짜)
+        learningDateMillis: Long,
         examDateMillis: Long,
         prepStartDateMillis: Long,
         dailyCap: Int = 5
     ) {
         if (_uiState.value.isLoading) return
+
+        // ✅ [포인트 4] examDateMillis=0이면 저장 불가 — 이중 안전장치
+        if (examDateMillis == 0L) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "블록 정보가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요."
+            )
+            return
+        }
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
@@ -88,9 +116,9 @@ class ReviewBlockDetailViewModel @Inject constructor(
                     uid = uid,
                     blockId = blockId,
                     examId = examId,
-                    title = title,                      // ✅ 전달
+                    title = title,
                     content = content,
-                    learningDateMillis = learningDateMillis,  // ✅ UI 선택값 사용
+                    learningDateMillis = learningDateMillis,
                     examDateMillis = examDateMillis,
                     prepStartDateMillis = prepStartDateMillis,
                     dailyCap = dailyCap
@@ -128,9 +156,11 @@ class ReviewBlockDetailViewModel @Inject constructor(
                 val nextItem = item.copy(
                     id = "${item.studyRecordId}_r${item.reviewOrder + 1}",
                     reviewDate = nextDate.atStartOfDay(
-                        java.time.ZoneId.of("Asia/Seoul")).toInstant().toEpochMilli(),
+                        java.time.ZoneId.of("Asia/Seoul")
+                    ).toInstant().toEpochMilli(),
                     originalReviewDate = nextDate.atStartOfDay(
-                        java.time.ZoneId.of("Asia/Seoul")).toInstant().toEpochMilli(),
+                        java.time.ZoneId.of("Asia/Seoul")
+                    ).toInstant().toEpochMilli(),
                     reviewOrder = item.reviewOrder + 1,
                     status = com.loorve.domain.model.ReviewStatus.PENDING,
                     previousGapDays = completeResult.nextGapDays,

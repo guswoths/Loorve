@@ -37,42 +37,63 @@ import java.util.*
 @Composable
 fun ReviewBlockDetailScreen(
     blockId: String,
-    block: ReviewBlock?,                    // NavHost에서 전달 (null이면 로컬 로드)
+    block: ReviewBlock?,                    // NavHost에서 전달 (null이면 ViewModel이 자체 로드)
     onNavigateBack: () -> Unit,
     viewModel: ReviewBlockDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
+    // ✅ [포인트 3] SnackbarHostState 추가
+    val snackbarHostState = remember { SnackbarHostState() }
+
     LaunchedEffect(blockId) {
-        viewModel.loadBlockData(uid, blockId)
+        // ✅ [포인트 4] NavHost에서 block=null로 전달될 때를 대비해 ViewModel에서 로드
+        viewModel.loadBlockData(uid, blockId, externalBlock = block)
     }
 
+    // ✅ [포인트 3] savedSuccess 감지 → Snackbar 표시 후 리셋
     LaunchedEffect(uiState.savedSuccess) {
-        if (uiState.savedSuccess) viewModel.resetSavedSuccess()
+        if (uiState.savedSuccess) {
+            snackbarHostState.showSnackbar("복습 일정이 생성되었습니다.")
+            viewModel.resetSavedSuccess()
+        }
     }
 
-    val examDateMillis = block?.examDate ?: 0L
-    val prepStartDateMillis = block?.prepStartDate ?: 0L
-    val dailyCap = block?.dailyCap ?: 5
-    val examName = block?.examName?.ifBlank { block.title } ?: blockId
+    // ✅ [포인트 4] block 데이터를 uiState.reviewBlock에서 읽음 (null-safe)
+    val resolvedBlock = uiState.reviewBlock
+    val examDateMillis = resolvedBlock?.examDate ?: 0L
+    val prepStartDateMillis = resolvedBlock?.prepStartDate ?: 0L
+    val dailyCap = resolvedBlock?.dailyCap ?: 5
+    val examName = resolvedBlock?.examName?.ifBlank { resolvedBlock.title }
+        ?: resolvedBlock?.title
+        ?: blockId
 
     // D-Day 계산
     val dDayText = if (examDateMillis > 0L) {
-        val examLocal = java.time.Instant.ofEpochMilli(examDateMillis)
-            .atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate()
-        val days = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), examLocal).toInt()
+        val examLocal = Instant.ofEpochMilli(examDateMillis)
+            .atZone(ZoneId.of("Asia/Seoul")).toLocalDate()
+        val days = java.time.temporal.ChronoUnit.DAYS
+            .between(LocalDate.now(), examLocal).toInt()
         when {
-            days > 0 -> "D-$days"
+            days > 0  -> "D-$days"
             days == 0 -> "D-Day"
-            else -> "D+${-days}"
+            else      -> "D+${-days}"
         }
     } else "D-?"
 
     Scaffold(
+        // ✅ [포인트 3] SnackbarHost 연결
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(examName, style = LoorveTypography.titleMedium, fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        examName,
+                        style = LoorveTypography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Outlined.ArrowBack, contentDescription = "뒤로")
@@ -92,18 +113,34 @@ fun ReviewBlockDetailScreen(
         ) {
             // ── 블록 요약 정보 ──
             item {
-                LoorveCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                LoorveCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(text = examName, style = LoorveTypography.titleSmall, fontWeight = FontWeight.Bold, color = OnBackground)
+                            Text(
+                                text = examName,
+                                style = LoorveTypography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = OnBackground
+                            )
                             Spacer(Modifier.height(4.dp))
-                            Text(text = "하루 최대 $dailyCap 회 복습", style = LoorveTypography.labelSmall, color = OnSurfaceVariant)
+                            Text(
+                                text = "하루 최대 $dailyCap 회 복습",
+                                style = LoorveTypography.labelSmall,
+                                color = OnSurfaceVariant
+                            )
                         }
-                        Surface(color = Primary.copy(alpha = 0.12f), shape = MaterialTheme.shapes.small) {
+                        Surface(
+                            color = Primary.copy(alpha = 0.12f),
+                            shape = MaterialTheme.shapes.small
+                        ) {
                             Text(
                                 text = dDayText,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -128,15 +165,27 @@ fun ReviewBlockDetailScreen(
                 }
             }
 
+            // ✅ [포인트 4] examDateMillis=0이면 저장 불가 → 사용자에게 안내 메시지
+            if (examDateMillis == 0L) {
+                item {
+                    Text(
+                        text = "⚠️ 블록 정보를 불러오는 중입니다...",
+                        style = LoorveTypography.bodySmall,
+                        color = OnSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
             // ── 학습 진도 입력 섹션 ──
             item {
                 StudyProgressInputSection(
-                    // ✅ 시그니처 변경: (date, title, content)
                     onSave = { learningDateMillis, title, content ->
                         viewModel.saveProgress(
                             uid = uid,
                             blockId = blockId,
-                            examId = blockId,
+                            // ✅ [포인트 4] examId를 blockId 대신 실제 examId로 전달
+                            examId = resolvedBlock?.blockId ?: blockId,
                             title = title,
                             content = content,
                             learningDateMillis = learningDateMillis,
@@ -145,7 +194,9 @@ fun ReviewBlockDetailScreen(
                             dailyCap = dailyCap
                         )
                     },
-                    isLoading = uiState.isLoading
+                    isLoading = uiState.isLoading,
+                    // ✅ [포인트 3] examDate 미로드 상태에서는 저장 버튼 비활성화
+                    isSaveEnabled = examDateMillis > 0L
                 )
             }
 
@@ -175,33 +226,53 @@ fun RecommendedCompletionCard(
     val dateText = remember(recommendedDateMillis) { sdf.format(Date(recommendedDateMillis)) }
 
     Card(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-            .semantics { contentDescription = "시험 ${deadlineBufferDays}일 전까지 1회독 완료를 권장합니다. 권장 완료일: $dateText" },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .semantics {
+                contentDescription =
+                    "시험 ${deadlineBufferDays}일 전까지 1회독 완료를 권장합니다. 권장 완료일: $dateText"
+            },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "📚 1회독 완료 권장일", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(
+                text = "📚 1회독 완료 권장일",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(text = "시험 ${deadlineBufferDays}일 전까지 1회독 완료를 권장합니다.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            Text(text = "권장 완료일: $dateText", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(
+                text = "시험 ${deadlineBufferDays}일 전까지 1회독 완료를 권장합니다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Text(
+                text = "권장 완료일: $dateText",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         }
     }
 }
 
-// ── 진도 입력 섹션 (개선) ──────────────────────────────────────
+// ── 진도 입력 섹션 ──────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudyProgressInputSection(
-    // ✅ 시그니처 변경: date(Long), title(String), content(String)
     onSave: (learningDateMillis: Long, title: String, content: String) -> Unit,
     isLoading: Boolean,
+    // ✅ [포인트 3] examDate 미로드 시 버튼 비활성화용 파라미터 추가
+    isSaveEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    // ── 상태 ──
     var titleText by remember { mutableStateOf("") }
     var contentText by remember { mutableStateOf("") }
 
-    // 날짜: KST 오늘 자정 epoch ms 기본값
     val kstZone = remember { ZoneId.of("Asia/Seoul") }
     val todayMillis = remember {
         LocalDate.now(kstZone).atStartOfDay(kstZone).toInstant().toEpochMilli()
@@ -210,12 +281,11 @@ fun StudyProgressInputSection(
     var showDatePicker by remember { mutableStateOf(false) }
 
     val displayDateText = remember(selectedDateMillis) {
-        SimpleDateFormat("yyyy년 MM월 dd일 (E)", Locale.KOREA)
-            .format(Date(selectedDateMillis))
+        SimpleDateFormat("yyyy년 MM월 dd일 (E)", Locale.KOREA).format(Date(selectedDateMillis))
     }
 
-    // 저장 버튼 활성화: 제목 OR 내용 중 하나라도 입력
-    val canSave = (titleText.isNotBlank() || contentText.isNotBlank()) && !isLoading
+    // ✅ [포인트 3] canSave: 제목 OR 내용 중 하나 입력 + 로딩 중 아님 + examDate 로드 완료
+    val canSave = (titleText.isNotBlank() || contentText.isNotBlank()) && !isLoading && isSaveEnabled
 
     // ── DatePickerDialog ──
     if (showDatePicker) {
@@ -227,11 +297,13 @@ fun StudyProgressInputSection(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { utcMs ->
-                        // UTC 자정(ms) → KST 자정(ms) 변환
+                        // UTC 자정(ms) → KST 자정(ms) 변환 (정상 유지)
                         val localDate = Instant.ofEpochMilli(utcMs)
                             .atZone(ZoneId.of("UTC")).toLocalDate()
-                        selectedDateMillis = localDate.atStartOfDay(kstZone)
-                            .toInstant().toEpochMilli()
+                        selectedDateMillis = localDate
+                            .atStartOfDay(kstZone)
+                            .toInstant()
+                            .toEpochMilli()
                     }
                     showDatePicker = false
                 }) { Text("확인") }
@@ -279,7 +351,8 @@ fun StudyProgressInputSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics { contentDescription = "학습 제목 입력" },
-            label = { Text("학습 제목") },
+            // ✅ [포인트 3] 라벨에 필수 조건 힌트 추가
+            label = { Text("학습 제목 (제목 또는 내용 중 하나 필수)") },
             placeholder = { Text("예: 수학 미분 1단원") },
             singleLine = true,
             enabled = !isLoading
@@ -287,7 +360,7 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // ③ 내용 입력 (기존 유지, label/placeholder만 명확화)
+        // ③ 내용 입력
         OutlinedTextField(
             value = contentText,
             onValueChange = { contentText = it },
@@ -307,9 +380,9 @@ fun StudyProgressInputSection(
             onClick = {
                 if (canSave) {
                     onSave(selectedDateMillis, titleText.trim(), contentText.trim())
+                    // ✅ [포인트 3] 저장 후 입력 필드 초기화 (날짜는 편의상 유지)
                     titleText = ""
                     contentText = ""
-                    // 날짜는 저장 후에도 선택값 유지 (UX 편의)
                 }
             },
             modifier = Modifier
@@ -317,8 +390,14 @@ fun StudyProgressInputSection(
                 .semantics { contentDescription = "학습 진도 저장 버튼" },
             enabled = canSave
         ) {
-            if (isLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-            else Text("저장하고 복습 일정 생성")
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text("저장하고 복습 일정 생성")
+            }
         }
     }
 }
@@ -345,7 +424,11 @@ fun ReviewScheduleList(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
             overdueItems.forEach { item ->
-                ReviewScheduleItemCard(item = item, dateText = sdf.format(Date(item.reviewDate)), onComplete = onComplete)
+                ReviewScheduleItemCard(
+                    item = item,
+                    dateText = sdf.format(Date(item.reviewDate)),
+                    onComplete = onComplete
+                )
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         }
@@ -354,7 +437,11 @@ fun ReviewScheduleList(
             it.status == ReviewStatus.PENDING || it.status == ReviewStatus.FINAL_URGENT_REVIEW
         }
         pendingItems.forEach { item ->
-            ReviewScheduleItemCard(item = item, dateText = sdf.format(Date(item.reviewDate)), onComplete = onComplete)
+            ReviewScheduleItemCard(
+                item = item,
+                dateText = sdf.format(Date(item.reviewDate)),
+                onComplete = onComplete
+            )
         }
     }
 }
@@ -366,20 +453,29 @@ fun ReviewScheduleItemCard(
     onComplete: (ReviewScheduleItem, CompletionResult) -> Unit
 ) {
     val (bgColor, statusLabel, statusDesc) = when (item.status) {
-        ReviewStatus.OVERDUE -> Triple(Color(0xFFFFF3E0), "• 누락 ${item.overdueDays}일 경과", "누락된 복습 항목")
-        ReviewStatus.FINAL_URGENT_REVIEW -> Triple(Color(0xFFFFEBEE), "🔴 긴급 복습", "시험 임박 긴급 복습 항목")
-        ReviewStatus.COMPLETED -> Triple(Color(0xFFF1F8E9), "✅ 완료", "완료된 복습 항목")
-        else -> Triple(MaterialTheme.colorScheme.surface, "", "예정된 복습 항목")
+        ReviewStatus.OVERDUE ->
+            Triple(Color(0xFFFFF3E0), "• 누락 ${item.overdueDays}일 경과", "누락된 복습 항목")
+        ReviewStatus.FINAL_URGENT_REVIEW ->
+            Triple(Color(0xFFFFEBEE), "🔴 긴급 복습", "시험 임박 긴급 복습 항목")
+        ReviewStatus.COMPLETED ->
+            Triple(Color(0xFFF1F8E9), "✅ 완료", "완료된 복습 항목")
+        else ->
+            Triple(MaterialTheme.colorScheme.surface, "", "예정된 복습 항목")
     }
 
     val isCompressed = item.compressedReview
 
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
             .semantics { contentDescription = "$statusDesc: ${item.title}, 날짜: $dateText" },
         colors = CardDefaults.cardColors(containerColor = bgColor)
     ) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = dateText, style = MaterialTheme.typography.labelSmall)
                 if (isCompressed) {
@@ -397,12 +493,17 @@ fun ReviewScheduleItemCard(
                         )
                     }
                 }
-                Text(text = item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
                 if (statusLabel.isNotBlank()) {
                     Text(
                         text = statusLabel,
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (item.status == ReviewStatus.OVERDUE || item.status == ReviewStatus.FINAL_URGENT_REVIEW)
+                        color = if (item.status == ReviewStatus.OVERDUE ||
+                            item.status == ReviewStatus.FINAL_URGENT_REVIEW)
                             MaterialTheme.colorScheme.error else Color.Unspecified
                     )
                 }
@@ -412,11 +513,15 @@ fun ReviewScheduleItemCard(
                 Column {
                     TextButton(
                         onClick = { onComplete(item, CompletionResult.REMEMBERED) },
-                        modifier = Modifier.semantics { contentDescription = "기억함 버튼 - ${item.title}" }
+                        modifier = Modifier.semantics {
+                            contentDescription = "기억함 버튼 - ${item.title}"
+                        }
                     ) { Text("기억함", color = Color(0xFF2E7D32)) }
                     TextButton(
                         onClick = { onComplete(item, CompletionResult.FORGOT) },
-                        modifier = Modifier.semantics { contentDescription = "잊어버림 버튼 - ${item.title}" }
+                        modifier = Modifier.semantics {
+                            contentDescription = "잊어버림 버튼 - ${item.title}"
+                        }
                     ) { Text("잊어버림", color = MaterialTheme.colorScheme.error) }
                 }
             }
@@ -427,7 +532,10 @@ fun ReviewScheduleItemCard(
 @Composable
 fun OverloadWarningBanner() {
     Row(
-        modifier = Modifier.fillMaxWidth().background(Color(0xFFFFEBEE)).padding(12.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFFFEBEE))
+            .padding(12.dp)
             .semantics { contentDescription = "경고: 시험 전 일정이 초과되었습니다." },
         verticalAlignment = Alignment.CenterVertically
     ) {
