@@ -107,6 +107,8 @@ sealed class Screen(val route: String) {
         fun createRoute(blockId: String): String = "reviewBlockDetail/$blockId"
     }
 
+}
+
 private data class BottomNavItem(
     val label: String,
     val icon: ImageVector,

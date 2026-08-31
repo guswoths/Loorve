@@ -183,10 +183,9 @@ class HomeViewModel @Inject constructor(
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         viewModelScope.launch {
             reviewBlockRepository.getReviewBlocks(uid)
-                .catch { }
-                .collect { blocks ->
+                .onSuccess { blocks: List<ReviewBlock> ->
                     val today = LocalDate.now()
-                    val uiBlocks = blocks.map { block ->
+                    val uiBlocks = blocks.map { block: ReviewBlock ->
                         val examLocalDate = Instant.ofEpochMilli(block.examDate)
                             .atZone(seoulZone).toLocalDate()
                         val dDay = ChronoUnit.DAYS.between(today, examLocalDate).toInt()
@@ -194,7 +193,7 @@ class HomeViewModel @Inject constructor(
                             blockId = block.blockId,
                             examName = block.examName.ifBlank { block.title },
                             dDay = dDay,
-                            completionRate = 0f, // TODO: 실제 완료율은 scheduleRepository에서 계산
+                            completionRate = 0f,
                             examDateMillis = block.examDate,
                             prepStartDateMillis = block.prepStartDate,
                             dailyCap = block.dailyCap
@@ -202,6 +201,7 @@ class HomeViewModel @Inject constructor(
                     }
                     _uiState.update { it.copy(reviewBlocks = uiBlocks) }
                 }
+                .onFailure { /* 오류 무시 또는 로깅 */ }
         }
     }
 
@@ -230,7 +230,7 @@ class HomeViewModel @Inject constructor(
                 createdAt = System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis()
             )
-            reviewBlockRepository.saveReviewBlock(uid, block)
+            reviewBlockRepository.saveReviewBlock(block)
                 .onSuccess {
                     _uiState.update { it.copy(isCreatingBlock = false, saveMessage = "복습 블록이 생성되었습니다.") }
                     loadReviewBlocks()
