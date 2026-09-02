@@ -15,7 +15,6 @@ class StudyRecordRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth
 ) : StudyRecordRepository {
 
-    // 경로: users/{uid}/studyRecords/{studyRecordId}
     private fun studyRecordsRef(uid: String) =
         firestore.collection("users").document(uid).collection("studyRecords")
 
@@ -93,5 +92,18 @@ class StudyRecordRepositoryImpl @Inject constructor(
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
             ).await()
+    }
+
+    // ✅ [추가] 개별 학습기록 Firestore 문서 삭제
+    override suspend fun deleteStudyRecord(
+        uid: String,
+        record: StudyRecord
+    ): Result<Unit> = runCatching {
+        val currentUid = auth.currentUser?.uid
+            ?: throw SecurityException("인증되지 않은 사용자입니다.")
+        require(currentUid == uid) { "본인의 학습기록만 삭제할 수 있습니다." }
+        require(record.id.isNotBlank()) { "삭제할 학습기록의 ID가 없습니다." }
+
+        studyRecordsRef(uid).document(record.id).delete().await()
     }
 }

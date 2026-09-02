@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material3.*
@@ -51,10 +53,19 @@ fun ReviewBlockDetailScreen(
         viewModel.loadBlockData(uid, blockId, externalBlock = block)
     }
 
+    // 저장 성공 스낵바
     LaunchedEffect(uiState.savedSuccess) {
         if (uiState.savedSuccess) {
             snackbarHostState.showSnackbar("복습 일정이 생성되었습니다.")
             viewModel.resetSavedSuccess()
+        }
+    }
+
+    // ✅ [추가] 블록 삭제 성공 시 뒤로가기
+    LaunchedEffect(uiState.deleteSuccess) {
+        if (uiState.deleteSuccess) {
+            viewModel.resetDeleteSuccess()
+            onNavigateBack()
         }
     }
 
@@ -78,6 +89,74 @@ fun ReviewBlockDetailScreen(
         }
     } else "D-?"
 
+    // ✅ [추가] 블록 삭제 확인 AlertDialog
+    if (uiState.showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { viewModel.setShowDeleteConfirm(false) },
+            title = { Text("블록 삭제") },
+            text = {
+                Text("이 복습 블록과 모든 학습 기록, 복습 일정이 삭제됩니다. 계속할까요?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.deleteBlock(uid, blockId) },
+                    enabled = !uiState.isLoading
+                ) {
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else {
+                        Text(
+                            "삭제",
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.setShowDeleteConfirm(false) },
+                    enabled = !uiState.isLoading
+                ) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+
+    // ✅ [추가] 개별 학습기록 삭제 확인 AlertDialog
+    uiState.recordToDelete?.let { record ->
+        AlertDialog(
+            onDismissRequest = { viewModel.setRecordToDelete(null) },
+            title = { Text("학습기록 삭제") },
+            text = { Text("\"${record.title.ifBlank { "이 학습기록" }}\"을 삭제할까요? 이 작업은 되돌릴 수 없습니다.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.deleteStudyRecord(uid, blockId, record) },
+                    enabled = !uiState.isLoading
+                ) {
+                    Text(
+                        "삭제",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.setRecordToDelete(null) },
+                    enabled = !uiState.isLoading
+                ) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -92,6 +171,19 @@ fun ReviewBlockDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Outlined.ArrowBack, contentDescription = "뒤로")
+                    }
+                },
+                // ✅ [추가] 삭제 아이콘 버튼
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.setShowDeleteConfirm(true) },
+                        enabled = !uiState.isLoading
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "블록 삭제",
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
@@ -174,7 +266,6 @@ fun ReviewBlockDetailScreen(
             // ── 학습 진도 입력 섹션 ──
             item {
                 StudyProgressInputSection(
-                    // ✅ completionRate 파라미터 추가된 람다
                     onSave = { learningDateMillis, title, content, completionRate ->
                         viewModel.saveProgress(
                             uid = uid,
@@ -194,9 +285,14 @@ fun ReviewBlockDetailScreen(
                 )
             }
 
-            // ── 📝 학습 기록 섹션 ──
+            // ── 학습 기록 섹션 ──
             item {
-                StudyRecordListSection(records = uiState.studyRecords)
+                // ✅ onDeleteRecord 콜백 전달
+                StudyRecordListSection(
+                    records = uiState.studyRecords,
+                    isLoading = uiState.isLoading,
+                    onDeleteRecord = { record -> viewModel.setRecordToDelete(record) }
+                )
             }
 
             // ── 복습 일정 리스트 ──
@@ -218,7 +314,9 @@ fun ReviewBlockDetailScreen(
 @Composable
 fun StudyRecordListSection(
     records: List<StudyRecord>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false,                          // ✅ [추가]
+    onDeleteRecord: (StudyRecord) -> Unit = {}           // ✅ [추가]
 ) {
     Column(
         modifier = modifier
@@ -242,7 +340,11 @@ fun StudyRecordListSection(
             )
         } else {
             records.forEach { record ->
-                StudyRecordMiniCard(record = record)
+                StudyRecordMiniCard(
+                    record = record,
+                    isLoading = isLoading,
+                    onDeleteClick = { onDeleteRecord(record) }   // ✅ [추가]
+                )
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
@@ -253,7 +355,9 @@ fun StudyRecordListSection(
 @Composable
 fun StudyRecordMiniCard(
     record: StudyRecord,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false,             // ✅ [추가]
+    onDeleteClick: () -> Unit = {}          // ✅ [추가]
 ) {
     val dateText = remember(record.learningDate) {
         if (record.learningDate > 0L)
@@ -261,7 +365,6 @@ fun StudyRecordMiniCard(
         else "-"
     }
 
-    // ✅ completionRate: 0.0~1.0 또는 0~100 범위 모두 대응
     val ratePercent = remember(record.completionRate) {
         when {
             record.completionRate <= 0.0  -> 0
@@ -270,13 +373,12 @@ fun StudyRecordMiniCard(
         }
     }
 
-    // ✅ ratePercent == 0 엣지케이스: "기록 없음" 처리
     val badgeText = if (ratePercent == 0) "기록 없음" else "완료 $ratePercent%"
     val badgeColor = when {
-        ratePercent == 0  -> OnSurfaceVariant                // 회색 (미기록)
-        ratePercent >= 80 -> Color(0xFF388E3C)               // 초록
-        ratePercent >= 50 -> Color(0xFFFF9800)               // 주황
-        else              -> MaterialTheme.colorScheme.error  // 빨강
+        ratePercent == 0  -> OnSurfaceVariant
+        ratePercent >= 80 -> Color(0xFF388E3C)
+        ratePercent >= 50 -> Color(0xFFFF9800)
+        else              -> MaterialTheme.colorScheme.error
     }
 
     LoorveCard(
@@ -287,7 +389,7 @@ fun StudyRecordMiniCard(
             }
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // 날짜 + 완료율 뱃지 행
+            // 날짜 + 완료율 뱃지 + 삭제 버튼 행
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -298,23 +400,38 @@ fun StudyRecordMiniCard(
                     style = LoorveTypography.labelSmall,
                     color = OnSurfaceVariant
                 )
-                Surface(
-                    color = badgeColor.copy(alpha = 0.15f),
-                    shape = MaterialTheme.shapes.extraSmall
-                ) {
-                    Text(
-                        text = badgeText,   // ✅ 엣지케이스 텍스트 적용
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        style = LoorveTypography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = badgeColor
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        color = badgeColor.copy(alpha = 0.15f),
+                        shape = MaterialTheme.shapes.extraSmall
+                    ) {
+                        Text(
+                            text = badgeText,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = LoorveTypography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = badgeColor
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    // ✅ [추가] 삭제 아이콘 버튼 (16dp)
+                    IconButton(
+                        onClick = onDeleteClick,
+                        enabled = !isLoading,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "학습기록 삭제",
+                            tint = OnSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 제목 (없을 경우 생략)
             if (record.title.isNotBlank()) {
                 Text(
                     text = record.title,
@@ -327,7 +444,6 @@ fun StudyRecordMiniCard(
                 Spacer(modifier = Modifier.height(2.dp))
             }
 
-            // 내용 요약 (최대 2줄 말줄임)
             if (record.content.isNotBlank()) {
                 Text(
                     text = record.content,
@@ -338,7 +454,6 @@ fun StudyRecordMiniCard(
                 )
             }
 
-            // ✅ 제목·내용 모두 없을 때 폴백 메시지
             if (record.title.isBlank() && record.content.isBlank()) {
                 Text(
                     text = "내용 없음",
@@ -399,7 +514,6 @@ fun RecommendedCompletionCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudyProgressInputSection(
-    // ✅ onSave 콜백에 completionRate: Float 파라미터 추가
     onSave: (learningDateMillis: Long, title: String, content: String, completionRate: Float) -> Unit,
     isLoading: Boolean,
     isSaveEnabled: Boolean = true,
@@ -407,7 +521,6 @@ fun StudyProgressInputSection(
 ) {
     var titleText by remember { mutableStateOf("") }
     var contentText by remember { mutableStateOf("") }
-    // ✅ 완료율 슬라이더 상태 (기본값 1.0f = 100%)
     var completionRate by remember { mutableFloatStateOf(1.0f) }
 
     val kstZone = remember { ZoneId.of("Asia/Seoul") }
@@ -458,7 +571,6 @@ fun StudyProgressInputSection(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        // ① 날짜 선택 버튼
         OutlinedButton(
             onClick = { showDatePicker = true },
             modifier = Modifier
@@ -477,7 +589,6 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // ② 제목 입력
         OutlinedTextField(
             value = titleText,
             onValueChange = { titleText = it },
@@ -492,7 +603,6 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // ③ 내용 입력
         OutlinedTextField(
             value = contentText,
             onValueChange = { contentText = it },
@@ -507,7 +617,6 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // ④ 완료율 슬라이더 (✅ 신규 추가)
         Text(
             text = "완료율: ${(completionRate * 100).toInt()}%",
             style = MaterialTheme.typography.bodyMedium,
@@ -520,7 +629,7 @@ fun StudyProgressInputSection(
             value = completionRate,
             onValueChange = { completionRate = it },
             valueRange = 0f..1f,
-            steps = 9,   // 10% 단위 (0%, 10%, 20% ... 100% → 11개 스텝, steps=9)
+            steps = 9,
             enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
@@ -534,15 +643,13 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // ⑤ 저장 버튼
         Button(
             onClick = {
                 if (canSave) {
-                    // ✅ completionRate 함께 전달
                     onSave(selectedDateMillis, titleText.trim(), contentText.trim(), completionRate)
                     titleText = ""
                     contentText = ""
-                    completionRate = 1.0f   // ✅ 저장 후 초기화
+                    completionRate = 1.0f
                 }
             },
             modifier = Modifier
