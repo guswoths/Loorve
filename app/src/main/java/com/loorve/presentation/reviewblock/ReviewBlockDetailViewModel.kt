@@ -53,7 +53,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
                     .getOrDefault(emptyList())
                     .firstOrNull { it.blockId == blockId }
 
-            // ✅ 최신순(learningDate 내림차순) 정렬 추가
+            // ✅ 최신순(learningDate 내림차순) 정렬 유지
             val records = studyRecordRepository.getStudyRecords(uid, blockId)
                 .getOrDefault(emptyList())
                 .sortedByDescending { it.learningDate }
@@ -87,6 +87,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
         examId: String,
         title: String,
         content: String,
+        completionRate: Float = 1.0f,   // ✅ 추가: UI 슬라이더 값 수신
         learningDateMillis: Long,
         examDateMillis: Long,
         prepStartDateMillis: Long,
@@ -111,6 +112,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
                     examId = examId,
                     title = title,
                     content = content,
+                    completionRate = completionRate.coerceIn(0f, 1f),  // ✅ clamp 보장
                     learningDateMillis = learningDateMillis,
                     examDateMillis = examDateMillis,
                     prepStartDateMillis = prepStartDateMillis,

@@ -14,8 +14,9 @@ data class SaveStudyProgressRequest(
     val uid: String,
     val blockId: String,
     val examId: String,
-    val title: String = "",          // ✅ 추가: 사용자 입력 제목
+    val title: String = "",
     val content: String,
+    val completionRate: Float = 1.0f,   // ✅ 추가: 0f..1f 범위, 저장 시 Double로 변환
     val learningDateMillis: Long,
     val examDateMillis: Long,
     val prepStartDateMillis: Long? = null,
@@ -37,7 +38,6 @@ class SaveStudyProgressUseCase @Inject constructor(
             }
 
             val studyRecordId = UUID.randomUUID().toString()
-            // ✅ 사용자 입력 title 우선, 없으면 content 앞 20자 폴백
             val resolvedTitle = request.title.trim().ifBlank { request.content.take(20) }
 
             val scheduleResult = ReviewScheduler.generateSchedule(
@@ -50,13 +50,17 @@ class SaveStudyProgressUseCase @Inject constructor(
                 prepStartDate = prepStart
             )
 
+            // ✅ completionRate: 0f..1f 범위로 clamp 후 Double 변환 (하위 호환 유지)
+            val safeCompletionRate = request.completionRate.coerceIn(0f, 1f).toDouble()
+
             val record = StudyRecord(
                 id = studyRecordId,
                 uid = request.uid,
                 blockId = request.blockId,
                 examId = request.examId,
-                title = resolvedTitle,          // ✅ resolvedTitle 사용
+                title = resolvedTitle,
                 content = request.content,
+                completionRate = safeCompletionRate,   // ✅ 반영
                 learningDate = request.learningDateMillis,
                 examDate = request.examDateMillis,
                 prepStartDate = prepStart.atStartOfDay(ZoneId.of("Asia/Seoul"))

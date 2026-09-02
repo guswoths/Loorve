@@ -174,13 +174,15 @@ fun ReviewBlockDetailScreen(
             // ── 학습 진도 입력 섹션 ──
             item {
                 StudyProgressInputSection(
-                    onSave = { learningDateMillis, title, content ->
+                    // ✅ completionRate 파라미터 추가된 람다
+                    onSave = { learningDateMillis, title, content, completionRate ->
                         viewModel.saveProgress(
                             uid = uid,
                             blockId = blockId,
                             examId = resolvedBlock?.blockId ?: blockId,
                             title = title,
                             content = content,
+                            completionRate = completionRate,
                             learningDateMillis = learningDateMillis,
                             examDateMillis = examDateMillis,
                             prepStartDateMillis = prepStartDateMillis,
@@ -192,7 +194,7 @@ fun ReviewBlockDetailScreen(
                 )
             }
 
-            // ── 📝 학습 기록 섹션 (신규 추가) ──
+            // ── 📝 학습 기록 섹션 ──
             item {
                 StudyRecordListSection(records = uiState.studyRecords)
             }
@@ -247,27 +249,31 @@ fun StudyRecordListSection(
     }
 }
 
-// ── StudyRecordMiniCard (신규 Composable) ─────────────────────
+// ── StudyRecordMiniCard ─────────────────────────────────────────
 @Composable
 fun StudyRecordMiniCard(
     record: StudyRecord,
     modifier: Modifier = Modifier
 ) {
     val dateText = remember(record.learningDate) {
-        if (record.learningDate > 0L) {
+        if (record.learningDate > 0L)
             SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(record.learningDate))
-        } else {
-            "-"
+        else "-"
+    }
+
+    // ✅ completionRate: 0.0~1.0 또는 0~100 범위 모두 대응
+    val ratePercent = remember(record.completionRate) {
+        when {
+            record.completionRate <= 0.0  -> 0
+            record.completionRate <= 1.0  -> (record.completionRate * 100).toInt()
+            else                          -> record.completionRate.toInt().coerceIn(0, 100)
         }
     }
 
-    // completionRate(0.0~1.0 또는 0~100 범위 모두 대응)
-    val ratePercent = remember(record.completionRate) {
-        if (record.completionRate <= 1.0) (record.completionRate * 100).toInt()
-        else record.completionRate.toInt()
-    }
-
+    // ✅ ratePercent == 0 엣지케이스: "기록 없음" 처리
+    val badgeText = if (ratePercent == 0) "기록 없음" else "완료 $ratePercent%"
     val badgeColor = when {
+        ratePercent == 0  -> OnSurfaceVariant                // 회색 (미기록)
         ratePercent >= 80 -> Color(0xFF388E3C)               // 초록
         ratePercent >= 50 -> Color(0xFFFF9800)               // 주황
         else              -> MaterialTheme.colorScheme.error  // 빨강
@@ -276,7 +282,9 @@ fun StudyRecordMiniCard(
     LoorveCard(
         modifier = modifier
             .fillMaxWidth()
-            .semantics { contentDescription = "학습기록: ${record.title}, 날짜: $dateText, 완료율: $ratePercent%" }
+            .semantics {
+                contentDescription = "학습기록: ${record.title}, 날짜: $dateText, 완료율: $ratePercent%"
+            }
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             // 날짜 + 완료율 뱃지 행
@@ -295,7 +303,7 @@ fun StudyRecordMiniCard(
                     shape = MaterialTheme.shapes.extraSmall
                 ) {
                     Text(
-                        text = "완료 $ratePercent%",
+                        text = badgeText,   // ✅ 엣지케이스 텍스트 적용
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                         style = LoorveTypography.labelSmall,
                         fontWeight = FontWeight.Bold,
@@ -306,7 +314,7 @@ fun StudyRecordMiniCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 제목
+            // 제목 (없을 경우 생략)
             if (record.title.isNotBlank()) {
                 Text(
                     text = record.title,
@@ -327,6 +335,15 @@ fun StudyRecordMiniCard(
                     color = OnSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // ✅ 제목·내용 모두 없을 때 폴백 메시지
+            if (record.title.isBlank() && record.content.isBlank()) {
+                Text(
+                    text = "내용 없음",
+                    style = LoorveTypography.bodySmall,
+                    color = OnSurfaceVariant
                 )
             }
         }
@@ -382,13 +399,16 @@ fun RecommendedCompletionCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudyProgressInputSection(
-    onSave: (learningDateMillis: Long, title: String, content: String) -> Unit,
+    // ✅ onSave 콜백에 completionRate: Float 파라미터 추가
+    onSave: (learningDateMillis: Long, title: String, content: String, completionRate: Float) -> Unit,
     isLoading: Boolean,
     isSaveEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var titleText by remember { mutableStateOf("") }
     var contentText by remember { mutableStateOf("") }
+    // ✅ 완료율 슬라이더 상태 (기본값 1.0f = 100%)
+    var completionRate by remember { mutableFloatStateOf(1.0f) }
 
     val kstZone = remember { ZoneId.of("Asia/Seoul") }
     val todayMillis = remember {
@@ -438,6 +458,7 @@ fun StudyProgressInputSection(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
+        // ① 날짜 선택 버튼
         OutlinedButton(
             onClick = { showDatePicker = true },
             modifier = Modifier
@@ -456,6 +477,7 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // ② 제목 입력
         OutlinedTextField(
             value = titleText,
             onValueChange = { titleText = it },
@@ -470,6 +492,7 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // ③ 내용 입력
         OutlinedTextField(
             value = contentText,
             onValueChange = { contentText = it },
@@ -482,14 +505,44 @@ fun StudyProgressInputSection(
             enabled = !isLoading
         )
 
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // ④ 완료율 슬라이더 (✅ 신규 추가)
+        Text(
+            text = "완료율: ${(completionRate * 100).toInt()}%",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.semantics {
+                contentDescription = "완료율 ${(completionRate * 100).toInt()}퍼센트"
+            }
+        )
+        Slider(
+            value = completionRate,
+            onValueChange = { completionRate = it },
+            valueRange = 0f..1f,
+            steps = 9,   // 10% 단위 (0%, 10%, 20% ... 100% → 11개 스텝, steps=9)
+            enabled = !isLoading,
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = "완료율 슬라이더" },
+            colors = SliderDefaults.colors(
+                thumbColor = Primary,
+                activeTrackColor = Primary,
+                inactiveTrackColor = Primary.copy(alpha = 0.24f)
+            )
+        )
+
         Spacer(modifier = Modifier.height(12.dp))
 
+        // ⑤ 저장 버튼
         Button(
             onClick = {
                 if (canSave) {
-                    onSave(selectedDateMillis, titleText.trim(), contentText.trim())
+                    // ✅ completionRate 함께 전달
+                    onSave(selectedDateMillis, titleText.trim(), contentText.trim(), completionRate)
                     titleText = ""
                     contentText = ""
+                    completionRate = 1.0f   // ✅ 저장 후 초기화
                 }
             },
             modifier = Modifier
