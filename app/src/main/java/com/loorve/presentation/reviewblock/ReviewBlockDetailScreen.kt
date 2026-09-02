@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -37,22 +38,19 @@ import java.util.*
 @Composable
 fun ReviewBlockDetailScreen(
     blockId: String,
-    block: ReviewBlock?,                    // NavHost에서 전달 (null이면 ViewModel이 자체 로드)
+    block: ReviewBlock?,
     onNavigateBack: () -> Unit,
     viewModel: ReviewBlockDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
-    // ✅ [포인트 3] SnackbarHostState 추가
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(blockId) {
-        // ✅ [포인트 4] NavHost에서 block=null로 전달될 때를 대비해 ViewModel에서 로드
         viewModel.loadBlockData(uid, blockId, externalBlock = block)
     }
 
-    // ✅ [포인트 3] savedSuccess 감지 → Snackbar 표시 후 리셋
     LaunchedEffect(uiState.savedSuccess) {
         if (uiState.savedSuccess) {
             snackbarHostState.showSnackbar("복습 일정이 생성되었습니다.")
@@ -60,7 +58,6 @@ fun ReviewBlockDetailScreen(
         }
     }
 
-    // ✅ [포인트 4] block 데이터를 uiState.reviewBlock에서 읽음 (null-safe)
     val resolvedBlock = uiState.reviewBlock
     val examDateMillis = resolvedBlock?.examDate ?: 0L
     val prepStartDateMillis = resolvedBlock?.prepStartDate ?: 0L
@@ -69,7 +66,6 @@ fun ReviewBlockDetailScreen(
         ?: resolvedBlock?.title
         ?: blockId
 
-    // D-Day 계산
     val dDayText = if (examDateMillis > 0L) {
         val examLocal = Instant.ofEpochMilli(examDateMillis)
             .atZone(ZoneId.of("Asia/Seoul")).toLocalDate()
@@ -83,7 +79,6 @@ fun ReviewBlockDetailScreen(
     } else "D-?"
 
     Scaffold(
-        // ✅ [포인트 3] SnackbarHost 연결
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
@@ -165,7 +160,6 @@ fun ReviewBlockDetailScreen(
                 }
             }
 
-            // ✅ [포인트 4] examDateMillis=0이면 저장 불가 → 사용자에게 안내 메시지
             if (examDateMillis == 0L) {
                 item {
                     Text(
@@ -184,7 +178,6 @@ fun ReviewBlockDetailScreen(
                         viewModel.saveProgress(
                             uid = uid,
                             blockId = blockId,
-                            // ✅ [포인트 4] examId를 blockId 대신 실제 examId로 전달
                             examId = resolvedBlock?.blockId ?: blockId,
                             title = title,
                             content = content,
@@ -195,9 +188,13 @@ fun ReviewBlockDetailScreen(
                         )
                     },
                     isLoading = uiState.isLoading,
-                    // ✅ [포인트 3] examDate 미로드 상태에서는 저장 버튼 비활성화
                     isSaveEnabled = examDateMillis > 0L
                 )
+            }
+
+            // ── 📝 학습 기록 섹션 (신규 추가) ──
+            item {
+                StudyRecordListSection(records = uiState.studyRecords)
             }
 
             // ── 복습 일정 리스트 ──
@@ -209,6 +206,127 @@ fun ReviewBlockDetailScreen(
                     onComplete = { scheduleItem, result ->
                         viewModel.completeReview(uid, scheduleItem, result, examDateMillis)
                     }
+                )
+            }
+        }
+    }
+}
+
+// ── 학습 기록 섹션 (헤더 + 목록) ──────────────────────────────
+@Composable
+fun StudyRecordListSection(
+    records: List<StudyRecord>,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = "📝 학습 기록",
+            style = LoorveTypography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = OnBackground
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (records.isEmpty()) {
+            Text(
+                text = "아직 기록된 학습이 없어요. 첫 학습을 입력해보세요!",
+                style = LoorveTypography.bodySmall,
+                color = OnSurfaceVariant,
+                modifier = Modifier.padding(vertical = 12.dp)
+            )
+        } else {
+            records.forEach { record ->
+                StudyRecordMiniCard(record = record)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+// ── StudyRecordMiniCard (신규 Composable) ─────────────────────
+@Composable
+fun StudyRecordMiniCard(
+    record: StudyRecord,
+    modifier: Modifier = Modifier
+) {
+    val dateText = remember(record.learningDate) {
+        if (record.learningDate > 0L) {
+            SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(record.learningDate))
+        } else {
+            "-"
+        }
+    }
+
+    // completionRate(0.0~1.0 또는 0~100 범위 모두 대응)
+    val ratePercent = remember(record.completionRate) {
+        if (record.completionRate <= 1.0) (record.completionRate * 100).toInt()
+        else record.completionRate.toInt()
+    }
+
+    val badgeColor = when {
+        ratePercent >= 80 -> Color(0xFF388E3C)               // 초록
+        ratePercent >= 50 -> Color(0xFFFF9800)               // 주황
+        else              -> MaterialTheme.colorScheme.error  // 빨강
+    }
+
+    LoorveCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "학습기록: ${record.title}, 날짜: $dateText, 완료율: $ratePercent%" }
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // 날짜 + 완료율 뱃지 행
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = dateText,
+                    style = LoorveTypography.labelSmall,
+                    color = OnSurfaceVariant
+                )
+                Surface(
+                    color = badgeColor.copy(alpha = 0.15f),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(
+                        text = "완료 $ratePercent%",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        style = LoorveTypography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = badgeColor
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // 제목
+            if (record.title.isNotBlank()) {
+                Text(
+                    text = record.title,
+                    style = LoorveTypography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = OnBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+            }
+
+            // 내용 요약 (최대 2줄 말줄임)
+            if (record.content.isNotBlank()) {
+                Text(
+                    text = record.content,
+                    style = LoorveTypography.bodySmall,
+                    color = OnSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -266,7 +384,6 @@ fun RecommendedCompletionCard(
 fun StudyProgressInputSection(
     onSave: (learningDateMillis: Long, title: String, content: String) -> Unit,
     isLoading: Boolean,
-    // ✅ [포인트 3] examDate 미로드 시 버튼 비활성화용 파라미터 추가
     isSaveEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -284,10 +401,8 @@ fun StudyProgressInputSection(
         SimpleDateFormat("yyyy년 MM월 dd일 (E)", Locale.KOREA).format(Date(selectedDateMillis))
     }
 
-    // ✅ [포인트 3] canSave: 제목 OR 내용 중 하나 입력 + 로딩 중 아님 + examDate 로드 완료
     val canSave = (titleText.isNotBlank() || contentText.isNotBlank()) && !isLoading && isSaveEnabled
 
-    // ── DatePickerDialog ──
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = selectedDateMillis
@@ -297,7 +412,6 @@ fun StudyProgressInputSection(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { utcMs ->
-                        // UTC 자정(ms) → KST 자정(ms) 변환 (정상 유지)
                         val localDate = Instant.ofEpochMilli(utcMs)
                             .atZone(ZoneId.of("UTC")).toLocalDate()
                         selectedDateMillis = localDate
@@ -316,7 +430,6 @@ fun StudyProgressInputSection(
         }
     }
 
-    // ── UI ──
     Column(modifier = modifier.padding(16.dp)) {
         Text(
             text = "오늘 학습 진도",
@@ -325,7 +438,6 @@ fun StudyProgressInputSection(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        // ① 날짜 선택 버튼
         OutlinedButton(
             onClick = { showDatePicker = true },
             modifier = Modifier
@@ -344,14 +456,12 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // ② 제목 입력
         OutlinedTextField(
             value = titleText,
             onValueChange = { titleText = it },
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics { contentDescription = "학습 제목 입력" },
-            // ✅ [포인트 3] 라벨에 필수 조건 힌트 추가
             label = { Text("학습 제목 (제목 또는 내용 중 하나 필수)") },
             placeholder = { Text("예: 수학 미분 1단원") },
             singleLine = true,
@@ -360,7 +470,6 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // ③ 내용 입력
         OutlinedTextField(
             value = contentText,
             onValueChange = { contentText = it },
@@ -375,12 +484,10 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // ④ 저장 버튼
         Button(
             onClick = {
                 if (canSave) {
                     onSave(selectedDateMillis, titleText.trim(), contentText.trim())
-                    // ✅ [포인트 3] 저장 후 입력 필드 초기화 (날짜는 편의상 유지)
                     titleText = ""
                     contentText = ""
                 }

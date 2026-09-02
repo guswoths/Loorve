@@ -30,7 +30,6 @@ data class ReviewBlockDetailUiState(
     val reviewOverloadWarning: Boolean = false,
     val errorMessage: String? = null,
     val savedSuccess: Boolean = false,
-    // ✅ [포인트 4] ReviewBlock 정보를 ViewModel이 직접 보유
     val reviewBlock: ReviewBlock? = null
 )
 
@@ -39,29 +38,25 @@ class ReviewBlockDetailViewModel @Inject constructor(
     private val saveStudyProgressUseCase: SaveStudyProgressUseCase,
     private val studyRecordRepository: StudyRecordRepository,
     private val scheduleRepository: ReviewScheduleItemRepository,
-    // ✅ [포인트 4] ReviewBlockRepository 추가
     private val reviewBlockRepository: ReviewBlockRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewBlockDetailUiState())
     val uiState: StateFlow<ReviewBlockDetailUiState> = _uiState.asStateFlow()
 
-    /**
-     * ✅ [포인트 4] externalBlock: NavHost에서 전달된 block 객체.
-     * null인 경우(현재 NavHost는 null 전달) Firestore에서 직접 조회.
-     */
     fun loadBlockData(uid: String, blockId: String, externalBlock: ReviewBlock? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
 
-            // ✅ externalBlock이 null이면 Repository에서 직접 조회
             val resolvedBlock = externalBlock
                 ?: reviewBlockRepository.getReviewBlocks(uid)
                     .getOrDefault(emptyList())
                     .firstOrNull { it.blockId == blockId }
 
+            // ✅ 최신순(learningDate 내림차순) 정렬 추가
             val records = studyRecordRepository.getStudyRecords(uid, blockId)
                 .getOrDefault(emptyList())
+                .sortedByDescending { it.learningDate }
 
             val allSchedules = records.flatMap { record ->
                 scheduleRepository.getSchedulesByStudyRecord(uid, record.id)
@@ -78,7 +73,6 @@ class ReviewBlockDetailViewModel @Inject constructor(
 
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
-                // ✅ [포인트 4] 조회한 block을 UiState에 저장
                 reviewBlock = resolvedBlock,
                 studyRecords = records,
                 scheduleItems = updatedSchedules,
@@ -100,7 +94,6 @@ class ReviewBlockDetailViewModel @Inject constructor(
     ) {
         if (_uiState.value.isLoading) return
 
-        // ✅ [포인트 4] examDateMillis=0이면 저장 불가 — 이중 안전장치
         if (examDateMillis == 0L) {
             _uiState.value = _uiState.value.copy(
                 errorMessage = "블록 정보가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요."
