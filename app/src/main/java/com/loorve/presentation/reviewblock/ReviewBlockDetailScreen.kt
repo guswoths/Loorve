@@ -252,7 +252,8 @@ fun ReviewBlockDetailScreen(
                 }
             }
 
-            if (examDateMillis == 0L) {
+            // ✅ [수정 2] isLoading 상태도 함께 체크하여 로딩 완료 후 문구 미표시
+            if (examDateMillis == 0L && uiState.isLoading) {
                 item {
                     Text(
                         text = "⚠️ 블록 정보를 불러오는 중입니다...",

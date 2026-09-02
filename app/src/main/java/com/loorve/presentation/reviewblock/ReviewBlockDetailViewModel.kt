@@ -31,10 +31,8 @@ data class ReviewBlockDetailUiState(
     val errorMessage: String? = null,
     val savedSuccess: Boolean = false,
     val reviewBlock: ReviewBlock? = null,
-    // ✅ [추가] 블록 삭제 관련 상태
     val deleteSuccess: Boolean = false,
     val showDeleteConfirm: Boolean = false,
-    // ✅ [추가] 개별 학습기록 삭제 확인 다이얼로그용
     val recordToDelete: StudyRecord? = null
 )
 
@@ -49,9 +47,13 @@ class ReviewBlockDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ReviewBlockDetailUiState())
     val uiState: StateFlow<ReviewBlockDetailUiState> = _uiState.asStateFlow()
 
-    // ── 기존 함수 (수정 없음) ────────────────────────────────────
-
     fun loadBlockData(uid: String, blockId: String, externalBlock: ReviewBlock? = null) {
+        // ✅ [수정 1] externalBlock이 있으면 코루틴 진입 전에 즉시 uiState에 반영
+        // → examDateMillis가 0L로 유지되는 비동기 gap을 제거
+        if (externalBlock != null) {
+            _uiState.value = _uiState.value.copy(reviewBlock = externalBlock)
+        }
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
 
@@ -59,6 +61,15 @@ class ReviewBlockDetailViewModel @Inject constructor(
                 ?: reviewBlockRepository.getReviewBlocks(uid)
                     .getOrDefault(emptyList())
                     .firstOrNull { it.blockId == blockId }
+
+            // ✅ [수정 1 추가] resolvedBlock이 null이면 에러 처리 후 종료
+            if (resolvedBlock == null) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "블록 정보를 불러올 수 없습니다."
+                )
+                return@launch
+            }
 
             val records = studyRecordRepository.getStudyRecords(uid, blockId)
                 .getOrDefault(emptyList())
@@ -180,19 +191,14 @@ class ReviewBlockDetailViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(savedSuccess = false)
     }
 
-    // ── 신규 추가: 블록 삭제 ─────────────────────────────────────
-
-    /** 삭제 확인 다이얼로그 표시 여부 제어 */
     fun setShowDeleteConfirm(show: Boolean) {
         _uiState.value = _uiState.value.copy(showDeleteConfirm = show)
     }
 
-    /** deleteSuccess 초기화 (LaunchedEffect 중복 실행 방지) */
     fun resetDeleteSuccess() {
         _uiState.value = _uiState.value.copy(deleteSuccess = false)
     }
 
-    /** 복습 블록 삭제 — Firestore reviewBlocks/{blockId} 문서 삭제 */
     fun deleteBlock(uid: String, blockId: String) {
         if (_uiState.value.isLoading) return
         viewModelScope.launch {
@@ -215,14 +221,10 @@ class ReviewBlockDetailViewModel @Inject constructor(
         }
     }
 
-    // ── 신규 추가: 개별 학습기록 삭제 ────────────────────────────
-
-    /** 삭제할 학습기록 지정 (다이얼로그 트리거) */
     fun setRecordToDelete(record: StudyRecord?) {
         _uiState.value = _uiState.value.copy(recordToDelete = record)
     }
 
-    /** 개별 학습기록 삭제 후 목록 갱신 */
     fun deleteStudyRecord(uid: String, blockId: String, record: StudyRecord) {
         if (_uiState.value.isLoading) return
         viewModelScope.launch {
