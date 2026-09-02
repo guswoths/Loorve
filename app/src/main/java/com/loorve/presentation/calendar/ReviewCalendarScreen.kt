@@ -22,8 +22,6 @@ import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,18 +31,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -54,27 +47,25 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.model.ReviewSchedule
 import com.loorve.ui.component.BannerAdView
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import androidx.compose.material3.Card
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewCalendarScreen(
     onNavigateBack: () -> Unit,
     onNavigateToAddReviewBlock: () -> Unit,
+    onNavigateToReviewBlockDetail: (blockId: String) -> Unit = {},  // ✅ 신규 파라미터
     reviewCalendarViewModel: ReviewCalendarViewModel = hiltViewModel()
 ) {
     val uiState by reviewCalendarViewModel.uiState.collectAsState()
 
-    // refreshUid()가 suspend fun이므로 순차 실행 보장
     LaunchedEffect(Unit) {
-        reviewCalendarViewModel.refreshUid()          // suspend — 완료될 때까지 대기
-        reviewCalendarViewModel.loadCurrentMonth()    // uid 세팅 후 안전하게 호출
+        reviewCalendarViewModel.refreshUid()
+        reviewCalendarViewModel.loadCurrentMonth()
         reviewCalendarViewModel.onDateSelected(LocalDate.now())
-        // loadReviewBlocks는 refreshUid() 내부에서 자동 호출됨
     }
 
     uiState.errorMessage?.let { message ->
@@ -131,7 +122,6 @@ fun ReviewCalendarScreen(
                     CircularProgressIndicator()
                 }
             } else {
-                // 기존 날짜별 복습 일정 + 복습 블록 목록을 하나의 LazyColumn으로 통합
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -142,7 +132,7 @@ fun ReviewCalendarScreen(
                         vertical = 4.dp
                     )
                 ) {
-                    // ── 섹션 1: 날짜별 복습 일정 ─────────────────────────
+                    // ── 섹션 1: 날짜별 복습 일정
                     item {
                         Text(
                             text = uiState.selectedDate?.format(
@@ -176,7 +166,7 @@ fun ReviewCalendarScreen(
                         }
                     }
 
-                    // ── 섹션 2: 복습 블록 목록 ───────────────────────────
+                    // ── 섹션 2: 복습 블록 목록
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
@@ -211,7 +201,8 @@ fun ReviewCalendarScreen(
                         ) { block ->
                             ReviewBlockCard(
                                 block = block,
-                                onClick = { reviewCalendarViewModel.onBlockClicked(block) }
+                                // ✅ 핵심 수정: 네비게이션으로 변경
+                                onClick = { onNavigateToReviewBlockDetail(block.blockId) }
                             )
                         }
                     }
@@ -223,21 +214,10 @@ fun ReviewCalendarScreen(
             }
         }
     }
-
-    // ── 바텀시트 ──────────────────────────────────────────────────────────────
-    if (uiState.showBlockDetail && uiState.selectedBlock != null) {
-        ReviewBlockDetailBottomSheet(
-            block = uiState.selectedBlock!!,
-            isDeleting = uiState.isDeleting,
-            onDismiss = { reviewCalendarViewModel.onDismissBlockDetail() },
-            onDelete = { reviewCalendarViewModel.deleteReviewBlock(uiState.selectedBlock!!.blockId) }
-        )
-    }
+    // ✅ ReviewBlockDetailBottomSheet 제거 — ReviewBlockDetailScreen으로 대체
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Private Composables
-// ──────────────────────────────────────────────────────────────────────────────
+// ── Private Composables ────────────────────────────────────────────────────────
 
 @Composable
 private fun ReviewScheduleItem(
@@ -373,167 +353,5 @@ private fun EmptyScheduleMessage(message: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ReviewBlockDetailBottomSheet(
-    block: ReviewBlock,
-    isDeleting: Boolean,
-    onDismiss: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("복습 블록 삭제") },
-            text = { Text("\"${block.title}\" 블록을 삭제하시겠습니까?\n삭제된 블록은 복구할 수 없습니다.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteConfirm = false
-                        onDelete()
-                    }
-                ) {
-                    Text("삭제", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("취소")
-                }
-            }
-        )
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-        ) {
-            // 제목
-            Text(
-                text = block.title,
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 완료 여부 Badge
-            if (block.isCompleted) {
-                Badge(containerColor = MaterialTheme.colorScheme.primary) {
-                    Text(
-                        text = "완료",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            } else {
-                Badge(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
-                    Text(
-                        text = "진행중",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 시험 종료일
-            if (block.date.isNotBlank()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "시험 종료일",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(80.dp)
-                    )
-                    Text(
-                        text = block.date,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            // 생성일 (epoch millis → LocalDate 변환)
-            if (block.createdAt > 0L) {
-                val createdDate = Instant.ofEpochMilli(block.createdAt)
-                    .atZone(ZoneId.of("Asia/Seoul"))
-                    .toLocalDate()
-                    .format(DateTimeFormatter.ofPattern("yyyy년 M월 d일", Locale.KOREAN))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "생성일",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(80.dp)
-                    )
-                    Text(
-                        text = createdDate,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            // 설명
-            if (block.description.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "설명",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = block.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // 삭제 버튼
-            Button(
-                onClick = { showDeleteConfirm = true },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError
-                ),
-                enabled = !isDeleting
-            ) {
-                if (isDeleting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onError,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("블록 삭제")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-        }
     }
 }

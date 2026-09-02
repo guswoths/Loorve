@@ -461,6 +461,9 @@ fun LoorveNavHost(
                             onNavigateBack = { },
                             onNavigateToAddReviewBlock = {
                                 navController.navigate(Screen.AddReviewBlock.route)
+                            },
+                            onNavigateToReviewBlockDetail = { blockId ->   // ✅ 핵심 연결
+                                navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId))
                             }
                         )
 
@@ -570,7 +573,7 @@ fun LoorveNavHost(
 
             ReviewBlockDetailScreen(
                 blockId = blockId,
-                block = null,     // TODO: HomeViewModel 또는 별도 ViewModel에서 block 조회 후 전달
+                block = null,  // ViewModel 내부에서 blockId로 자체 로드하도록 위임
                 onNavigateBack = { navController.popBackStack() }
             )
         }
