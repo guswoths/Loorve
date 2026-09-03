@@ -378,7 +378,10 @@ class HomeViewModel @Inject constructor(
 
             if (result.isSuccess) {
                 _uiState.update { it.copy(isSaving = false, saveMessage = "학습 진도가 저장되었습니다.") }
+                // ✅ 진도 + 복습 일정 모두 최신 상태로 갱신 (캘린더 도트 즉시 반영)
                 loadProgressListAndThenSchedules(uid, _displayYearMonth.value)
+                // ✅ 현재 월 외에 다음 달 일정도 캘린더에 즉시 반영되도록 추가 트리거
+                loadReviewScheduleDatesByMonth(uid, _displayYearMonth.value)
             } else {
                 _uiState.update {
                     it.copy(
@@ -388,6 +391,14 @@ class HomeViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    // ✅ 복습 로그 생성 또는 완료 처리 후 캘린더 강제 갱신
+    fun refreshCalendar() {
+        viewModelScope.launch {
+            val uid = getUidSafely() ?: return@launch
+            loadReviewScheduleDatesByMonth(uid, _displayYearMonth.value)
         }
     }
 
