@@ -27,6 +27,7 @@ import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.model.StudyRecord
+import com.loorve.presentation.home.HomeViewModel          // ✅ [추가] import
 import com.loorve.ui.component.LoorveCard
 import com.loorve.ui.theme.*
 import java.text.SimpleDateFormat
@@ -42,7 +43,8 @@ fun ReviewBlockDetailScreen(
     blockId: String,
     block: ReviewBlock?,
     onNavigateBack: () -> Unit,
-    viewModel: ReviewBlockDetailViewModel = hiltViewModel()
+    viewModel: ReviewBlockDetailViewModel = hiltViewModel(),
+    homeViewModel: HomeViewModel = hiltViewModel()          // ✅ [추가]
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
@@ -68,7 +70,7 @@ fun ReviewBlockDetailScreen(
         }
     }
 
-    // ✅ [추가] 블록 삭제 성공 시 뒤로가기
+    // 블록 삭제 성공 시 뒤로가기
     LaunchedEffect(uiState.deleteSuccess) {
         if (uiState.deleteSuccess) {
             viewModel.resetDeleteSuccess()
@@ -84,8 +86,8 @@ fun ReviewBlockDetailScreen(
         ?: blockId
 
     val dDayText = when {
-        resolvedBlock == null -> ""           // 아직 로딩 중 → 빈 문자열 (플리커 방지)
-        examDateMillis == 0L  -> "D-?"        // 블록은 있지만 시험일 미설정
+        resolvedBlock == null -> ""
+        examDateMillis == 0L  -> "D-?"
         else -> {
             val examLocal = Instant.ofEpochMilli(examDateMillis)
                 .atZone(ZoneId.of("Asia/Seoul")).toLocalDate()
@@ -99,7 +101,7 @@ fun ReviewBlockDetailScreen(
         }
     }
 
-    // ✅ [추가] 블록 삭제 확인 AlertDialog
+    // 블록 삭제 확인 AlertDialog
     if (uiState.showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { viewModel.setShowDeleteConfirm(false) },
@@ -138,7 +140,7 @@ fun ReviewBlockDetailScreen(
         )
     }
 
-    // ✅ [추가] 개별 학습기록 삭제 확인 AlertDialog
+    // 개별 학습기록 삭제 확인 AlertDialog
     uiState.recordToDelete?.let { record ->
         AlertDialog(
             onDismissRequest = { viewModel.setRecordToDelete(null) },
@@ -183,7 +185,6 @@ fun ReviewBlockDetailScreen(
                         Icon(Icons.Outlined.ArrowBack, contentDescription = "뒤로")
                     }
                 },
-                // ✅ [추가] 삭제 아이콘 버튼
                 actions = {
                     IconButton(
                         onClick = { viewModel.setShowDeleteConfirm(true) },
@@ -289,13 +290,12 @@ fun ReviewBlockDetailScreen(
                         )
                     },
                     isLoading = uiState.isLoading,
-                    isSaveEnabled = resolvedBlock != null && resolvedBlock.examDate != 0L  // ← 핵심 수정
+                    isSaveEnabled = resolvedBlock != null && resolvedBlock.examDate != 0L
                 )
             }
 
             // ── 학습 기록 섹션 ──
             item {
-                // ✅ onDeleteRecord 콜백 전달
                 StudyRecordListSection(
                     records = uiState.studyRecords,
                     isLoading = uiState.isLoading,
@@ -323,8 +323,8 @@ fun ReviewBlockDetailScreen(
 fun StudyRecordListSection(
     records: List<StudyRecord>,
     modifier: Modifier = Modifier,
-    isLoading: Boolean = false,                          // ✅ [추가]
-    onDeleteRecord: (StudyRecord) -> Unit = {}           // ✅ [추가]
+    isLoading: Boolean = false,
+    onDeleteRecord: (StudyRecord) -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -351,7 +351,7 @@ fun StudyRecordListSection(
                 StudyRecordMiniCard(
                     record = record,
                     isLoading = isLoading,
-                    onDeleteClick = { onDeleteRecord(record) }   // ✅ [추가]
+                    onDeleteClick = { onDeleteRecord(record) }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -364,8 +364,8 @@ fun StudyRecordListSection(
 fun StudyRecordMiniCard(
     record: StudyRecord,
     modifier: Modifier = Modifier,
-    isLoading: Boolean = false,             // ✅ [추가]
-    onDeleteClick: () -> Unit = {}          // ✅ [추가]
+    isLoading: Boolean = false,
+    onDeleteClick: () -> Unit = {}
 ) {
     val dateText = remember(record.learningDate) {
         if (record.learningDate > 0L)
@@ -397,7 +397,6 @@ fun StudyRecordMiniCard(
             }
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // 날짜 + 완료율 뱃지 + 삭제 버튼 행
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -422,7 +421,6 @@ fun StudyRecordMiniCard(
                         )
                     }
                     Spacer(modifier = Modifier.width(4.dp))
-                    // ✅ [추가] 삭제 아이콘 버튼 (16dp)
                     IconButton(
                         onClick = onDeleteClick,
                         enabled = !isLoading,
