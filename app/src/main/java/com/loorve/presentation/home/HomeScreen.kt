@@ -1,4 +1,3 @@
-// 파일 경로: app/src/main/java/com/loorve/presentation/home/HomeScreen.kt
 package com.loorve.presentation.home
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -35,9 +34,12 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.ui.component.*
 import com.loorve.ui.theme.*
+// ✅ [원인3 수정] java.time 패키지를 명시적으로 import — Firebase DataConnect의 LocalDate와 충돌 방지
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+// ❌ import com.google.firebase.dataconnect.LocalDate  ← 이 줄이 있다면 반드시 제거
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,11 +53,7 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
 
-    // ✅ [수정] displayYearMonth를 ViewModel StateFlow에서 수집 (로컬 remember 제거)
     val displayYearMonth by viewModel.displayYearMonth.collectAsState()
-
-    // ✅ [제거] LaunchedEffect(displayYearMonth) 블록 삭제
-    //    setDisplayYearMonth() 내부에서 loadReviewScheduleDatesByMonth()를 이미 호출하므로 중복 방지
 
     LaunchedEffect(uiState.saveMessage) {
         uiState.saveMessage?.let {
@@ -132,7 +130,6 @@ fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            // ✅ [수정] setDisplayYearMonth() 호출로 변경 (ViewModel이 reload 담당)
                             IconButton(onClick = {
                                 viewModel.setDisplayYearMonth(displayYearMonth.minusMonths(1))
                             }) {
@@ -144,7 +141,6 @@ fun HomeScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = Primary
                             )
-                            // ✅ [수정] setDisplayYearMonth() 호출로 변경
                             IconButton(onClick = {
                                 viewModel.setDisplayYearMonth(displayYearMonth.plusMonths(1))
                             }) {
@@ -161,7 +157,6 @@ fun HomeScreen(
                         HomeMiniCalendar(
                             displayYearMonth = displayYearMonth,
                             selectedDate = selectedDate,
-                            // ✅ Progress 날짜 + ReviewSchedule 날짜 합집합 전달 (기존 유지)
                             scheduledDates = uiState.scheduledDates + uiState.reviewScheduleDates,
                             onDateSelected = { selectedDate = it }
                         )
@@ -170,8 +165,23 @@ fun HomeScreen(
             }
 
             // ── 4) 선택 날짜의 복습 일정 카드 ──
+            // ✅ [원인2 수정] reviewDate 타입에 관계없이 안전하게 LocalDate로 변환 후 비교
             val todaySchedules = uiState.reviewSchedules.filter { schedule ->
-                schedule.reviewDate == selectedDate
+                val reviewLocalDate: LocalDate? = when (val d = schedule.reviewDate) {
+                    is LocalDate -> d
+                    is com.google.firebase.Timestamp -> d.toDate()
+                        .toInstant()
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                    is java.util.Date -> d.toInstant()
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                    is String -> runCatching {
+                        LocalDate.parse(d)
+                    }.getOrNull()
+                    else -> null
+                }
+                reviewLocalDate == selectedDate
             }
 
             if (todaySchedules.isNotEmpty()) {
@@ -258,7 +268,12 @@ private fun HomeReviewRateCard(rate: Float, completed: Int, total: Int) {
 
 /** 미니 달력 */
 @Composable
-private fun HomeMiniCalendar(displayYearMonth: YearMonth, selectedDate: LocalDate, scheduledDates: Set<LocalDate>, onDateSelected: (LocalDate) -> Unit) {
+private fun HomeMiniCalendar(
+    displayYearMonth: YearMonth,
+    selectedDate: LocalDate,
+    scheduledDates: Set<LocalDate>,
+    onDateSelected: (LocalDate) -> Unit
+) {
     val today = LocalDate.now()
     val firstDayOfWeek = displayYearMonth.atDay(1).dayOfWeek.value % 7
     val daysInMonth = displayYearMonth.lengthOfMonth()
@@ -288,16 +303,39 @@ private fun HomeMiniCalendar(displayYearMonth: YearMonth, selectedDate: LocalDat
                         val hasSchedule = scheduledDates.contains(date)
                         day++
                         Box(
-                            modifier = Modifier.weight(1f).height(36.dp).clip(CircleShape)
-                                .background(when { isSelected -> Primary; isToday -> Primary.copy(alpha = 0.15f); else -> Color.Transparent })
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    when {
+                                        isSelected -> Primary
+                                        isToday -> Primary.copy(alpha = 0.15f)
+                                        else -> Color.Transparent
+                                    }
+                                )
                                 .clickable { onDateSelected(date) },
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = "$currentDay", style = LoorveTypography.labelMedium, color = when { isSelected -> Color.White; isToday -> Primary; else -> OnBackground }, fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal)
+                                Text(
+                                    text = "$currentDay",
+                                    style = LoorveTypography.labelMedium,
+                                    color = when {
+                                        isSelected -> Color.White
+                                        isToday -> Primary
+                                        else -> OnBackground
+                                    },
+                                    fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
+                                )
                                 if (hasSchedule) {
                                     Spacer(Modifier.height(1.dp))
-                                    Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(if (isSelected) Color.White else Primary))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(4.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isSelected) Color.White else Primary)
+                                    )
                                 }
                             }
                         }
@@ -313,7 +351,11 @@ private fun HomeMiniCalendar(displayYearMonth: YearMonth, selectedDate: LocalDat
 @Composable
 private fun HomeScheduleCard(subjectName: String, content: String, onStart: () -> Unit) {
     LoorveCard(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = "오늘 · $subjectName", style = LoorveTypography.labelMedium, color = Primary, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
