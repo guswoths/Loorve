@@ -78,7 +78,6 @@ fun ReviewBlockDetailScreen(
 
     val resolvedBlock = uiState.reviewBlock
     val examDateMillis = resolvedBlock?.examDate ?: 0L
-    val prepStartDateMillis = resolvedBlock?.prepStartDate ?: 0L
     val dailyCap = resolvedBlock?.dailyCap ?: 5
     val examName = resolvedBlock?.examName?.ifBlank { resolvedBlock.title }
         ?: resolvedBlock?.title
@@ -259,7 +258,7 @@ fun ReviewBlockDetailScreen(
                 }
             }
 
-            if (examDateMillis == 0L) {
+            if (uiState.isLoading && examDateMillis == 0L) {
                 item {
                     Text(
                         text = "⚠️ 블록 정보를 불러오는 중입니다...",
@@ -282,8 +281,6 @@ fun ReviewBlockDetailScreen(
                             content = content,
                             completionRate = completionRate,
                             learningDateMillis = learningDateMillis,
-                            examDateMillis = examDateMillis,
-                            prepStartDateMillis = prepStartDateMillis,
                             dailyCap = dailyCap
                         )
                     },

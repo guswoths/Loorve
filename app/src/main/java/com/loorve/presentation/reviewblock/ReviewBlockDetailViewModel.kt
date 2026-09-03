@@ -48,8 +48,6 @@ class ReviewBlockDetailViewModel @Inject constructor(
     val uiState: StateFlow<ReviewBlockDetailUiState> = _uiState.asStateFlow()
 
     fun loadBlockData(uid: String, blockId: String, externalBlock: ReviewBlock? = null) {
-        // ✅ [수정 1] externalBlock이 있으면 코루틴 진입 전에 즉시 uiState에 반영
-        // → examDateMillis가 0L로 유지되는 비동기 gap을 제거
         if (externalBlock != null) {
             _uiState.value = _uiState.value.copy(reviewBlock = externalBlock)
         }
@@ -62,7 +60,6 @@ class ReviewBlockDetailViewModel @Inject constructor(
                     .getOrDefault(emptyList())
                     .firstOrNull { it.blockId == blockId }
 
-            // ✅ [수정 1 추가] resolvedBlock이 null이면 에러 처리 후 종료
             if (resolvedBlock == null) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -106,15 +103,24 @@ class ReviewBlockDetailViewModel @Inject constructor(
         content: String,
         completionRate: Float = 1.0f,
         learningDateMillis: Long,
-        examDateMillis: Long,
-        prepStartDateMillis: Long,
         dailyCap: Int = 5
     ) {
         if (_uiState.value.isLoading) return
 
+        val currentBlock = _uiState.value.reviewBlock
+        if (currentBlock == null) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "블록 정보를 아직 불러오지 못했습니다. 잠시 후 다시 시도해주세요."
+            )
+            return
+        }
+
+        val examDateMillis = currentBlock.examDate
+        val prepStartDateMillis = currentBlock.prepStartDate
+
         if (examDateMillis == 0L) {
             _uiState.value = _uiState.value.copy(
-                errorMessage = "블록 정보가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요."
+                errorMessage = "시험 날짜가 설정되지 않은 블록입니다. 블록을 수정해주세요."
             )
             return
         }
