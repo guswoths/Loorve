@@ -80,11 +80,12 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                 val schedules = snapshot?.documents.orEmpty()
                     .mapNotNull { document ->
                         runCatching {
+                            // scheduleId(var)가 @DocumentId로 자동 주입됨
                             document.toObject(ReviewSchedule::class.java)
+                                ?.also { if (it.scheduleId.isBlank()) it.scheduleId = document.id }
                         }.getOrNull()
                     }
                     .filter { it.scheduleId.isNotBlank() }
-
                 trySend(schedules)
             }
 

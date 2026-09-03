@@ -5,17 +5,17 @@ import com.google.firebase.firestore.PropertyName
 
 data class ReviewSchedule(
     @DocumentId
-    val scheduleId: String = "",       // scheduleId = reviewScheduleId 역할
+    var scheduleId: String = "",       // ✅ val → var 로 변경 (@DocumentId 자동 주입 위해 필수)
     val blockId: String = "",
     @get:PropertyName("uid") @set:PropertyName("uid")
     var userId: String = "",
-    val originProgressId: String = "", // ← 추가
+    val originProgressId: String = "",
     val title: String = "",
-    val reviewDate: Long = 0L,
     val reviewDateText: String = "",
-    val reviewOrder: Int = 0,          // reviewOrder = reviewRound 역할
+    val reviewOrder: Int = 0,
     val scheduleType: String = "EBBINGHAUS",
     val isCompleted: Boolean = false,
+    val reviewDate: Long = 0L,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 )
