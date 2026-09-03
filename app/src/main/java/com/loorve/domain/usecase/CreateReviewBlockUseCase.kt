@@ -162,7 +162,7 @@ class CreateReviewBlockUseCase @Inject constructor(
         return hashMapOf(
             "scheduleId" to scheduleId,
             "blockId" to blockId,
-            "userId" to uid,
+            "uid" to uid,             // ✅ 수정: "userId" → "uid" (Firestore 규칙과 일치)
             "title" to examName,
             "reviewDate" to reviewDate
                 .atStartOfDay(ZoneId.of("Asia/Seoul"))
@@ -176,4 +176,3 @@ class CreateReviewBlockUseCase @Inject constructor(
             "updatedAt" to createdAt
         )
     }
-}
