@@ -1,4 +1,3 @@
-// 파일 경로: app/src/main/java/com/loorve/presentation/home/HomeViewModel.kt
 package com.loorve.presentation.home
 
 import androidx.lifecycle.ViewModel
@@ -21,6 +20,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -95,7 +96,6 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    // ✅ [추가] ViewModel이 현재 표시 월을 직접 관리
     private val _displayYearMonth = MutableStateFlow(YearMonth.now())
     val displayYearMonth: StateFlow<YearMonth> = _displayYearMonth.asStateFlow()
 
@@ -106,27 +106,40 @@ class HomeViewModel @Inject constructor(
     private var reviewScheduleJob: Job? = null
 
     init {
-        loadExams()
-        loadReviewBlocks()
-        // ✅ _displayYearMonth.value 기준으로 통일 (init 시점엔 YearMonth.now()와 동일)
+        // ✅ uid를 반드시 토큰 갱신 후 확보, 그 다음 모든 데이터 로드
         viewModelScope.launch {
-            loadProgressListAndThenSchedules(_displayYearMonth.value)
+            val uid = getUidSafely() ?: run {
+                _uiState.update { it.copy(isLoading = false) }
+                return@launch
+            }
+            loadExams()
+            loadReviewBlocks(uid)
+            loadProgressListAndThenSchedules(uid, _displayYearMonth.value)
         }
     }
 
-    // ✅ [추가] HomeScreen에서 월 변경 시 호출 → ViewModel 상태 갱신 + 복습일정 재조회
-    fun setDisplayYearMonth(yearMonth: YearMonth) {
-        _displayYearMonth.update { yearMonth }
-        loadReviewScheduleDatesByMonth(yearMonth)
+    // ✅ 핵심: 토큰 강제 갱신으로 uid를 안전하게 확보
+    private suspend fun getUidSafely(): String? {
+        val user = FirebaseAuth.getInstance().currentUser ?: return null
+        return runCatching {
+            user.getIdToken(true).await()
+            user.uid
+        }.getOrElse { user.uid }
     }
 
-    // ✅ progressList 로드 완료 후 reviewSchedules 조회 — 레이스 컨디션 원천 차단
-    private suspend fun loadProgressListAndThenSchedules(yearMonth: YearMonth) {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+    fun setDisplayYearMonth(yearMonth: YearMonth) {
+        _displayYearMonth.update { yearMonth }
+        viewModelScope.launch {
+            val uid = getUidSafely() ?: return@launch
+            loadReviewScheduleDatesByMonth(uid, yearMonth)
+        }
+    }
+
+    private suspend fun loadProgressListAndThenSchedules(uid: String, yearMonth: YearMonth) {
         try {
             val list = getProgressListUseCase(uid).first()
             applyProgressList(list)
-            loadReviewScheduleDatesByMonth(yearMonth)
+            loadReviewScheduleDatesByMonth(uid, yearMonth)
         } catch (_: Exception) {}
     }
 
@@ -143,33 +156,27 @@ class HomeViewModel @Inject constructor(
                     }
                 }
                 .collect { exams ->
-                    val nearest = exams
-                        .mapNotNull { exam ->
-                            runCatching {
-                                val examDate = Instant.ofEpochMilli(exam.examDate)
-                                    .atZone(seoulZone).toLocalDate()
-                                val today = LocalDate.now()
-                                val days = ChronoUnit.DAYS.between(today, examDate).toInt()
-                                if (days >= 0) {
-                                    NearestExamUiModel(
-                                        subjectName = exam.subjectName,
-                                        daysLeft = days,
-                                        examDateFormatted = examDate.format(displayFormatter)
-                                    )
-                                } else null
-                            }.getOrNull()
-                        }
-                        .minByOrNull { it.daysLeft }
-                    _uiState.update {
-                        it.copy(isLoading = false, exams = exams, nearestExam = nearest)
-                    }
+                    val nearest = exams.mapNotNull { exam ->
+                        runCatching {
+                            val examDate = Instant.ofEpochMilli(exam.examDate)
+                                .atZone(seoulZone).toLocalDate()
+                            val today = LocalDate.now()
+                            val days = ChronoUnit.DAYS.between(today, examDate).toInt()
+                            if (days >= 0) NearestExamUiModel(
+                                subjectName = exam.subjectName,
+                                daysLeft = days,
+                                examDateFormatted = examDate.format(displayFormatter)
+                            ) else null
+                        }.getOrNull()
+                    }.minByOrNull { it.daysLeft }
+                    _uiState.update { it.copy(isLoading = false, exams = exams, nearestExam = nearest) }
                 }
         }
     }
 
     fun loadProgressList() {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         viewModelScope.launch {
+            val uid = getUidSafely() ?: return@launch
             getProgressListUseCase(uid)
                 .catch { }
                 .collect { list ->
@@ -179,8 +186,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // ✅ progressList → UiState 반영 로직을 분리 (재사용)
-    private fun applyProgressList(list: List<com.loorve.domain.model.Progress>) {
+    private fun applyProgressList(list: List<Progress>) {
         val uiList = list.map { p ->
             ProgressUiModel(
                 id = p.progressId,
@@ -197,8 +203,8 @@ class HomeViewModel @Inject constructor(
             )
         }
         val today = LocalDate.now()
-        val weekStart = today.with(java.time.DayOfWeek.MONDAY)
-        val weekEnd = today.with(java.time.DayOfWeek.SUNDAY)
+        val weekStart = today.with(DayOfWeek.MONDAY)
+        val weekEnd = today.with(DayOfWeek.SUNDAY)
         val weeklyList = uiList.filter { p ->
             runCatching {
                 val d = Instant.ofEpochMilli(p.createdAt).atZone(seoulZone).toLocalDate()
@@ -225,10 +231,9 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun loadReviewScheduleDatesByMonth(yearMonth: YearMonth) {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+    // ✅ uid를 파라미터로 받아서 절대 null 상황이 생기지 않도록 변경
+    fun loadReviewScheduleDatesByMonth(uid: String, yearMonth: YearMonth) {
         reviewScheduleJob?.cancel()
-
         reviewScheduleJob = viewModelScope.launch {
             val startDate = yearMonth.atDay(1).format(dateRangeFormatter)
             val endDate = yearMonth.atEndOfMonth().format(dateRangeFormatter)
@@ -237,7 +242,6 @@ class HomeViewModel @Inject constructor(
                 .getReviewSchedulesByDateRange(uid, startDate, endDate)
                 .catch { }
                 .collect { schedules ->
-                    // ✅ 항상 최신 progressMap 사용
                     val currentProgressMap = _uiState.value.progressList.associateBy { it.id }
 
                     val reviewScheduleUiModels = schedules.mapNotNull { schedule ->
@@ -248,53 +252,43 @@ class HomeViewModel @Inject constructor(
                         }.getOrNull() ?: return@mapNotNull null
 
                         val originProgress = currentProgressMap[schedule.originProgressId]
-
-                        // ✅ originProgressId가 ""이거나 매핑 못 찾아도 일정은 표시
                         val displayContent = originProgress?.content
                             ?: schedule.title.ifBlank { "복습 일정 ${schedule.reviewOrder}회차" }
                         val displayExamId = originProgress?.examId ?: ""
 
                         ReviewScheduleUiModel(
-                            scheduleId       = schedule.scheduleId,
+                            scheduleId = schedule.scheduleId,
                             originProgressId = schedule.originProgressId,
-                            examId           = displayExamId,
-                            content          = displayContent,
-                            reviewDate       = localDate,
-                            reviewOrder      = schedule.reviewOrder
+                            examId = displayExamId,
+                            content = displayContent,
+                            reviewDate = localDate,
+                            reviewOrder = schedule.reviewOrder
                         )
                     }
 
                     val reviewDates = reviewScheduleUiModels.map { it.reviewDate }.toSet()
-
                     _uiState.update { state ->
                         state.copy(
                             reviewScheduleDates = reviewDates,
-                            reviewSchedules     = reviewScheduleUiModels
+                            reviewSchedules = reviewScheduleUiModels
                         )
                     }
                 }
         }
     }
 
-    // ✅ progressList 갱신 후 reviewSchedules content/examId 재매핑
     private fun refreshReviewSchedulesFromCache() {
         val currentProgressMap = _uiState.value.progressList.associateBy { it.id }
         val refreshed = _uiState.value.reviewSchedules.map { schedule ->
             val originProgress = currentProgressMap[schedule.originProgressId]
             if (originProgress != null) {
-                schedule.copy(
-                    examId  = originProgress.examId,
-                    content = originProgress.content
-                )
-            } else {
-                schedule
-            }
+                schedule.copy(examId = originProgress.examId, content = originProgress.content)
+            } else schedule
         }
         _uiState.update { it.copy(reviewSchedules = refreshed) }
     }
 
-    fun loadReviewBlocks() {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+    private fun loadReviewBlocks(uid: String) {
         viewModelScope.launch {
             reviewBlockRepository.getReviewBlocks(uid)
                 .onSuccess { blocks: List<ReviewBlock> ->
@@ -304,13 +298,13 @@ class HomeViewModel @Inject constructor(
                             .atZone(seoulZone).toLocalDate()
                         val dDay = ChronoUnit.DAYS.between(today, examLocalDate).toInt()
                         ReviewBlockUiModel(
-                            blockId             = block.blockId,
-                            examName            = block.examName.ifBlank { block.title },
-                            dDay                = dDay,
-                            completionRate      = 0f,
-                            examDateMillis      = block.examDate,
+                            blockId = block.blockId,
+                            examName = block.examName.ifBlank { block.title },
+                            dDay = dDay,
+                            completionRate = 0f,
+                            examDateMillis = block.examDate,
                             prepStartDateMillis = block.prepStartDate,
-                            dailyCap            = block.dailyCap
+                            dailyCap = block.dailyCap
                         )
                     }
                     _uiState.update { it.copy(reviewBlocks = uiBlocks) }
@@ -325,28 +319,28 @@ class HomeViewModel @Inject constructor(
         prepStartDateMillis: Long,
         dailyCap: Int
     ) {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid
-        if (uid.isNullOrBlank()) {
-            _uiState.update { it.copy(saveMessage = "로그인 정보가 없습니다.") }
-            return
-        }
         viewModelScope.launch {
+            val uid = getUidSafely()
+            if (uid.isNullOrBlank()) {
+                _uiState.update { it.copy(saveMessage = "로그인 정보가 없습니다.") }
+                return@launch
+            }
             _uiState.update { it.copy(isCreatingBlock = true, errorMessage = null) }
             val block = ReviewBlock(
-                blockId         = "",
-                uid             = uid,
-                examName        = examName,
-                title           = examName,
-                examDate        = examDateMillis,
-                prepStartDate   = prepStartDateMillis,
-                dailyCap        = dailyCap,
-                createdAt       = System.currentTimeMillis(),
-                updatedAt       = System.currentTimeMillis()
+                blockId = "",
+                uid = uid,
+                examName = examName,
+                title = examName,
+                examDate = examDateMillis,
+                prepStartDate = prepStartDateMillis,
+                dailyCap = dailyCap,
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
             )
             reviewBlockRepository.saveReviewBlock(block)
                 .onSuccess {
                     _uiState.update { it.copy(isCreatingBlock = false, saveMessage = "복습 블록이 생성되었습니다.") }
-                    loadReviewBlocks()
+                    loadReviewBlocks(uid)
                 }
                 .onFailure { e ->
                     _uiState.update {
@@ -357,40 +351,39 @@ class HomeViewModel @Inject constructor(
     }
 
     fun addProgress(examId: String, content: String, completedCount: Int, totalCount: Int) {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid
-        if (uid.isNullOrBlank()) {
-            _uiState.update {
-                it.copy(
-                    saveMessage  = "로그인 정보가 없습니다. 다시 로그인해 주세요.",
-                    errorMessage = "로그인 정보가 없습니다."
-                )
-            }
-            return
-        }
         viewModelScope.launch {
+            val uid = getUidSafely()
+            if (uid.isNullOrBlank()) {
+                _uiState.update {
+                    it.copy(
+                        saveMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요.",
+                        errorMessage = "로그인 정보가 없습니다."
+                    )
+                }
+                return@launch
+            }
             _uiState.update { it.copy(isSaving = true, saveMessage = null, errorMessage = null) }
 
             val progress = Progress(
-                progressId     = UUID.randomUUID().toString(),
-                examId         = examId,
-                content        = content.trim(),
+                progressId = UUID.randomUUID().toString(),
+                examId = examId,
+                content = content.trim(),
                 completedCount = completedCount,
-                totalCount     = totalCount,
-                isCompleted    = totalCount > 0 && completedCount >= totalCount,
-                createdAt      = System.currentTimeMillis()
+                totalCount = totalCount,
+                isCompleted = totalCount > 0 && completedCount >= totalCount,
+                createdAt = System.currentTimeMillis()
             )
 
             val result = saveProgressAndScheduleUseCase(uid, progress)
 
             if (result.isSuccess) {
                 _uiState.update { it.copy(isSaving = false, saveMessage = "학습 진도가 저장되었습니다.") }
-                // ✅ [수정] 중첩 launch 제거 + 현재 표시 월(_displayYearMonth.value) 기준으로 reload
-                loadProgressListAndThenSchedules(_displayYearMonth.value)
+                loadProgressListAndThenSchedules(uid, _displayYearMonth.value)
             } else {
                 _uiState.update {
                     it.copy(
-                        isSaving     = false,
-                        saveMessage  = result.exceptionOrNull()?.message ?: "저장하지 못했습니다.",
+                        isSaving = false,
+                        saveMessage = result.exceptionOrNull()?.message ?: "저장하지 못했습니다.",
                         errorMessage = result.exceptionOrNull()?.message
                     )
                 }
