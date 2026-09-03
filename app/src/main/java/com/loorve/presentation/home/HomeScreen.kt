@@ -1,6 +1,5 @@
 package com.loorve.presentation.home
 
-import android.app.DatePickerDialog
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -37,7 +36,6 @@ import com.loorve.ui.component.*
 import com.loorve.ui.theme.*
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,6 +50,11 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var displayYearMonth by remember { mutableStateOf(YearMonth.now()) }
+
+    // ✅ [추가] 월이 변경될 때마다 복습일정 날짜 자동 로드
+    LaunchedEffect(displayYearMonth) {
+        viewModel.loadReviewScheduleDatesByMonth(displayYearMonth)
+    }
 
     LaunchedEffect(uiState.saveMessage) {
         uiState.saveMessage?.let {
@@ -128,6 +131,7 @@ fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                            // ✅ 버튼은 상태만 변경. LaunchedEffect가 ViewModel 호출을 담당
                             IconButton(onClick = { displayYearMonth = displayYearMonth.minusMonths(1) }) {
                                 Icon(Icons.Outlined.ChevronLeft, contentDescription = "이전 달", tint = Primary)
                             }
@@ -151,7 +155,8 @@ fun HomeScreen(
                         HomeMiniCalendar(
                             displayYearMonth = displayYearMonth,
                             selectedDate = selectedDate,
-                            scheduledDates = uiState.scheduledDates,
+                            // ✅ [수정] Progress 날짜 + ReviewSchedule 날짜 합집합 전달
+                            scheduledDates = uiState.scheduledDates + uiState.reviewScheduleDates,
                             onDateSelected = { selectedDate = it }
                         )
                     }
