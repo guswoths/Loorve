@@ -10,7 +10,9 @@ import com.loorve.domain.usecase.AddProgressUseCase
 import com.loorve.domain.usecase.GetExamsUseCase
 import com.loorve.domain.usecase.GetProgressListUseCase
 import com.loorve.domain.repository.ReviewBlockRepository
+import com.loorve.domain.repository.ReviewScheduleRepository  // ✅ 추가
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job                                 // ✅ 추가
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth                                    // ✅ 추가
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -40,11 +43,10 @@ data class ProgressUiModel(
     val createdAt: Long = 0L
 )
 
-// ✅ 복습 블록 UI 모델
 data class ReviewBlockUiModel(
     val blockId: String,
     val examName: String,
-    val dDay: Int,          // 시험까지 남은 일 수 (음수 = 지남)
+    val dDay: Int,
     val completionRate: Float,
     val examDateMillis: Long,
     val prepStartDateMillis: Long,
@@ -62,8 +64,8 @@ data class HomeUiState(
     val weeklyCompletionRate: Float = 0f,
     val weeklyCompleted: Int = 0,
     val weeklyTotal: Int = 0,
-    val scheduledDates: Set<LocalDate> = emptySet(),
-    // ✅ 복습 블록 목록
+    val scheduledDates: Set<LocalDate> = emptySet(),       // Progress 날짜
+    val reviewScheduleDates: Set<LocalDate> = emptySet(),  // ✅ 복습일정 전용 필드 추가
     val reviewBlocks: List<ReviewBlockUiModel> = emptyList(),
     val isCreatingBlock: Boolean = false
 )
@@ -73,7 +75,8 @@ class HomeViewModel @Inject constructor(
     private val getExamsUseCase: GetExamsUseCase,
     private val addProgressUseCase: AddProgressUseCase,
     private val getProgressListUseCase: GetProgressListUseCase,
-    private val reviewBlockRepository: ReviewBlockRepository   // ✅ 추가
+    private val reviewBlockRepository: ReviewBlockRepository,
+    private val reviewScheduleRepository: ReviewScheduleRepository  // ✅ 추가
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -81,11 +84,16 @@ class HomeViewModel @Inject constructor(
 
     private val displayFormatter = DateTimeFormatter.ofPattern("M월 d일")
     private val seoulZone = ZoneId.of("Asia/Seoul")
+    private val dateRangeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")  // ✅ 추가
+
+    // ✅ 월 이동 시 이전 Job 취소를 위한 참조
+    private var reviewScheduleJob: Job? = null
 
     init {
         loadExams()
         loadProgressList()
-        loadReviewBlocks()   // ✅ 추가
+        loadReviewBlocks()
+        loadReviewScheduleDatesByMonth(YearMonth.now())  // ✅ 추가
     }
 
     fun loadExams() {
@@ -116,7 +124,6 @@ class HomeViewModel @Inject constructor(
                             }.getOrNull()
                         }
                         .minByOrNull { it.daysLeft }
-
                     _uiState.update {
                         it.copy(isLoading = false, exams = exams, nearestExam = nearest)
                     }
@@ -145,7 +152,6 @@ class HomeViewModel @Inject constructor(
                             }.getOrElse { p.createdAt.toString() }
                         )
                     }
-
                     val today = LocalDate.now()
                     val weekStart = today.with(java.time.DayOfWeek.MONDAY)
                     val weekEnd = today.with(java.time.DayOfWeek.SUNDAY)
@@ -172,13 +178,37 @@ class HomeViewModel @Inject constructor(
                             weeklyTotal = weeklyTotal,
                             weeklyCompletionRate = weeklyRate,
                             scheduledDates = scheduledDates
+                            // ✅ reviewScheduleDates는 건드리지 않음 (분리 유지)
                         )
                     }
                 }
         }
     }
 
-    // ✅ 복습 블록 목록 로드
+    // ✅ 신규: 월 이동 시 이전 Job 취소 후 해당 월 복습일정 로드
+    fun loadReviewScheduleDatesByMonth(yearMonth: YearMonth) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        reviewScheduleJob?.cancel()  // 이전 수집 취소
+        reviewScheduleJob = viewModelScope.launch {
+            val startDate = yearMonth.atDay(1).format(dateRangeFormatter)
+            val endDate = yearMonth.atEndOfMonth().format(dateRangeFormatter)
+            reviewScheduleRepository
+                .getReviewSchedulesByDateRange(uid, startDate, endDate)
+                .catch { }
+                .collect { schedules ->
+                    val reviewDates = schedules.mapNotNull { schedule ->
+                        runCatching {
+                            Instant.ofEpochMilli(schedule.reviewDate)
+                                .atZone(seoulZone).toLocalDate()
+                        }.getOrNull()
+                    }.toSet()
+                    _uiState.update { state ->
+                        state.copy(reviewScheduleDates = reviewDates)  // ✅ 덮어쓰기(누적 방지)
+                    }
+                }
+        }
+    }
+
     fun loadReviewBlocks() {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         viewModelScope.launch {
@@ -201,11 +231,10 @@ class HomeViewModel @Inject constructor(
                     }
                     _uiState.update { it.copy(reviewBlocks = uiBlocks) }
                 }
-                .onFailure { /* 오류 무시 또는 로깅 */ }
+                .onFailure { }
         }
     }
 
-    // ✅ 복습 블록 생성
     fun createReviewBlock(
         examName: String,
         examDateMillis: Long,
@@ -220,7 +249,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isCreatingBlock = true, errorMessage = null) }
             val block = ReviewBlock(
-                blockId = "",   // Repository에서 Firestore auto-id 할당
+                blockId = "",
                 uid = uid,
                 examName = examName,
                 title = examName,
