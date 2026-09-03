@@ -20,18 +20,18 @@ class ReviewBlockRepositoryImpl @Inject constructor(
         data: Map<String, Any?>,
         docId: String
     ): ReviewBlock = ReviewBlock(
-        blockId      = docId,
-        uid          = data["uid"]          as? String  ?: "",
-        date         = data["date"]         as? String  ?: "",
-        title        = data["title"]        as? String  ?: "",
-        description  = data["description"]  as? String  ?: "",
-        isCompleted  = data["isCompleted"]  as? Boolean ?: false,
-        examDate     = (data["examDate"]    as? Number)?.toLong() ?: 0L,
-        prepStartDate= (data["prepStartDate"] as? Number)?.toLong() ?: 0L,
-        dailyCap     = (data["dailyCap"]    as? Number)?.toInt()  ?: 5,
-        examName     = data["examName"]     as? String  ?: "",
-        createdAt    = (data["createdAt"]   as? Number)?.toLong() ?: 0L,
-        updatedAt    = (data["updatedAt"]   as? Number)?.toLong() ?: 0L
+        blockId = docId,
+        uid = data["uid"] as? String ?: "",
+        date = data["date"] as? String ?: "",
+        title = data["title"] as? String ?: "",
+        description = data["description"] as? String ?: "",
+        isCompleted = data["isCompleted"] as? Boolean ?: false,
+        examDate = (data["examDate"] as? Number)?.toLong() ?: 0L,
+        prepStartDate = (data["prepStartDate"] as? Number)?.toLong() ?: 0L,
+        dailyCap = (data["dailyCap"] as? Number)?.toInt() ?: 5,
+        examName = data["examName"] as? String ?: "",
+        createdAt = (data["createdAt"] as? Number)?.toLong() ?: 0L,
+        updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L
     )
 
     override suspend fun saveReviewBlock(reviewBlock: ReviewBlock): Result<Unit> {
@@ -43,18 +43,18 @@ class ReviewBlockRepositoryImpl @Inject constructor(
             }
 
             val data = hashMapOf(
-                "blockId"      to docId,
-                "uid"          to reviewBlock.uid,
-                "date"         to reviewBlock.date,
-                "title"        to reviewBlock.title,
-                "description"  to reviewBlock.description,
-                "isCompleted"  to reviewBlock.isCompleted,
-                "examDate"     to reviewBlock.examDate,
-                "prepStartDate"to reviewBlock.prepStartDate,
-                "dailyCap"     to reviewBlock.dailyCap,
-                "examName"     to reviewBlock.examName,
-                "createdAt"    to reviewBlock.createdAt,
-                "updatedAt"    to reviewBlock.updatedAt
+                "blockId" to docId,
+                "uid" to reviewBlock.uid,
+                "date" to reviewBlock.date,
+                "title" to reviewBlock.title,
+                "description" to reviewBlock.description,
+                "isCompleted" to reviewBlock.isCompleted,
+                "examDate" to reviewBlock.examDate,
+                "prepStartDate" to reviewBlock.prepStartDate,
+                "dailyCap" to reviewBlock.dailyCap,
+                "examName" to reviewBlock.examName,
+                "createdAt" to reviewBlock.createdAt,
+                "updatedAt" to reviewBlock.updatedAt
             )
 
             reviewBlocksRef(reviewBlock.uid)
