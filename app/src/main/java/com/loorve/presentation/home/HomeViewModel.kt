@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -101,9 +102,21 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadExams()
-        loadProgressList()
         loadReviewBlocks()
-        loadReviewScheduleDatesByMonth(YearMonth.now())
+        // ✅ progressList를 먼저 로드하고 완료 후 reviewSchedule 로드 (레이스 컨디션 방지)
+        viewModelScope.launch {
+            loadProgressListAndThenSchedules(YearMonth.now())
+        }
+    }
+
+    // ✅ progressList 로드 완료 후 reviewSchedules 조회 — 레이스 컨디션 원천 차단
+    private suspend fun loadProgressListAndThenSchedules(yearMonth: YearMonth) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        try {
+            val list = getProgressListUseCase(uid).first()
+            applyProgressList(list)
+            loadReviewScheduleDatesByMonth(yearMonth)
+        } catch (_: Exception) {}
     }
 
     fun loadExams() {
@@ -149,53 +162,55 @@ class HomeViewModel @Inject constructor(
             getProgressListUseCase(uid)
                 .catch { }
                 .collect { list ->
-                    val uiList = list.map { p ->
-                        ProgressUiModel(
-                            id = p.progressId,
-                            examId = p.examId,
-                            content = p.content,
-                            completed = p.completedCount,
-                            total = p.totalCount,
-                            createdAt = p.createdAt,
-                            dateFormatted = runCatching {
-                                Instant.ofEpochMilli(p.createdAt)
-                                    .atZone(seoulZone).toLocalDate()
-                                    .format(displayFormatter)
-                            }.getOrElse { p.createdAt.toString() }
-                        )
-                    }
-                    val today = LocalDate.now()
-                    val weekStart = today.with(java.time.DayOfWeek.MONDAY)
-                    val weekEnd = today.with(java.time.DayOfWeek.SUNDAY)
-                    val weeklyList = uiList.filter { p ->
-                        runCatching {
-                            val d = Instant.ofEpochMilli(p.createdAt).atZone(seoulZone).toLocalDate()
-                            !d.isBefore(weekStart) && !d.isAfter(weekEnd)
-                        }.getOrElse { false }
-                    }
-                    val weeklyCompleted = weeklyList.sumOf { it.completed }
-                    val weeklyTotal = weeklyList.sumOf { it.total }
-                    val weeklyRate = if (weeklyTotal > 0) weeklyCompleted.toFloat() / weeklyTotal else 0f
-
-                    val scheduledDates = uiList.mapNotNull { p ->
-                        runCatching {
-                            Instant.ofEpochMilli(p.createdAt).atZone(seoulZone).toLocalDate()
-                        }.getOrNull()
-                    }.toSet()
-
-                    _uiState.update {
-                        it.copy(
-                            progressList = uiList,
-                            weeklyCompleted = weeklyCompleted,
-                            weeklyTotal = weeklyTotal,
-                            weeklyCompletionRate = weeklyRate,
-                            scheduledDates = scheduledDates
-                        )
-                    }
-
-                    // ✅ progressList 갱신 후 reviewSchedules 콘텐츠도 즉시 재매핑
+                    applyProgressList(list)
                     refreshReviewSchedulesFromCache()
                 }
+        }
+    }
+
+    // ✅ progressList → UiState 반영 로직을 분리 (재사용)
+    private fun applyProgressList(list: List<com.loorve.domain.model.Progress>) {
+        val uiList = list.map { p ->
+            ProgressUiModel(
+                id = p.progressId,
+                examId = p.examId,
+                content = p.content,
+                completed = p.completedCount,
+                total = p.totalCount,
+                createdAt = p.createdAt,
+                dateFormatted = runCatching {
+                    Instant.ofEpochMilli(p.createdAt)
+                        .atZone(seoulZone).toLocalDate()
+                        .format(displayFormatter)
+                }.getOrElse { p.createdAt.toString() }
+            )
+        }
+        val today = LocalDate.now()
+        val weekStart = today.with(java.time.DayOfWeek.MONDAY)
+        val weekEnd = today.with(java.time.DayOfWeek.SUNDAY)
+        val weeklyList = uiList.filter { p ->
+            runCatching {
+                val d = Instant.ofEpochMilli(p.createdAt).atZone(seoulZone).toLocalDate()
+                !d.isBefore(weekStart) && !d.isAfter(weekEnd)
+            }.getOrElse { false }
+        }
+        val weeklyCompleted = weeklyList.sumOf { it.completed }
+        val weeklyTotal = weeklyList.sumOf { it.total }
+        val weeklyRate = if (weeklyTotal > 0) weeklyCompleted.toFloat() / weeklyTotal else 0f
+        val scheduledDates = uiList.mapNotNull { p ->
+            runCatching {
+                Instant.ofEpochMilli(p.createdAt).atZone(seoulZone).toLocalDate()
+            }.getOrNull()
+        }.toSet()
+
+        _uiState.update {
+            it.copy(
+                progressList = uiList,
+                weeklyCompleted = weeklyCompleted,
+                weeklyTotal = weeklyTotal,
+                weeklyCompletionRate = weeklyRate,
+                scheduledDates = scheduledDates
+            )
         }
     }
 
@@ -211,6 +226,7 @@ class HomeViewModel @Inject constructor(
                 .getReviewSchedulesByDateRange(uid, startDate, endDate)
                 .catch { }
                 .collect { schedules ->
+                    // ✅ 항상 최신 progressMap 사용
                     val currentProgressMap = _uiState.value.progressList.associateBy { it.id }
 
                     val reviewScheduleUiModels = schedules.mapNotNull { schedule ->
@@ -220,10 +236,11 @@ class HomeViewModel @Inject constructor(
                                 .toLocalDate()
                         }.getOrNull() ?: return@mapNotNull null
 
-                        // ✅ originProgressId가 "" 이면 content를 schedule 자체 title로 대체
                         val originProgress = currentProgressMap[schedule.originProgressId]
+
+                        // ✅ originProgressId가 ""이거나 매핑 못 찾아도 일정은 표시
                         val displayContent = originProgress?.content
-                            ?: schedule.originProgressId.ifBlank { "복습 일정" }
+                            ?: schedule.title.ifBlank { "복습 일정 ${schedule.reviewOrder}회차" }
                         val displayExamId = originProgress?.examId ?: ""
 
                         ReviewScheduleUiModel(
@@ -248,7 +265,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // ✅ progressList가 갱신된 뒤 이미 로드된 reviewSchedules의 content/examId를 재매핑
+    // ✅ progressList 갱신 후 reviewSchedules content/examId 재매핑
     private fun refreshReviewSchedulesFromCache() {
         val currentProgressMap = _uiState.value.progressList.associateBy { it.id }
         val refreshed = _uiState.value.reviewSchedules.map { schedule ->
@@ -276,13 +293,13 @@ class HomeViewModel @Inject constructor(
                             .atZone(seoulZone).toLocalDate()
                         val dDay = ChronoUnit.DAYS.between(today, examLocalDate).toInt()
                         ReviewBlockUiModel(
-                            blockId            = block.blockId,
-                            examName           = block.examName.ifBlank { block.title },
-                            dDay               = dDay,
-                            completionRate     = 0f,
-                            examDateMillis     = block.examDate,
+                            blockId             = block.blockId,
+                            examName            = block.examName.ifBlank { block.title },
+                            dDay                = dDay,
+                            completionRate      = 0f,
+                            examDateMillis      = block.examDate,
                             prepStartDateMillis = block.prepStartDate,
-                            dailyCap           = block.dailyCap
+                            dailyCap            = block.dailyCap
                         )
                     }
                     _uiState.update { it.copy(reviewBlocks = uiBlocks) }
@@ -343,21 +360,23 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(isSaving = true, saveMessage = null, errorMessage = null) }
 
             val progress = Progress(
-                progressId     = UUID.randomUUID().toString(), // ✅ 핵심 수정: ID 미리 생성
+                progressId     = UUID.randomUUID().toString(), // ✅ ID 미리 확정
                 examId         = examId,
                 content        = content.trim(),
                 completedCount = completedCount,
                 totalCount     = totalCount,
                 isCompleted    = totalCount > 0 && completedCount >= totalCount,
-                createdAt      = System.currentTimeMillis()   // ✅ 저장 시각도 미리 확정
+                createdAt      = System.currentTimeMillis()
             )
 
             val result = saveProgressAndScheduleUseCase(uid, progress)
 
             if (result.isSuccess) {
                 _uiState.update { it.copy(isSaving = false, saveMessage = "학습 진도가 저장되었습니다.") }
-                loadProgressList()
-                loadReviewScheduleDatesByMonth(YearMonth.now())
+                // ✅ 저장 후 progressList 먼저 → 그 다음 reviewSchedule (순서 보장)
+                viewModelScope.launch {
+                    loadProgressListAndThenSchedules(YearMonth.now())
+                }
             } else {
                 _uiState.update {
                     it.copy(
