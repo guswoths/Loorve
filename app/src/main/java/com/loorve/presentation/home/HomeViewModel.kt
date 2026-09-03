@@ -11,6 +11,7 @@ import com.loorve.domain.usecase.GetProgressListUseCase
 import com.loorve.domain.usecase.SaveProgressAndScheduleUseCase
 import com.loorve.domain.repository.ReviewBlockRepository
 import com.loorve.domain.repository.ReviewScheduleRepository
+import com.loorve.util.CalendarRefreshBus  // ✅ 추가
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,7 +91,8 @@ class HomeViewModel @Inject constructor(
     private val saveProgressAndScheduleUseCase: SaveProgressAndScheduleUseCase,
     private val getProgressListUseCase: GetProgressListUseCase,
     private val reviewBlockRepository: ReviewBlockRepository,
-    private val reviewScheduleRepository: ReviewScheduleRepository
+    private val reviewScheduleRepository: ReviewScheduleRepository,
+    private val calendarRefreshBus: CalendarRefreshBus  // ✅ 추가
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -115,6 +117,12 @@ class HomeViewModel @Inject constructor(
             loadExams()
             loadReviewBlocks(uid)
             loadProgressListAndThenSchedules(uid, _displayYearMonth.value)
+        }
+        // ✅ 다른 화면(복습기록 생성/삭제)에서 이벤트 수신 시 캘린더 자동 갱신
+        viewModelScope.launch {
+            calendarRefreshBus.refreshEvent.collect {
+                refreshCalendar()
+            }
         }
     }
 
@@ -398,7 +406,7 @@ class HomeViewModel @Inject constructor(
     fun refreshCalendar() {
         viewModelScope.launch {
             val uid = getUidSafely() ?: return@launch
-            loadReviewScheduleDatesByMonth(uid, _displayYearMonth.value)
+            loadProgressListAndThenSchedules(uid, _displayYearMonth.value)
         }
     }
 

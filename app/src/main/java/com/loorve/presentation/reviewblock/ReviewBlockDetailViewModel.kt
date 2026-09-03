@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
+import com.loorve.util.CalendarRefreshBus
 
 data class ReviewBlockDetailUiState(
     val isLoading: Boolean = false,
@@ -41,7 +42,8 @@ class ReviewBlockDetailViewModel @Inject constructor(
     private val saveStudyProgressUseCase: SaveStudyProgressUseCase,
     private val studyRecordRepository: StudyRecordRepository,
     private val scheduleRepository: ReviewScheduleItemRepository,
-    private val reviewBlockRepository: ReviewBlockRepository
+    private val reviewBlockRepository: ReviewBlockRepository,
+    private val calendarRefreshBus: CalendarRefreshBus
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewBlockDetailUiState())
@@ -146,6 +148,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
             ).onSuccess {
                 loadBlockData(uid, blockId)
                 _uiState.value = _uiState.value.copy(savedSuccess = true)
+                calendarRefreshBus.notifyRefresh()
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -245,6 +248,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(recordToDelete = null)
                     loadBlockData(uid, blockId)
+                    calendarRefreshBus.notifyRefresh()
                 }
                 .onFailure { e ->
                     _uiState.value = _uiState.value.copy(
