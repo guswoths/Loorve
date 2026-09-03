@@ -34,9 +34,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         return runCatching {
             require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
             require(reviewSchedule.scheduleId.isNotBlank()) { "복습 일정 ID가 비어 있습니다." }
-
             val scheduleToSave = reviewSchedule.copy(userId = uid)
-
             firestore
                 .collection("users")
                 .document(uid)
@@ -57,7 +55,6 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
             close()
             return@callbackFlow
         }
-
         val startMillis = parseStartOfDayMillis(startDate)
         val endExclusiveMillis = parseNextDayStartMillis(endDate)
 
@@ -70,11 +67,11 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
             .orderBy("reviewDate", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    Log.w(TAG, "복습일정 스냅샷 오류 (리스너 유지): ${error.message}")
+                    Log.w(TAG, "복습일정 스냅샷 오류: ${error.message}")
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
-
+                // ✅ filter 제거, apply로 scheduleId 보장
                 val schedules = snapshot?.documents.orEmpty()
                     .mapNotNull { document ->
                         runCatching {
@@ -84,11 +81,9 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                                 }
                         }.getOrNull()
                     }
-
                 Log.d(TAG, "복습일정 스냅샷 수신: ${schedules.size}건 (${startDate}~${endDate})")
                 trySend(schedules)
             }
-
         awaitClose { listenerRegistration.remove() }
     }
 
@@ -99,7 +94,6 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         return runCatching {
             require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
             require(progressId.isNotBlank()) { "진도 ID가 비어 있습니다." }
-
             firestore
                 .collection("users")
                 .document(uid)
@@ -110,7 +104,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                 .documents
                 .mapNotNull { doc ->
                     doc.toObject(ReviewSchedule::class.java)
-                        ?.also { if (it.scheduleId.isBlank()) it.scheduleId = doc.id }
+                        ?.apply { if (scheduleId.isBlank()) scheduleId = doc.id }
                 }
         }
     }
@@ -121,7 +115,6 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
     ): Result<List<ReviewSchedule>> {
         return runCatching {
             require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
-
             firestore
                 .collection("users")
                 .document(uid)
@@ -134,7 +127,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                 .documents
                 .mapNotNull { doc ->
                     doc.toObject(ReviewSchedule::class.java)
-                        ?.also { if (it.scheduleId.isBlank()) it.scheduleId = doc.id }
+                        ?.apply { if (scheduleId.isBlank()) scheduleId = doc.id }
                 }
         }
     }
@@ -146,7 +139,6 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         return runCatching {
             require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
             require(scheduleId.isNotBlank()) { "복습 일정 ID가 비어 있습니다." }
-
             firestore
                 .collection("users")
                 .document(uid)
@@ -156,7 +148,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                 .await()
                 .let { doc ->
                     doc.toObject(ReviewSchedule::class.java)
-                        ?.also { if (it.scheduleId.isBlank()) it.scheduleId = doc.id }
+                        ?.apply { if (this.scheduleId.isBlank()) this.scheduleId = doc.id }
                 }
         }
     }
@@ -179,7 +171,6 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         return runCatching {
             require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
             require(scheduleId.isNotBlank()) { "복습 일정 ID가 비어 있습니다." }
-
             firestore
                 .collection("users")
                 .document(uid)
@@ -198,22 +189,20 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         return runCatching {
             require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
             require(scheduleId.isNotBlank()) { "복습 일정 ID가 비어 있습니다." }
-
             firestore
                 .collection("users")
                 .document(uid)
                 .collection("reviewSchedules")
                 .document(scheduleId)
-                .update(
-                    mapOf(
-                        "isCompleted" to isCompleted,
-                        "updatedAt" to System.currentTimeMillis()
-                    )
-                )
+                .update(mapOf(
+                    "isCompleted" to isCompleted,
+                    "updatedAt"   to System.currentTimeMillis()
+                ))
                 .await()
         }
     }
 
+    // ✅ scheduleId 포함
     private fun ReviewSchedule.toFirestoreMap(): Map<String, Any> {
         return mapOf(
             "scheduleId"       to scheduleId,
@@ -233,14 +222,9 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
 
     private fun parseStartOfDayMillis(date: String): Long =
         java.time.LocalDate.parse(date)
-            .atStartOfDay(KST)
-            .toInstant()
-            .toEpochMilli()
+            .atStartOfDay(KST).toInstant().toEpochMilli()
 
     private fun parseNextDayStartMillis(date: String): Long =
         java.time.LocalDate.parse(date)
-            .plusDays(1)
-            .atStartOfDay(KST)
-            .toInstant()
-            .toEpochMilli()
+            .plusDays(1).atStartOfDay(KST).toInstant().toEpochMilli()
 }
