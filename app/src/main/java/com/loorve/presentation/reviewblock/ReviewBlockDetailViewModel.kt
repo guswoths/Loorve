@@ -191,6 +191,10 @@ class ReviewBlockDetailViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(savedSuccess = false)
     }
 
+    fun clearErrorMessage() {
+        _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
     fun setShowDeleteConfirm(show: Boolean) {
         _uiState.value = _uiState.value.copy(showDeleteConfirm = show)
     }

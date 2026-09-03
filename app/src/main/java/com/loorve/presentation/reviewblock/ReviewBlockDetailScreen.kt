@@ -61,6 +61,13 @@ fun ReviewBlockDetailScreen(
         }
     }
 
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearErrorMessage()
+        }
+    }
+
     // ✅ [추가] 블록 삭제 성공 시 뒤로가기
     LaunchedEffect(uiState.deleteSuccess) {
         if (uiState.deleteSuccess) {
@@ -252,8 +259,7 @@ fun ReviewBlockDetailScreen(
                 }
             }
 
-            // ✅ [수정 2] isLoading 상태도 함께 체크하여 로딩 완료 후 문구 미표시
-            if (examDateMillis == 0L && uiState.isLoading) {
+            if (examDateMillis == 0L) {
                 item {
                     Text(
                         text = "⚠️ 블록 정보를 불러오는 중입니다...",
@@ -282,7 +288,7 @@ fun ReviewBlockDetailScreen(
                         )
                     },
                     isLoading = uiState.isLoading,
-                    isSaveEnabled = examDateMillis > 0L
+                    isSaveEnabled = true
                 )
             }
 
