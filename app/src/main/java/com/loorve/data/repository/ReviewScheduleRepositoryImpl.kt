@@ -79,10 +79,11 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                     .mapNotNull { document ->
                         runCatching {
                             document.toObject(ReviewSchedule::class.java)
-                                ?.also { if (it.scheduleId.isBlank()) it.scheduleId = document.id }
+                                ?.apply {
+                                    if (scheduleId.isBlank()) scheduleId = document.id
+                                }
                         }.getOrNull()
                     }
-                    .filter { it.scheduleId.isNotBlank() }
 
                 Log.d(TAG, "복습일정 스냅샷 수신: ${schedules.size}건 (${startDate}~${endDate})")
                 trySend(schedules)
@@ -215,17 +216,18 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
 
     private fun ReviewSchedule.toFirestoreMap(): Map<String, Any> {
         return mapOf(
-            "blockId" to blockId,
-            "uid" to userId,
+            "scheduleId"       to scheduleId,
+            "blockId"          to blockId,
+            "uid"              to userId,
             "originProgressId" to originProgressId,
-            "title" to title,
-            "reviewDate" to reviewDate,
-            "reviewDateText" to reviewDateText,
-            "reviewOrder" to reviewOrder,
-            "scheduleType" to scheduleType,
-            "isCompleted" to isCompleted,
-            "createdAt" to createdAt,
-            "updatedAt" to updatedAt
+            "title"            to title,
+            "reviewDate"       to reviewDate,
+            "reviewDateText"   to reviewDateText,
+            "reviewOrder"      to reviewOrder,
+            "scheduleType"     to scheduleType,
+            "isCompleted"      to isCompleted,
+            "createdAt"        to createdAt,
+            "updatedAt"        to updatedAt
         )
     }
 
