@@ -32,9 +32,8 @@ class CreateReviewBlockUseCase @Inject constructor(
             val zoneId = ZoneId.of("Asia/Seoul")
             val today = LocalDate.now(zoneId)
 
-            // DatePicker는 UTC 자정 기준 밀리초 반환 → KST 기준으로 파싱해야 날짜가 일치함
             val examDate = Instant.ofEpochMilli(request.examDateMillis)
-                .atZone(zoneId)   // ZoneId.of("UTC") → zoneId (Asia/Seoul) 로 변경
+                .atZone(zoneId)
                 .toLocalDate()
 
             require(!examDate.isBefore(today)) {
@@ -43,6 +42,17 @@ class CreateReviewBlockUseCase @Inject constructor(
 
             val blockId = UUID.randomUUID().toString()
             val now = System.currentTimeMillis()
+
+            // examDate를 KST 자정 기준 epoch ms로 변환 (mapToReviewBlock과 동일한 방식으로 저장)
+            val examDateEpochMs = examDate
+                .atStartOfDay(zoneId)
+                .toInstant()
+                .toEpochMilli()
+
+            val prepStartDateEpochMs = today
+                .atStartOfDay(zoneId)
+                .toInstant()
+                .toEpochMilli()
 
             val blockRef = firestore
                 .collection("users")
@@ -67,6 +77,12 @@ class CreateReviewBlockUseCase @Inject constructor(
                     "title" to request.examName.trim(),
                     "description" to createCycleDescription(request.cycleOption),
                     "isCompleted" to false,
+                    // ✅ 수정: 누락된 핵심 필드 추가
+                    "examDate" to examDateEpochMs,
+                    "prepStartDate" to prepStartDateEpochMs,
+                    "examName" to request.examName.trim(),
+                    "dailyCap" to 5,
+                    // ─────────────────────────────
                     "createdAt" to now,
                     "updatedAt" to now
                 )
