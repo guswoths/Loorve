@@ -28,12 +28,8 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         reviewSchedule: ReviewSchedule
     ): Result<Unit> {
         return runCatching {
-            require(uid.isNotBlank()) {
-                "사용자 ID가 비어 있습니다."
-            }
-            require(reviewSchedule.scheduleId.isNotBlank()) {
-                "복습 일정 ID가 비어 있습니다."
-            }
+            require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
+            require(reviewSchedule.scheduleId.isNotBlank()) { "복습 일정 ID가 비어 있습니다." }
 
             val scheduleToSave = reviewSchedule.copy(userId = uid)
 
@@ -77,16 +73,14 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                     .mapNotNull { document ->
                         runCatching {
                             document.toObject(ReviewSchedule::class.java)
-                        }.getOrNull()  // 개별 문서 파싱 실패 시 해당 항목만 제외, 앱 크래시 방지
+                        }.getOrNull()
                     }
-                    .filter { it.scheduleId.isNotBlank() }  // 빈 scheduleId 데이터 제외
+                    .filter { it.scheduleId.isNotBlank() }
 
                 trySend(schedules)
             }
 
-        awaitClose {
-            listenerRegistration.remove()
-        }
+        awaitClose { listenerRegistration.remove() }
     }
 
     override suspend fun getReviewSchedulesByProgressId(
@@ -94,12 +88,8 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         progressId: String
     ): Result<List<ReviewSchedule>> {
         return runCatching {
-            require(uid.isNotBlank()) {
-                "사용자 ID가 비어 있습니다."
-            }
-            require(progressId.isNotBlank()) {
-                "진도 ID가 비어 있습니다."
-            }
+            require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
+            require(progressId.isNotBlank()) { "진도 ID가 비어 있습니다." }
 
             firestore
                 .collection("users")
@@ -109,9 +99,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                 .get()
                 .await()
                 .documents
-                .mapNotNull { document ->
-                    document.toObject(ReviewSchedule::class.java)
-                }
+                .mapNotNull { it.toObject(ReviewSchedule::class.java) }
         }
     }
 
@@ -120,9 +108,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         fromMillis: Long
     ): Result<List<ReviewSchedule>> {
         return runCatching {
-            require(uid.isNotBlank()) {
-                "사용자 ID가 비어 있습니다."
-            }
+            require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
 
             firestore
                 .collection("users")
@@ -134,9 +120,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                 .get()
                 .await()
                 .documents
-                .mapNotNull { document ->
-                    document.toObject(ReviewSchedule::class.java)
-                }
+                .mapNotNull { it.toObject(ReviewSchedule::class.java) }
         }
     }
 
@@ -145,12 +129,8 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         scheduleId: String
     ): Result<ReviewSchedule?> {
         return runCatching {
-            require(uid.isNotBlank()) {
-                "사용자 ID가 비어 있습니다."
-            }
-            require(scheduleId.isNotBlank()) {
-                "복습 일정 ID가 비어 있습니다."
-            }
+            require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
+            require(scheduleId.isNotBlank()) { "복습 일정 ID가 비어 있습니다." }
 
             firestore
                 .collection("users")
@@ -166,37 +146,21 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
     override suspend fun completeReviewSchedule(
         uid: String,
         scheduleId: String
-    ): Result<Unit> {
-        return updateCompletion(
-            uid = uid,
-            scheduleId = scheduleId,
-            isCompleted = true
-        )
-    }
+    ): Result<Unit> = updateCompletion(uid, scheduleId, true)
 
     override suspend fun updateReviewCompletion(
         uid: String,
         scheduleId: String,
         isCompleted: Boolean
-    ): Result<Unit> {
-        return updateCompletion(
-            uid = uid,
-            scheduleId = scheduleId,
-            isCompleted = isCompleted
-        )
-    }
+    ): Result<Unit> = updateCompletion(uid, scheduleId, isCompleted)
 
     override suspend fun deleteReviewSchedule(
         uid: String,
         scheduleId: String
     ): Result<Unit> {
         return runCatching {
-            require(uid.isNotBlank()) {
-                "사용자 ID가 비어 있습니다."
-            }
-            require(scheduleId.isNotBlank()) {
-                "복습 일정 ID가 비어 있습니다."
-            }
+            require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
+            require(scheduleId.isNotBlank()) { "복습 일정 ID가 비어 있습니다." }
 
             firestore
                 .collection("users")
@@ -214,59 +178,47 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         isCompleted: Boolean
     ): Result<Unit> {
         return runCatching {
-            require(uid.isNotBlank()) {
-                "사용자 ID가 비어 있습니다."
-            }
-            require(scheduleId.isNotBlank()) {
-                "복습 일정 ID가 비어 있습니다."
-            }
+            require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
+            require(scheduleId.isNotBlank()) { "복습 일정 ID가 비어 있습니다." }
 
             firestore
                 .collection("users")
                 .document(uid)
                 .collection("reviewSchedules")
                 .document(scheduleId)
-                .update(
-                    mapOf(
-                        "isCompleted" to isCompleted,
-                        "updatedAt" to System.currentTimeMillis()
-                    )
-                )
+                .update(mapOf(
+                    "isCompleted" to isCompleted,
+                    "updatedAt" to System.currentTimeMillis()
+                ))
                 .await()
         }
     }
 
+    // ✅ 핵심 수정: "scheduleId" 제거 — @DocumentId 필드는 문서 ID에서 자동 주입
     private fun ReviewSchedule.toFirestoreMap(): Map<String, Any> {
         return mapOf(
-            "scheduleId" to scheduleId,
-            "blockId" to blockId,
-            "uid" to userId,
+            "blockId"          to blockId,
+            "uid"              to userId,
             "originProgressId" to originProgressId,
-            "title" to title,
-            "reviewDate" to reviewDate,
-            "reviewDateText" to reviewDateText,
-            "reviewOrder" to reviewOrder,
-            "scheduleType" to scheduleType,
-            "isCompleted" to isCompleted,
-            "createdAt" to createdAt,
-            "updatedAt" to updatedAt
+            "title"            to title,
+            "reviewDate"       to reviewDate,
+            "reviewDateText"   to reviewDateText,
+            "reviewOrder"      to reviewOrder,
+            "scheduleType"     to scheduleType,
+            "isCompleted"      to isCompleted,
+            "createdAt"        to createdAt,
+            "updatedAt"        to updatedAt
         )
     }
 
-    private fun parseStartOfDayMillis(date: String): Long {
-        return java.time.LocalDate
-            .parse(date)
+    private fun parseStartOfDayMillis(date: String): Long =
+        java.time.LocalDate.parse(date)
             .atStartOfDay(java.time.ZoneId.of("Asia/Seoul"))
-            .toInstant()
-            .toEpochMilli()
-    }
+            .toInstant().toEpochMilli()
 
-    private fun parseNextDayStartMillis(date: String): Long {
-        return java.time.LocalDate
-            .parse(date)
+    private fun parseNextDayStartMillis(date: String): Long =
+        java.time.LocalDate.parse(date)
             .plusDays(1)
             .atStartOfDay(java.time.ZoneId.of("Asia/Seoul"))
-            .toInstant()
-            .toEpochMilli()
-    }
+            .toInstant().toEpochMilli()
 }
