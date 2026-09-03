@@ -52,7 +52,8 @@ class ReviewBlockDetailViewModel @Inject constructor(
         // → UI가 로딩 중에도 examDate를 올바르게 읽을 수 있음
         _uiState.value = _uiState.value.copy(
             isLoading = true,
-            reviewBlock = externalBlock ?: _uiState.value.reviewBlock
+            reviewBlock = externalBlock ?: _uiState.value.reviewBlock,
+            errorMessage = null  // 이전 에러 초기화
         )
 
         viewModelScope.launch {

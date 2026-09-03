@@ -289,7 +289,7 @@ fun ReviewBlockDetailScreen(
                         )
                     },
                     isLoading = uiState.isLoading,
-                    isSaveEnabled = true
+                    isSaveEnabled = resolvedBlock != null && resolvedBlock.examDate != 0L  // ← 핵심 수정
                 )
             }
 
