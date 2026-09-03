@@ -443,17 +443,10 @@ fun LoorveNavHost(
                 ) {
                     when (selectedTabIndex) {
                         0 -> HomeScreen(
-                            onNavigateToMyPage = {
-                                navController.navigate(Screen.MyPage.route)
-                            },
-                            onNavigateToExamSetting = {
-                                navController.navigate(Screen.ExamSetting.route)
-                            },
+                            onNavigateToMyPage = { navController.navigate(Screen.MyPage.route) },
+                            onNavigateToExamSetting = { navController.navigate(Screen.ExamSetting.route) },
                             onNavigateToProgressDetail = { progressId ->
                                 navController.navigate(Screen.ProgressDetail.createRoute(progressId))
-                            },
-                            onNavigateToReviewBlockDetail = { blockId ->   // ✅ 추가
-                                navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId))
                             }
                         )
 
@@ -509,11 +502,10 @@ fun LoorveNavHost(
 
         composable(Screen.Calendar.route) {
             ReviewCalendarScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
-                onNavigateToAddReviewBlock = {
-                    navController.navigate(Screen.AddReviewBlock.route)
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAddReviewBlock = { navController.navigate(Screen.AddReviewBlock.route) },
+                onNavigateToReviewBlockDetail = { blockId ->
+                    navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId))
                 }
             )
         }
