@@ -8,7 +8,7 @@ import com.loorve.domain.model.Progress
 import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.usecase.GetExamsUseCase
 import com.loorve.domain.usecase.GetProgressListUseCase
-import com.loorve.domain.usecase.SaveProgressAndScheduleUseCase  // ✅ 변경: AddProgressUseCase → SaveProgressAndScheduleUseCase
+import com.loorve.domain.usecase.SaveProgressAndScheduleUseCase
 import com.loorve.domain.repository.ReviewBlockRepository
 import com.loorve.domain.repository.ReviewScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,6 +43,15 @@ data class ProgressUiModel(
     val createdAt: Long = 0L
 )
 
+data class ReviewScheduleUiModel(
+    val scheduleId: String,
+    val originProgressId: String,
+    val examId: String,
+    val content: String,
+    val reviewDate: LocalDate,
+    val reviewOrder: Int
+)
+
 data class ReviewBlockUiModel(
     val blockId: String,
     val examName: String,
@@ -66,6 +75,7 @@ data class HomeUiState(
     val weeklyTotal: Int = 0,
     val scheduledDates: Set<LocalDate> = emptySet(),
     val reviewScheduleDates: Set<LocalDate> = emptySet(),
+    val reviewSchedules: List<ReviewScheduleUiModel> = emptyList(),
     val reviewBlocks: List<ReviewBlockUiModel> = emptyList(),
     val isCreatingBlock: Boolean = false
 )
@@ -73,7 +83,7 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val getExamsUseCase: GetExamsUseCase,
-    private val saveProgressAndScheduleUseCase: SaveProgressAndScheduleUseCase,  // ✅ 변경
+    private val saveProgressAndScheduleUseCase: SaveProgressAndScheduleUseCase,
     private val getProgressListUseCase: GetProgressListUseCase,
     private val reviewBlockRepository: ReviewBlockRepository,
     private val reviewScheduleRepository: ReviewScheduleRepository
@@ -115,14 +125,17 @@ class HomeViewModel @Inject constructor(
                                     .atZone(seoulZone).toLocalDate()
                                 val today = LocalDate.now()
                                 val days = ChronoUnit.DAYS.between(today, examDate).toInt()
-                                if (days >= 0) NearestExamUiModel(
-                                    subjectName = exam.subjectName,
-                                    daysLeft = days,
-                                    examDateFormatted = examDate.format(displayFormatter)
-                                ) else null
+                                if (days >= 0) {
+                                    NearestExamUiModel(
+                                        subjectName = exam.subjectName,
+                                        daysLeft = days,
+                                        examDateFormatted = examDate.format(displayFormatter)
+                                    )
+                                } else null
                             }.getOrNull()
                         }
                         .minByOrNull { it.daysLeft }
+
                     _uiState.update {
                         it.copy(isLoading = false, exams = exams, nearestExam = nearest)
                     }
@@ -151,6 +164,7 @@ class HomeViewModel @Inject constructor(
                             }.getOrElse { p.createdAt.toString() }
                         )
                     }
+
                     val today = LocalDate.now()
                     val weekStart = today.with(java.time.DayOfWeek.MONDAY)
                     val weekEnd = today.with(java.time.DayOfWeek.SUNDAY)
@@ -160,6 +174,7 @@ class HomeViewModel @Inject constructor(
                             !d.isBefore(weekStart) && !d.isAfter(weekEnd)
                         }.getOrElse { false }
                     }
+
                     val weeklyCompleted = weeklyList.sumOf { it.completed }
                     val weeklyTotal = weeklyList.sumOf { it.total }
                     val weeklyRate = if (weeklyTotal > 0) weeklyCompleted.toFloat() / weeklyTotal else 0f
@@ -186,21 +201,43 @@ class HomeViewModel @Inject constructor(
     fun loadReviewScheduleDatesByMonth(yearMonth: YearMonth) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         reviewScheduleJob?.cancel()
+
         reviewScheduleJob = viewModelScope.launch {
             val startDate = yearMonth.atDay(1).format(dateRangeFormatter)
             val endDate = yearMonth.atEndOfMonth().format(dateRangeFormatter)
+
             reviewScheduleRepository
                 .getReviewSchedulesByDateRange(uid, startDate, endDate)
                 .catch { }
                 .collect { schedules ->
-                    val reviewDates = schedules.mapNotNull { schedule ->
-                        runCatching {
+                    val currentProgressMap = _uiState.value.progressList.associateBy { it.id }
+
+                    val reviewScheduleUiModels = schedules.mapNotNull { schedule ->
+                        val localDate = runCatching {
                             Instant.ofEpochMilli(schedule.reviewDate)
-                                .atZone(seoulZone).toLocalDate()
-                        }.getOrNull()
-                    }.toSet()
+                                .atZone(seoulZone)
+                                .toLocalDate()
+                        }.getOrNull() ?: return@mapNotNull null
+
+                        val originProgress = currentProgressMap[schedule.originProgressId] ?: return@mapNotNull null
+
+                        ReviewScheduleUiModel(
+                            scheduleId = schedule.scheduleId,
+                            originProgressId = schedule.originProgressId,
+                            examId = originProgress.examId,
+                            content = originProgress.content,
+                            reviewDate = localDate,
+                            reviewOrder = schedule.reviewOrder
+                        )
+                    }
+
+                    val reviewDates = reviewScheduleUiModels.map { it.reviewDate }.toSet()
+
                     _uiState.update { state ->
-                        state.copy(reviewScheduleDates = reviewDates)
+                        state.copy(
+                            reviewScheduleDates = reviewDates,
+                            reviewSchedules = reviewScheduleUiModels
+                        )
                     }
                 }
         }
@@ -216,6 +253,7 @@ class HomeViewModel @Inject constructor(
                         val examLocalDate = Instant.ofEpochMilli(block.examDate)
                             .atZone(seoulZone).toLocalDate()
                         val dDay = ChronoUnit.DAYS.between(today, examLocalDate).toInt()
+
                         ReviewBlockUiModel(
                             blockId = block.blockId,
                             examName = block.examName.ifBlank { block.title },
@@ -243,6 +281,7 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(saveMessage = "로그인 정보가 없습니다.") }
             return
         }
+
         viewModelScope.launch {
             _uiState.update { it.copy(isCreatingBlock = true, errorMessage = null) }
             val block = ReviewBlock(
@@ -256,6 +295,7 @@ class HomeViewModel @Inject constructor(
                 createdAt = System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis()
             )
+
             reviewBlockRepository.saveReviewBlock(block)
                 .onSuccess {
                     _uiState.update { it.copy(isCreatingBlock = false, saveMessage = "복습 블록이 생성되었습니다.") }
@@ -272,9 +312,15 @@ class HomeViewModel @Inject constructor(
     fun addProgress(examId: String, content: String, completedCount: Int, totalCount: Int) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         if (uid.isNullOrBlank()) {
-            _uiState.update { it.copy(saveMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요.", errorMessage = "로그인 정보가 없습니다.") }
+            _uiState.update {
+                it.copy(
+                    saveMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요.",
+                    errorMessage = "로그인 정보가 없습니다."
+                )
+            }
             return
         }
+
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, saveMessage = null, errorMessage = null) }
             val progress = Progress(
@@ -284,12 +330,12 @@ class HomeViewModel @Inject constructor(
                 totalCount = totalCount,
                 isCompleted = totalCount > 0 && completedCount >= totalCount
             )
-            // ✅ 핵심 수정: addProgressUseCase → saveProgressAndScheduleUseCase
-            // SaveProgressAndScheduleUseCase가 Progress 저장 + ReviewSchedule 생성 + 알람 등록을 모두 처리
+
             val result = saveProgressAndScheduleUseCase(uid, progress)
+
             if (result.isSuccess) {
                 _uiState.update { it.copy(isSaving = false, saveMessage = "학습 진도가 저장되었습니다.") }
-                // ✅ Progress 저장 성공 후 현재 표시 월의 복습 일정 즉시 갱신
+                loadProgressList()
                 loadReviewScheduleDatesByMonth(YearMonth.now())
             } else {
                 _uiState.update {

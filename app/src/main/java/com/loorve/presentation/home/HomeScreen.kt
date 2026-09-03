@@ -164,12 +164,9 @@ fun HomeScreen(
             }
 
             // ── 4) 선택 날짜의 복습 일정 카드 ──
-            val todaySchedules = uiState.progressList.filter { progress ->
-                try {
-                    val d = java.time.Instant.ofEpochMilli(progress.createdAt)
-                        .atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate()
-                    d == selectedDate
-                } catch (e: Exception) { false }
+            // 기존 todaySchedules 제거
+            val todaySchedules = uiState.reviewSchedules.filter { schedule ->
+                schedule.reviewDate == selectedDate
             }
 
             if (todaySchedules.isNotEmpty()) {
@@ -182,11 +179,11 @@ fun HomeScreen(
                         modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
                     )
                 }
-                items(todaySchedules, key = { "sched_${it.id}" }) { progress ->
+                items(todaySchedules, key = { "sched_${it.scheduleId}" }) { schedule ->
                     HomeScheduleCard(
-                        subjectName = uiState.exams.find { it.id == progress.examId }?.subjectName ?: "",
-                        content = progress.content,
-                        onStart = { onNavigateToProgressDetail(progress.id) }
+                        subjectName = uiState.exams.find { it.id == schedule.examId }?.subjectName ?: "",
+                        content = schedule.content,
+                        onStart = { onNavigateToProgressDetail(schedule.originProgressId) }
                     )
                 }
             } else {
