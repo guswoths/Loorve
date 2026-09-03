@@ -63,17 +63,24 @@ class ReviewCalendarViewModel @Inject constructor(
      * suspend fun으로 변경하여 호출부(LaunchedEffect)에서 완료를 기다릴 수 있도록 함.
      * 토큰 갱신 실패 시 캐시 uid 폴백으로 네트워크 오류와 로그인 오류를 구분.
      */
+    // ✅ AFTER — refreshUid() 내부에서 직접 스케줄 로드까지 완료
     suspend fun refreshUid() {
         _isUidReady.value = false
         val user = FirebaseAuth.getInstance().currentUser
-        _currentUid.value = runCatching {
+        val uid = runCatching {
             user?.getIdToken(true)?.await()
             user?.uid
         }.getOrElse {
             user?.uid
         }
-        _isUidReady.value = (_currentUid.value != null)
-        _currentUid.value?.let { uid -> loadReviewBlocks(uid) }  // 추가
+        _currentUid.value = uid
+        _isUidReady.value = (uid != null)
+        if (!uid.isNullOrBlank()) {
+            loadReviewBlocks(uid)              // 기존 유지
+            // ✅ 핵심 추가: uid 세팅 직후 스케줄 로드
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            loadSchedulesForMonth(_uiState.value.displayYearMonth)
+        }
     }
 
     fun onMonthChanged(yearMonth: YearMonth) {
@@ -188,8 +195,7 @@ class ReviewCalendarViewModel @Inject constructor(
     private fun loadSchedulesForMonth(yearMonth: YearMonth) {
         val uid = _currentUid.value
         if (uid.isNullOrBlank()) {
-            // uid 미준비 상태 — 로딩 유지, 에러 미표시 (Screen에서 순차 호출로 정상 처리)
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update { it.copy(isLoading = false, errorMessage = null) }
             return
         }
 

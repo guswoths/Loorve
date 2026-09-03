@@ -64,7 +64,6 @@ fun ReviewCalendarScreen(
 
     LaunchedEffect(Unit) {
         reviewCalendarViewModel.refreshUid()
-        reviewCalendarViewModel.loadCurrentMonth()
         reviewCalendarViewModel.onDateSelected(LocalDate.now())
     }
 
