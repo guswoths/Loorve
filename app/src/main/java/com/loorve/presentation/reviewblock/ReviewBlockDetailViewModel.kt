@@ -48,13 +48,14 @@ class ReviewBlockDetailViewModel @Inject constructor(
     val uiState: StateFlow<ReviewBlockDetailUiState> = _uiState.asStateFlow()
 
     fun loadBlockData(uid: String, blockId: String, externalBlock: ReviewBlock? = null) {
-        if (externalBlock != null) {
-            _uiState.value = _uiState.value.copy(reviewBlock = externalBlock)
-        }
+        // externalBlock이 있으면 isLoading = true와 동시에 reviewBlock도 함께 세팅
+        // → UI가 로딩 중에도 examDate를 올바르게 읽을 수 있음
+        _uiState.value = _uiState.value.copy(
+            isLoading = true,
+            reviewBlock = externalBlock ?: _uiState.value.reviewBlock
+        )
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-
             val resolvedBlock = externalBlock
                 ?: reviewBlockRepository.getReviewBlocks(uid)
                     .getOrDefault(emptyList())

@@ -83,17 +83,21 @@ fun ReviewBlockDetailScreen(
         ?: resolvedBlock?.title
         ?: blockId
 
-    val dDayText = if (examDateMillis > 0L) {
-        val examLocal = Instant.ofEpochMilli(examDateMillis)
-            .atZone(ZoneId.of("Asia/Seoul")).toLocalDate()
-        val days = java.time.temporal.ChronoUnit.DAYS
-            .between(LocalDate.now(), examLocal).toInt()
-        when {
-            days > 0  -> "D-$days"
-            days == 0 -> "D-Day"
-            else      -> "D+${-days}"
+    val dDayText = when {
+        resolvedBlock == null -> ""           // 아직 로딩 중 → 빈 문자열 (플리커 방지)
+        examDateMillis == 0L  -> "D-?"        // 블록은 있지만 시험일 미설정
+        else -> {
+            val examLocal = Instant.ofEpochMilli(examDateMillis)
+                .atZone(ZoneId.of("Asia/Seoul")).toLocalDate()
+            val days = java.time.temporal.ChronoUnit.DAYS
+                .between(LocalDate.now(), examLocal).toInt()
+            when {
+                days > 0  -> "D-$days"
+                days == 0 -> "D-Day"
+                else      -> "D+${-days}"
+            }
         }
-    } else "D-?"
+    }
 
     // ✅ [추가] 블록 삭제 확인 AlertDialog
     if (uiState.showDeleteConfirm) {
@@ -258,7 +262,7 @@ fun ReviewBlockDetailScreen(
                 }
             }
 
-            if (uiState.isLoading && examDateMillis == 0L) {
+            if (uiState.isLoading && uiState.reviewBlock == null) {
                 item {
                     Text(
                         text = "⚠️ 블록 정보를 불러오는 중입니다...",
