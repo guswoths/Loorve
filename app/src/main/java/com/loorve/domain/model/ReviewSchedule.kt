@@ -1,12 +1,14 @@
 package com.loorve.domain.model
 
 import com.google.firebase.firestore.DocumentId
+import com.google.firebase.firestore.PropertyName
 
 data class ReviewSchedule(
     @DocumentId
     val scheduleId: String = "",       // scheduleId = reviewScheduleId 역할
     val blockId: String = "",
-    val userId: String = "",           // userId = uid 역할
+    @get:PropertyName("uid") @set:PropertyName("uid")
+    var userId: String = "",
     val originProgressId: String = "", // ← 추가
     val title: String = "",
     val reviewDate: Long = 0L,

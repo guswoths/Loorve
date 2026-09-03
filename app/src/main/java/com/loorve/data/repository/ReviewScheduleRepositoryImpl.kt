@@ -240,7 +240,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         return mapOf(
             "scheduleId" to scheduleId,
             "blockId" to blockId,
-            "userId" to userId,
+            "uid" to userId,
             "originProgressId" to originProgressId,
             "title" to title,
             "reviewDate" to reviewDate,
