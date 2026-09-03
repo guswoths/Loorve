@@ -4,8 +4,8 @@ import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.PropertyName
 
 data class ReviewSchedule(
-    @DocumentId
-    var scheduleId: String = "",        // ✅ val → var (@DocumentId 자동 주입 필수)
+    @set:DocumentId
+    var scheduleId: String = "",
     val blockId: String = "",
     @get:PropertyName("uid") @set:PropertyName("uid")
     var userId: String = "",

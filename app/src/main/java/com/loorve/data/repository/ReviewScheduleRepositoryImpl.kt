@@ -53,7 +53,7 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         endDate: String
     ): Flow<List<ReviewSchedule>> = callbackFlow {
         if (uid.isBlank()) {
-            trySend(emptyList())    // ✅ [수정 3] close() 대신 빈 리스트 emit 후 정상 종료
+            trySend(emptyList())
             close()
             return@callbackFlow
         }
@@ -70,8 +70,6 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
             .orderBy("reviewDate", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    // ✅ [수정 3] 에러 시 Flow 영구 종료 대신 로그 + 빈 리스트 emit으로 변경
-                    //    일시적 네트워크 오류에도 리스너가 살아남아 자동 재수신
                     Log.w(TAG, "복습일정 스냅샷 오류 (리스너 유지): ${error.message}")
                     trySend(emptyList())
                     return@addSnapshotListener
@@ -80,12 +78,13 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                 val schedules = snapshot?.documents.orEmpty()
                     .mapNotNull { document ->
                         runCatching {
-                            // scheduleId(var)가 @DocumentId로 자동 주입됨
                             document.toObject(ReviewSchedule::class.java)
                                 ?.also { if (it.scheduleId.isBlank()) it.scheduleId = document.id }
                         }.getOrNull()
                     }
                     .filter { it.scheduleId.isNotBlank() }
+
+                Log.d(TAG, "복습일정 스냅샷 수신: ${schedules.size}건 (${startDate}~${endDate})")
                 trySend(schedules)
             }
 
@@ -108,7 +107,10 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                 .get()
                 .await()
                 .documents
-                .mapNotNull { it.toObject(ReviewSchedule::class.java) }
+                .mapNotNull { doc ->
+                    doc.toObject(ReviewSchedule::class.java)
+                        ?.also { if (it.scheduleId.isBlank()) it.scheduleId = doc.id }
+                }
         }
     }
 
@@ -119,9 +121,6 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         return runCatching {
             require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
 
-            // ✅ [문제 4 대응] isCompleted + reviewDate 복합 인덱스 필요
-            //    firestore.indexes.json에 아래 인덱스가 반드시 정의되어 있어야 함:
-            //    collection: reviewSchedules, fields: [isCompleted ASC, reviewDate ASC]
             firestore
                 .collection("users")
                 .document(uid)
@@ -132,7 +131,10 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                 .get()
                 .await()
                 .documents
-                .mapNotNull { it.toObject(ReviewSchedule::class.java) }
+                .mapNotNull { doc ->
+                    doc.toObject(ReviewSchedule::class.java)
+                        ?.also { if (it.scheduleId.isBlank()) it.scheduleId = doc.id }
+                }
         }
     }
 
@@ -151,7 +153,10 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                 .document(scheduleId)
                 .get()
                 .await()
-                .toObject(ReviewSchedule::class.java)
+                .let { doc ->
+                    doc.toObject(ReviewSchedule::class.java)
+                        ?.also { if (it.scheduleId.isBlank()) it.scheduleId = doc.id }
+                }
         }
     }
 
@@ -198,39 +203,42 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                 .document(uid)
                 .collection("reviewSchedules")
                 .document(scheduleId)
-                .update(mapOf(
-                    "isCompleted" to isCompleted,
-                    "updatedAt"   to System.currentTimeMillis()
-                ))
+                .update(
+                    mapOf(
+                        "isCompleted" to isCompleted,
+                        "updatedAt" to System.currentTimeMillis()
+                    )
+                )
                 .await()
         }
     }
 
-    // ✅ scheduleId 제거 유지 — @DocumentId 필드는 문서 ID에서 자동 주입
     private fun ReviewSchedule.toFirestoreMap(): Map<String, Any> {
         return mapOf(
-            "blockId"          to blockId,
-            "uid"              to userId,
+            "blockId" to blockId,
+            "uid" to userId,
             "originProgressId" to originProgressId,
-            "title"            to title,
-            "reviewDate"       to reviewDate,
-            "reviewDateText"   to reviewDateText,
-            "reviewOrder"      to reviewOrder,
-            "scheduleType"     to scheduleType,
-            "isCompleted"      to isCompleted,
-            "createdAt"        to createdAt,
-            "updatedAt"        to updatedAt
+            "title" to title,
+            "reviewDate" to reviewDate,
+            "reviewDateText" to reviewDateText,
+            "reviewOrder" to reviewOrder,
+            "scheduleType" to scheduleType,
+            "isCompleted" to isCompleted,
+            "createdAt" to createdAt,
+            "updatedAt" to updatedAt
         )
     }
 
     private fun parseStartOfDayMillis(date: String): Long =
         java.time.LocalDate.parse(date)
             .atStartOfDay(KST)
-            .toInstant().toEpochMilli()
+            .toInstant()
+            .toEpochMilli()
 
     private fun parseNextDayStartMillis(date: String): Long =
         java.time.LocalDate.parse(date)
             .plusDays(1)
             .atStartOfDay(KST)
-            .toInstant().toEpochMilli()
+            .toInstant()
+            .toEpochMilli()
 }
