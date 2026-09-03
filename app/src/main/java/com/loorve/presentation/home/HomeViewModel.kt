@@ -1,3 +1,4 @@
+// 파일 경로: app/src/main/java/com/loorve/presentation/home/HomeViewModel.kt
 package com.loorve.presentation.home
 
 import androidx.lifecycle.ViewModel
@@ -94,6 +95,10 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    // ✅ [추가] ViewModel이 현재 표시 월을 직접 관리
+    private val _displayYearMonth = MutableStateFlow(YearMonth.now())
+    val displayYearMonth: StateFlow<YearMonth> = _displayYearMonth.asStateFlow()
+
     private val displayFormatter = DateTimeFormatter.ofPattern("M월 d일")
     private val seoulZone = ZoneId.of("Asia/Seoul")
     private val dateRangeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
@@ -103,10 +108,16 @@ class HomeViewModel @Inject constructor(
     init {
         loadExams()
         loadReviewBlocks()
-        // ✅ progressList를 먼저 로드하고 완료 후 reviewSchedule 로드 (레이스 컨디션 방지)
+        // ✅ _displayYearMonth.value 기준으로 통일 (init 시점엔 YearMonth.now()와 동일)
         viewModelScope.launch {
-            loadProgressListAndThenSchedules(YearMonth.now())
+            loadProgressListAndThenSchedules(_displayYearMonth.value)
         }
+    }
+
+    // ✅ [추가] HomeScreen에서 월 변경 시 호출 → ViewModel 상태 갱신 + 복습일정 재조회
+    fun setDisplayYearMonth(yearMonth: YearMonth) {
+        _displayYearMonth.update { yearMonth }
+        loadReviewScheduleDatesByMonth(yearMonth)
     }
 
     // ✅ progressList 로드 완료 후 reviewSchedules 조회 — 레이스 컨디션 원천 차단
@@ -360,7 +371,7 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(isSaving = true, saveMessage = null, errorMessage = null) }
 
             val progress = Progress(
-                progressId     = UUID.randomUUID().toString(), // ✅ ID 미리 확정
+                progressId     = UUID.randomUUID().toString(),
                 examId         = examId,
                 content        = content.trim(),
                 completedCount = completedCount,
@@ -373,10 +384,8 @@ class HomeViewModel @Inject constructor(
 
             if (result.isSuccess) {
                 _uiState.update { it.copy(isSaving = false, saveMessage = "학습 진도가 저장되었습니다.") }
-                // ✅ 저장 후 progressList 먼저 → 그 다음 reviewSchedule (순서 보장)
-                viewModelScope.launch {
-                    loadProgressListAndThenSchedules(YearMonth.now())
-                }
+                // ✅ [수정] 중첩 launch 제거 + 현재 표시 월(_displayYearMonth.value) 기준으로 reload
+                loadProgressListAndThenSchedules(_displayYearMonth.value)
             } else {
                 _uiState.update {
                     it.copy(

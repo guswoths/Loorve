@@ -1,3 +1,4 @@
+// 파일 경로: app/src/main/java/com/loorve/presentation/home/HomeScreen.kt
 package com.loorve.presentation.home
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -49,12 +50,12 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    var displayYearMonth by remember { mutableStateOf(YearMonth.now()) }
 
-    // ✅ [추가] 월이 변경될 때마다 복습일정 날짜 자동 로드
-    LaunchedEffect(displayYearMonth) {
-        viewModel.loadReviewScheduleDatesByMonth(displayYearMonth)
-    }
+    // ✅ [수정] displayYearMonth를 ViewModel StateFlow에서 수집 (로컬 remember 제거)
+    val displayYearMonth by viewModel.displayYearMonth.collectAsState()
+
+    // ✅ [제거] LaunchedEffect(displayYearMonth) 블록 삭제
+    //    setDisplayYearMonth() 내부에서 loadReviewScheduleDatesByMonth()를 이미 호출하므로 중복 방지
 
     LaunchedEffect(uiState.saveMessage) {
         uiState.saveMessage?.let {
@@ -131,8 +132,10 @@ fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            // ✅ 버튼은 상태만 변경. LaunchedEffect가 ViewModel 호출을 담당
-                            IconButton(onClick = { displayYearMonth = displayYearMonth.minusMonths(1) }) {
+                            // ✅ [수정] setDisplayYearMonth() 호출로 변경 (ViewModel이 reload 담당)
+                            IconButton(onClick = {
+                                viewModel.setDisplayYearMonth(displayYearMonth.minusMonths(1))
+                            }) {
                                 Icon(Icons.Outlined.ChevronLeft, contentDescription = "이전 달", tint = Primary)
                             }
                             Text(
@@ -141,7 +144,10 @@ fun HomeScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = Primary
                             )
-                            IconButton(onClick = { displayYearMonth = displayYearMonth.plusMonths(1) }) {
+                            // ✅ [수정] setDisplayYearMonth() 호출로 변경
+                            IconButton(onClick = {
+                                viewModel.setDisplayYearMonth(displayYearMonth.plusMonths(1))
+                            }) {
                                 Icon(Icons.Outlined.ChevronRight, contentDescription = "다음 달", tint = Primary)
                             }
                         }
@@ -155,7 +161,7 @@ fun HomeScreen(
                         HomeMiniCalendar(
                             displayYearMonth = displayYearMonth,
                             selectedDate = selectedDate,
-                            // ✅ [수정] Progress 날짜 + ReviewSchedule 날짜 합집합 전달
+                            // ✅ Progress 날짜 + ReviewSchedule 날짜 합집합 전달 (기존 유지)
                             scheduledDates = uiState.scheduledDates + uiState.reviewScheduleDates,
                             onDateSelected = { selectedDate = it }
                         )
@@ -164,7 +170,6 @@ fun HomeScreen(
             }
 
             // ── 4) 선택 날짜의 복습 일정 카드 ──
-            // 기존 todaySchedules 제거
             val todaySchedules = uiState.reviewSchedules.filter { schedule ->
                 schedule.reviewDate == selectedDate
             }
