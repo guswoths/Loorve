@@ -25,6 +25,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.util.UUID
 import javax.inject.Inject
 
 data class NearestExamUiModel(
@@ -135,7 +136,6 @@ class HomeViewModel @Inject constructor(
                             }.getOrNull()
                         }
                         .minByOrNull { it.daysLeft }
-
                     _uiState.update {
                         it.copy(isLoading = false, exams = exams, nearestExam = nearest)
                     }
@@ -164,7 +164,6 @@ class HomeViewModel @Inject constructor(
                             }.getOrElse { p.createdAt.toString() }
                         )
                     }
-
                     val today = LocalDate.now()
                     val weekStart = today.with(java.time.DayOfWeek.MONDAY)
                     val weekEnd = today.with(java.time.DayOfWeek.SUNDAY)
@@ -174,7 +173,6 @@ class HomeViewModel @Inject constructor(
                             !d.isBefore(weekStart) && !d.isAfter(weekEnd)
                         }.getOrElse { false }
                     }
-
                     val weeklyCompleted = weeklyList.sumOf { it.completed }
                     val weeklyTotal = weeklyList.sumOf { it.total }
                     val weeklyRate = if (weeklyTotal > 0) weeklyCompleted.toFloat() / weeklyTotal else 0f
@@ -194,6 +192,9 @@ class HomeViewModel @Inject constructor(
                             scheduledDates = scheduledDates
                         )
                     }
+
+                    // ✅ progressList 갱신 후 reviewSchedules 콘텐츠도 즉시 재매핑
+                    refreshReviewSchedulesFromCache()
                 }
         }
     }
@@ -219,15 +220,19 @@ class HomeViewModel @Inject constructor(
                                 .toLocalDate()
                         }.getOrNull() ?: return@mapNotNull null
 
-                        val originProgress = currentProgressMap[schedule.originProgressId] ?: return@mapNotNull null
+                        // ✅ originProgressId가 "" 이면 content를 schedule 자체 title로 대체
+                        val originProgress = currentProgressMap[schedule.originProgressId]
+                        val displayContent = originProgress?.content
+                            ?: schedule.originProgressId.ifBlank { "복습 일정" }
+                        val displayExamId = originProgress?.examId ?: ""
 
                         ReviewScheduleUiModel(
-                            scheduleId = schedule.scheduleId,
+                            scheduleId       = schedule.scheduleId,
                             originProgressId = schedule.originProgressId,
-                            examId = originProgress.examId,
-                            content = originProgress.content,
-                            reviewDate = localDate,
-                            reviewOrder = schedule.reviewOrder
+                            examId           = displayExamId,
+                            content          = displayContent,
+                            reviewDate       = localDate,
+                            reviewOrder      = schedule.reviewOrder
                         )
                     }
 
@@ -236,11 +241,28 @@ class HomeViewModel @Inject constructor(
                     _uiState.update { state ->
                         state.copy(
                             reviewScheduleDates = reviewDates,
-                            reviewSchedules = reviewScheduleUiModels
+                            reviewSchedules     = reviewScheduleUiModels
                         )
                     }
                 }
         }
+    }
+
+    // ✅ progressList가 갱신된 뒤 이미 로드된 reviewSchedules의 content/examId를 재매핑
+    private fun refreshReviewSchedulesFromCache() {
+        val currentProgressMap = _uiState.value.progressList.associateBy { it.id }
+        val refreshed = _uiState.value.reviewSchedules.map { schedule ->
+            val originProgress = currentProgressMap[schedule.originProgressId]
+            if (originProgress != null) {
+                schedule.copy(
+                    examId  = originProgress.examId,
+                    content = originProgress.content
+                )
+            } else {
+                schedule
+            }
+        }
+        _uiState.update { it.copy(reviewSchedules = refreshed) }
     }
 
     fun loadReviewBlocks() {
@@ -253,15 +275,14 @@ class HomeViewModel @Inject constructor(
                         val examLocalDate = Instant.ofEpochMilli(block.examDate)
                             .atZone(seoulZone).toLocalDate()
                         val dDay = ChronoUnit.DAYS.between(today, examLocalDate).toInt()
-
                         ReviewBlockUiModel(
-                            blockId = block.blockId,
-                            examName = block.examName.ifBlank { block.title },
-                            dDay = dDay,
-                            completionRate = 0f,
-                            examDateMillis = block.examDate,
+                            blockId            = block.blockId,
+                            examName           = block.examName.ifBlank { block.title },
+                            dDay               = dDay,
+                            completionRate     = 0f,
+                            examDateMillis     = block.examDate,
                             prepStartDateMillis = block.prepStartDate,
-                            dailyCap = block.dailyCap
+                            dailyCap           = block.dailyCap
                         )
                     }
                     _uiState.update { it.copy(reviewBlocks = uiBlocks) }
@@ -281,21 +302,19 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(saveMessage = "로그인 정보가 없습니다.") }
             return
         }
-
         viewModelScope.launch {
             _uiState.update { it.copy(isCreatingBlock = true, errorMessage = null) }
             val block = ReviewBlock(
-                blockId = "",
-                uid = uid,
-                examName = examName,
-                title = examName,
-                examDate = examDateMillis,
-                prepStartDate = prepStartDateMillis,
-                dailyCap = dailyCap,
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
+                blockId         = "",
+                uid             = uid,
+                examName        = examName,
+                title           = examName,
+                examDate        = examDateMillis,
+                prepStartDate   = prepStartDateMillis,
+                dailyCap        = dailyCap,
+                createdAt       = System.currentTimeMillis(),
+                updatedAt       = System.currentTimeMillis()
             )
-
             reviewBlockRepository.saveReviewBlock(block)
                 .onSuccess {
                     _uiState.update { it.copy(isCreatingBlock = false, saveMessage = "복습 블록이 생성되었습니다.") }
@@ -314,21 +333,23 @@ class HomeViewModel @Inject constructor(
         if (uid.isNullOrBlank()) {
             _uiState.update {
                 it.copy(
-                    saveMessage = "로그인 정보가 없습니다. 다시 로그인해 주세요.",
+                    saveMessage  = "로그인 정보가 없습니다. 다시 로그인해 주세요.",
                     errorMessage = "로그인 정보가 없습니다."
                 )
             }
             return
         }
-
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, saveMessage = null, errorMessage = null) }
+
             val progress = Progress(
-                examId = examId,
-                content = content.trim(),
+                progressId     = UUID.randomUUID().toString(), // ✅ 핵심 수정: ID 미리 생성
+                examId         = examId,
+                content        = content.trim(),
                 completedCount = completedCount,
-                totalCount = totalCount,
-                isCompleted = totalCount > 0 && completedCount >= totalCount
+                totalCount     = totalCount,
+                isCompleted    = totalCount > 0 && completedCount >= totalCount,
+                createdAt      = System.currentTimeMillis()   // ✅ 저장 시각도 미리 확정
             )
 
             val result = saveProgressAndScheduleUseCase(uid, progress)
@@ -340,8 +361,8 @@ class HomeViewModel @Inject constructor(
             } else {
                 _uiState.update {
                     it.copy(
-                        isSaving = false,
-                        saveMessage = result.exceptionOrNull()?.message ?: "저장하지 못했습니다.",
+                        isSaving     = false,
+                        saveMessage  = result.exceptionOrNull()?.message ?: "저장하지 못했습니다.",
                         errorMessage = result.exceptionOrNull()?.message
                     )
                 }
