@@ -15,7 +15,6 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth
 ) : ReviewScheduleItemRepository {
 
-    // 경로: users/{uid}/reviewScheduleItems/{itemId}
     private fun schedulesRef(uid: String) =
         firestore.collection("users").document(uid).collection("reviewScheduleItems")
 
@@ -28,7 +27,6 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
             ?: throw SecurityException("인증되지 않은 사용자입니다.")
         require(currentUid == uid) { "본인의 일정만 저장할 수 있습니다." }
 
-        // Batch write: 최대 500건 제한 고려 (현실적으로 복습 수는 수십 건 이내)
         val batch = firestore.batch()
         items.forEach { item ->
             val docRef = schedulesRef(uid).document(item.id)
@@ -88,15 +86,14 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
         items: List<ReviewScheduleItem>
     ): Result<Unit> = runCatching {
         validateAuth(uid)
-        // transaction 기반: 동시 수정 충돌 방지
         firestore.runBatch { batch ->
             items.forEach { item ->
                 val ref = schedulesRef(uid).document(item.id)
                 batch.update(ref, mapOf(
-                    "reviewDate" to item.reviewDate,
-                    "previousGapDays" to item.previousGapDays,
+                    "reviewDate"       to item.reviewDate,
+                    "previousGapDays"  to item.previousGapDays,
                     "compressedReview" to item.compressedReview,
-                    "updatedAt" to FieldValue.serverTimestamp()
+                    "updatedAt"        to FieldValue.serverTimestamp()
                 ))
             }
         }.await()
@@ -109,22 +106,22 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
     }
 
     private fun buildItemMap(item: ReviewScheduleItem): Map<String, Any?> = mapOf(
-        "id" to item.id,
-        "studyRecordId" to item.studyRecordId,
-        "blockId" to item.blockId,
-        "uid" to item.uid,
-        "title" to item.title,
-        "reviewDate" to item.reviewDate,
-        "originalReviewDate" to item.originalReviewDate,
-        "stage" to item.stage,
-        "reviewOrder" to item.reviewOrder,
-        "status" to item.status.name,
-        "previousGapDays" to item.previousGapDays,
-        "overdueDays" to item.overdueDays,
-        "compressedReview" to item.compressedReview,
-        "completionResult" to item.completionResult?.name,
-        "completedAt" to item.completedAt,
-        "createdAt" to FieldValue.serverTimestamp(),
-        "updatedAt" to FieldValue.serverTimestamp()
+        "id"                  to item.id,
+        "studyRecordId"       to item.studyRecordId,
+        "blockId"             to item.blockId,
+        "uid"                 to item.uid,
+        "title"               to item.title,
+        "reviewDate"          to item.reviewDate,
+        "originalReviewDate"  to item.originalReviewDate,
+        "stage"               to item.stage,
+        "reviewOrder"         to item.reviewOrder,
+        "status"              to item.status.name,
+        "previousGapDays"     to item.previousGapDays,
+        "overdueDays"         to item.overdueDays,
+        "compressedReview"    to item.compressedReview,
+        "completionResult"    to item.completionResult?.name,
+        "completedAt"         to item.completedAt,
+        "createdAt"           to FieldValue.serverTimestamp(),
+        "updatedAt"           to FieldValue.serverTimestamp()
     )
 }
