@@ -157,58 +157,46 @@ fun HomeScreen(
                         HomeMiniCalendar(
                             displayYearMonth = displayYearMonth,
                             selectedDate = selectedDate,
-                            scheduledDates = uiState.studyRecordDates,
+                            scheduledDates = uiState.reviewScheduleDates,
                             onDateSelected = { selectedDate = it }
                         )
+
+                        Spacer(Modifier.height(16.dp))
+                        HorizontalDivider(color = Divider, thickness = 0.5.dp)
+                        Spacer(Modifier.height(16.dp))
+
+                        // 선택 날짜의 복습 일정 인라인 표시
+                        val todaySchedules = uiState.reviewSchedules.filter { it.reviewDate == selectedDate }
+
+                        if (todaySchedules.isNotEmpty()) {
+                            Text(
+                                text = "${selectedDate.format(DateTimeFormatter.ofPattern("M월 d일"))} · 복습 일정",
+                                style = LoorveTypography.labelMedium,
+                                color = Primary,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                todaySchedules.forEach { schedule ->
+                                    HomeScheduleCard(
+                                        subjectName = uiState.exams.find { it.id == schedule.examId }?.subjectName ?: "",
+                                        content = schedule.content,
+                                        onStart = { onNavigateToProgressDetail(schedule.originProgressId) }
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "${selectedDate.format(DateTimeFormatter.ofPattern("M월 d일"))} · 복습 일정 없음",
+                                style = LoorveTypography.bodySmall,
+                                color = OnSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        }
                     }
-                }
-            }
-
-            // ── 4) 선택 날짜의 복습 일정 카드 ──
-            // ✅ [원인2 수정] reviewDate 타입에 관계없이 안전하게 LocalDate로 변환 후 비교
-            val todaySchedules = uiState.reviewSchedules.filter { schedule ->
-                val reviewLocalDate: LocalDate? = when (val d = schedule.reviewDate) {
-                    is LocalDate -> d
-                    is com.google.firebase.Timestamp -> d.toDate()
-                        .toInstant()
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDate()
-                    is java.util.Date -> d.toInstant()
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDate()
-                    is String -> runCatching {
-                        LocalDate.parse(d)
-                    }.getOrNull()
-                    else -> null
-                }
-                reviewLocalDate == selectedDate
-            }
-
-            if (todaySchedules.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "${selectedDate.format(DateTimeFormatter.ofPattern("M월 d일"))} · 복습 일정",
-                        style = LoorveTypography.labelMedium,
-                        color = Primary,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
-                    )
-                }
-                items(todaySchedules, key = { "sched_${it.scheduleId}" }) { schedule ->
-                    HomeScheduleCard(
-                        subjectName = uiState.exams.find { it.id == schedule.examId }?.subjectName ?: "",
-                        content = schedule.content,
-                        onStart = { onNavigateToProgressDetail(schedule.originProgressId) }
-                    )
-                }
-            } else {
-                item {
-                    Text(
-                        text = "${selectedDate.format(DateTimeFormatter.ofPattern("M월 d일"))} · 복습 일정 없음",
-                        style = LoorveTypography.bodySmall,
-                        color = OnSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
                 }
             }
         }
