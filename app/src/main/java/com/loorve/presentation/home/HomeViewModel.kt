@@ -6,6 +6,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.loorve.domain.model.Exam
 import com.loorve.domain.model.Progress
 import com.loorve.domain.model.ReviewBlock
+import com.loorve.domain.model.StudyRecord
 import com.loorve.domain.usecase.GetExamsUseCase
 import com.loorve.domain.usecase.GetProgressListUseCase
 import com.loorve.domain.usecase.SaveProgressAndScheduleUseCase
