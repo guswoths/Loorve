@@ -106,4 +106,44 @@ class StudyRecordRepositoryImpl @Inject constructor(
 
         studyRecordsRef(uid).document(record.id).delete().await()
     }
+
+    // ✅ [추가] 기간별 학습기록 조회 (홈 캘린더 dot 연동용)
+    override suspend fun getStudyRecordsByDateRange(
+        uid: String,
+        startDateMillis: Long,
+        endDateMillis: Long
+    ): Result<List<StudyRecord>> = runCatching {
+        val currentUid = auth.currentUser?.uid
+            ?: throw SecurityException("인증되지 않은 사용자입니다.")
+        require(currentUid == uid) { "본인의 학습기록만 조회할 수 있습니다." }
+
+        studyRecordsRef(uid)
+            .whereGreaterThanOrEqualTo("learningDate", startDateMillis)
+            .whereLessThanOrEqualTo("learningDate", endDateMillis)
+            .get().await()
+            .documents
+            .mapNotNull { doc ->
+                doc.toObject(StudyRecordDto::class.java)
+                    ?.copy(id = doc.id)
+                    ?.toDomain()
+            }
+    }
+
+    // ✅ [추가] 사용자 전체 학습기록 조회
+    override suspend fun getAllStudyRecords(
+        uid: String
+    ): Result<List<StudyRecord>> = runCatching {
+        val currentUid = auth.currentUser?.uid
+            ?: throw SecurityException("인증되지 않은 사용자입니다.")
+        require(currentUid == uid) { "본인의 학습기록만 조회할 수 있습니다." }
+
+        studyRecordsRef(uid)
+            .get().await()
+            .documents
+            .mapNotNull { doc ->
+                doc.toObject(StudyRecordDto::class.java)
+                    ?.copy(id = doc.id)
+                    ?.toDomain()
+            }
+    }
 }

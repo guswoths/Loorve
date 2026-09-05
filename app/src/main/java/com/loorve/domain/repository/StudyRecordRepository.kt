@@ -23,4 +23,16 @@ interface StudyRecordRepository {
         uid: String,
         record: StudyRecord
     ): Result<Unit>
+
+    // ✅ [추가] 기간별 학습기록 조회 (홈 캘린더 dot 연동용)
+    suspend fun getStudyRecordsByDateRange(
+        uid: String,
+        startDateMillis: Long,
+        endDateMillis: Long
+    ): Result<List<StudyRecord>> = Result.success(emptyList())
+
+    // ✅ [추가] 사용자 전체 학습기록 조회
+    suspend fun getAllStudyRecords(
+        uid: String
+    ): Result<List<StudyRecord>> = Result.success(emptyList())
 }

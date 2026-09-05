@@ -11,6 +11,7 @@ import com.loorve.domain.usecase.GetProgressListUseCase
 import com.loorve.domain.usecase.SaveProgressAndScheduleUseCase
 import com.loorve.domain.repository.ReviewBlockRepository
 import com.loorve.domain.repository.ReviewScheduleRepository
+import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.util.CalendarRefreshBus  // ✅ 추가
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -80,6 +81,7 @@ data class HomeUiState(
     val weeklyTotal: Int = 0,
     val scheduledDates: Set<LocalDate> = emptySet(),
     val reviewScheduleDates: Set<LocalDate> = emptySet(),
+    val studyRecordDates: Set<LocalDate> = emptySet(),
     val reviewSchedules: List<ReviewScheduleUiModel> = emptyList(),
     val reviewBlocks: List<ReviewBlockUiModel> = emptyList(),
     val isCreatingBlock: Boolean = false
@@ -92,6 +94,7 @@ class HomeViewModel @Inject constructor(
     private val getProgressListUseCase: GetProgressListUseCase,
     private val reviewBlockRepository: ReviewBlockRepository,
     private val reviewScheduleRepository: ReviewScheduleRepository,
+    private val studyRecordRepository: StudyRecordRepository,
     private val calendarRefreshBus: CalendarRefreshBus  // ✅ 추가
 ) : ViewModel() {
 
@@ -140,6 +143,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val uid = getUidSafely() ?: return@launch
             loadReviewScheduleDatesByMonth(uid, yearMonth)
+            loadStudyRecordDatesByMonth(uid, yearMonth)
         }
     }
 
@@ -147,8 +151,9 @@ class HomeViewModel @Inject constructor(
         try {
             val list = getProgressListUseCase(uid).first()
             applyProgressList(list)
-            loadReviewScheduleDatesByMonth(uid, yearMonth)
         } catch (_: Exception) {}
+        loadReviewScheduleDatesByMonth(uid, yearMonth)
+        loadStudyRecordDatesByMonth(uid, yearMonth)
     }
 
     fun loadExams() {
@@ -239,8 +244,57 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private var studyRecordJob: Job? = null
+
+    // ✅ 복습 블록에서 저장된 StudyRecord의 learningDate 조회하여 캘린더 dot 연동
+    fun loadStudyRecordDatesByMonth(uid: String, yearMonth: YearMonth) {
+        studyRecordJob?.cancel()
+        studyRecordJob = viewModelScope.launch {
+            val startMillis = yearMonth.atDay(1).minusDays(1)
+                .atStartOfDay(seoulZone).toInstant().toEpochMilli()
+            val endMillis = yearMonth.atEndOfMonth().plusDays(1)
+                .atTime(23, 59, 59, 999).atZone(seoulZone).toInstant().toEpochMilli()
+
+            studyRecordRepository.getStudyRecordsByDateRange(uid, startMillis, endMillis)
+                .onSuccess { records ->
+                    val dates = records.mapNotNull { record ->
+                        runCatching {
+                            Instant.ofEpochMilli(record.learningDate)
+                                .atZone(seoulZone)
+                                .toLocalDate()
+                        }.getOrNull()
+                    }.filter { date ->
+                        date.year == yearMonth.year && date.monthValue == yearMonth.monthValue
+                    }.toSet()
+
+                    _uiState.update { state ->
+                        state.copy(studyRecordDates = dates)
+                    }
+                }
+                .onFailure {
+                    // 폴백: 전체 조회
+                    studyRecordRepository.getAllStudyRecords(uid).onSuccess { allRecords ->
+                        val dates = allRecords.mapNotNull { record ->
+                            runCatching {
+                                Instant.ofEpochMilli(record.learningDate)
+                                    .atZone(seoulZone)
+                                    .toLocalDate()
+                            }.getOrNull()
+                        }.filter { date ->
+                            date.year == yearMonth.year && date.monthValue == yearMonth.monthValue
+                        }.toSet()
+
+                        _uiState.update { state ->
+                            state.copy(studyRecordDates = dates)
+                        }
+                    }
+                }
+        }
+    }
+
     // ✅ uid를 파라미터로 받아서 절대 null 상황이 생기지 않도록 변경
     fun loadReviewScheduleDatesByMonth(uid: String, yearMonth: YearMonth) {
+        loadStudyRecordDatesByMonth(uid, yearMonth)
         reviewScheduleJob?.cancel()
         reviewScheduleJob = viewModelScope.launch {
             val startDate = yearMonth.atDay(1).format(dateRangeFormatter)
@@ -407,6 +461,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val uid = getUidSafely() ?: return@launch
             loadProgressListAndThenSchedules(uid, _displayYearMonth.value)
+            loadStudyRecordDatesByMonth(uid, _displayYearMonth.value)
         }
     }
 

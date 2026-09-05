@@ -27,7 +27,7 @@ import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.model.StudyRecord
-import com.loorve.presentation.home.HomeViewModel          // ✅ [추가] import
+import com.loorve.presentation.home.HomeViewModel
 import com.loorve.ui.component.LoorveCard
 import com.loorve.ui.theme.*
 import java.text.SimpleDateFormat
