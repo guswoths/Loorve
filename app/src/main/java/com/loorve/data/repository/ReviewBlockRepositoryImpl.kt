@@ -116,11 +116,12 @@ class ReviewBlockRepositoryImpl @Inject constructor(
                 .whereEqualTo("blockId", reviewBlockId)
                 .get()
                 .await()
+            val deletedRecordIds = recordsSnapshot.documents.map { it.id }.toSet()
             for (doc in recordsSnapshot.documents) {
                 doc.reference.delete().await()
             }
 
-            // 3) 연관된 복습 일정 항목(reviewScheduleItems) 삭제
+            // 3) 연관된 복습 일정 항목(reviewScheduleItems) 삭제 (blockId 기준)
             val schedulesSnapshot = firestore.collection("users")
                 .document(uid)
                 .collection("reviewScheduleItems")
@@ -128,6 +129,30 @@ class ReviewBlockRepositoryImpl @Inject constructor(
                 .get()
                 .await()
             for (doc in schedulesSnapshot.documents) {
+                doc.reference.delete().await()
+            }
+
+            // 4) studyRecordId 기준으로 생성된 reviewScheduleItems 추가 정리
+            for (recordId in deletedRecordIds) {
+                val recordSchedulesSnapshot = firestore.collection("users")
+                    .document(uid)
+                    .collection("reviewScheduleItems")
+                    .whereEqualTo("studyRecordId", recordId)
+                    .get()
+                    .await()
+                for (doc in recordSchedulesSnapshot.documents) {
+                    doc.reference.delete().await()
+                }
+            }
+
+            // 5) 연관된 구버전 복습 일정(reviewSchedules) 삭제
+            val legacySchedulesSnapshot = firestore.collection("users")
+                .document(uid)
+                .collection("reviewSchedules")
+                .whereEqualTo("blockId", reviewBlockId)
+                .get()
+                .await()
+            for (doc in legacySchedulesSnapshot.documents) {
                 doc.reference.delete().await()
             }
         }

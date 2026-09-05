@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.repository.ReviewBlockRepository
+import com.loorve.util.CalendarRefreshBus
 
 data class ReviewCalendarUiState(
     val displayYearMonth: YearMonth = YearMonth.now(),
@@ -42,7 +43,8 @@ data class ReviewCalendarUiState(
 class ReviewCalendarViewModel @Inject constructor(
     private val reviewScheduleRepository: ReviewScheduleRepository,
     private val updateReviewCompletionUseCase: UpdateReviewCompletionUseCase,
-    private val reviewBlockRepository: ReviewBlockRepository   // 추가
+    private val reviewBlockRepository: ReviewBlockRepository,
+    private val calendarRefreshBus: CalendarRefreshBus
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewCalendarUiState())
@@ -180,6 +182,7 @@ class ReviewCalendarViewModel @Inject constructor(
                         )
                     }
                     loadReviewBlocks(uid)
+                    calendarRefreshBus.notifyRefresh()
                 }
                 .onFailure { e ->
                     _uiState.update {

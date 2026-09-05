@@ -117,6 +117,7 @@ class HomeViewModel @Inject constructor(
     private var observeReviewScheduleItemsJob: Job? = null
 
     // 복습 일정(ReviewScheduleItem 및 구 ReviewSchedule) 통합 상태 관리
+    private var rawReviewScheduleItems: List<ReviewScheduleItem> = emptyList()
     private var reviewScheduleItemDates = emptySet<LocalDate>()
     private var legacyReviewScheduleDates = emptySet<LocalDate>()
     private var reviewScheduleItemUiModels = emptyList<ReviewScheduleUiModel>()
@@ -259,8 +260,17 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun updateCombinedReviewSchedules() {
-        val combinedDates = reviewScheduleItemDates + legacyReviewScheduleDates
-        val combinedSchedules = (reviewScheduleItemUiModels + legacyReviewScheduleUiModels)
+        val activeBlockIds = _uiState.value.reviewBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
+        // legacy 일정 중에서도 블록 ID가 지정되어 있는데 현재 활성 블록에 없는 것은 제외
+        val filteredLegacyUiModels = if (activeBlockIds.isNotEmpty()) {
+            legacyReviewScheduleUiModels.filter { it.examId.isBlank() || it.examId in activeBlockIds }
+        } else {
+            legacyReviewScheduleUiModels.filter { it.examId.isBlank() }
+        }
+        val filteredLegacyDates = filteredLegacyUiModels.map { it.reviewDate }.toSet()
+
+        val combinedDates = reviewScheduleItemDates + filteredLegacyDates
+        val combinedSchedules = (reviewScheduleItemUiModels + filteredLegacyUiModels)
             .distinctBy { it.scheduleId }
             .sortedWith(compareBy<ReviewScheduleUiModel> { it.reviewDate }.thenBy { it.reviewOrder })
 
@@ -284,17 +294,19 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private suspend fun syncReviewScheduleItems(items: List<ReviewScheduleItem>, uid: String) {
-        val activeBlockIds = reviewBlockRepository.getReviewBlocks(uid)
-            .getOrNull()
-            ?.map { it.blockId }
-            ?.toSet() ?: emptySet()
-
-        val validItems = if (activeBlockIds.isEmpty()) {
-            items
-        } else {
-            items.filter { it.blockId.isBlank() || it.blockId in activeBlockIds }
+    /**
+     * 현재 복습캘린더에 존재하는 활성 복습블록(activeBlockIds)의 복습기록만 정확히 필터링하여 캘린더 dot 데이터에 반영.
+     * 복습블록이 삭제되었거나 존재하지 않는 경우 해당 블록의 복습기록 dot은 즉시 제거됨.
+     */
+    private fun applyActiveBlocksFilter(activeBlockIds: Set<String>) {
+        if (activeBlockIds.isEmpty()) {
+            reviewScheduleItemUiModels = emptyList()
+            reviewScheduleItemDates = emptySet()
+            updateCombinedReviewSchedules()
+            return
         }
+
+        val validItems = rawReviewScheduleItems.filter { it.blockId in activeBlockIds }
 
         val blockMap = _uiState.value.reviewBlocks.associateBy { it.blockId }
         val examMap = _uiState.value.exams.associateBy { it.id }
@@ -325,6 +337,18 @@ class HomeViewModel @Inject constructor(
         reviewScheduleItemUiModels = uiModels
         reviewScheduleItemDates = uiModels.map { it.reviewDate }.toSet()
         updateCombinedReviewSchedules()
+    }
+
+    private suspend fun syncReviewScheduleItems(items: List<ReviewScheduleItem>, uid: String) {
+        rawReviewScheduleItems = items
+
+        val activeBlockIds = reviewBlockRepository.getReviewBlocks(uid)
+            .getOrNull()
+            ?.map { it.blockId }
+            ?.filter { it.isNotBlank() }
+            ?.toSet() ?: emptySet()
+
+        applyActiveBlocksFilter(activeBlockIds)
     }
 
     private var studyRecordJob: Job? = null
@@ -518,16 +542,10 @@ class HomeViewModel @Inject constructor(
                         )
                     }
                     _uiState.update { it.copy(reviewBlocks = uiBlocks) }
-                    val blockMap = uiBlocks.associateBy { it.blockId }
-                    if (reviewScheduleItemUiModels.isNotEmpty()) {
-                        reviewScheduleItemUiModels = reviewScheduleItemUiModels.map { model ->
-                            if (model.subjectName.isBlank()) {
-                                val name = blockMap[model.examId]?.examName ?: ""
-                                if (name.isNotBlank()) model.copy(subjectName = name) else model
-                            } else model
-                        }
-                        updateCombinedReviewSchedules()
-                    }
+                    // ✅ 복습캘린더의 현재 존재하는 복습블록 ID 목록 추출
+                    val activeBlockIds = uiBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
+                    // ✅ 블록 삭제 또는 갱신 시, 현재 존재하는 블록의 복습기록만 dot 데이터에 남도록 즉시 동기화
+                    applyActiveBlocksFilter(activeBlockIds)
                 }
                 .onFailure { }
         }
