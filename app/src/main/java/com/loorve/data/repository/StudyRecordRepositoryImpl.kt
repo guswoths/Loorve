@@ -7,6 +7,9 @@ import com.loorve.data.model.StudyRecordDto
 import com.loorve.data.model.toDto
 import com.loorve.domain.model.StudyRecord
 import com.loorve.domain.repository.StudyRecordRepository
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
@@ -145,5 +148,53 @@ class StudyRecordRepositoryImpl @Inject constructor(
                     ?.copy(id = doc.id)
                     ?.toDomain()
             }
+    }
+
+    // ✅ [추가] 실시간 학습기록 관찰 (스냅샷 리스너)
+    override fun observeStudyRecords(uid: String): Flow<List<StudyRecord>> = callbackFlow {
+        if (uid.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val registration = studyRecordsRef(uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+
+                val records = snapshot?.documents.orEmpty().mapNotNull { doc ->
+                    doc.toObject(StudyRecordDto::class.java)
+                        ?.copy(id = doc.id)
+                        ?.toDomain()
+                }
+                trySend(records)
+            }
+
+        awaitClose {
+            registration.remove()
+        }
+    }
+
+    // ✅ [추가] 특정 블록에 속한 모든 학습기록 일괄 삭제
+    override suspend fun deleteStudyRecordsByBlockId(
+        uid: String,
+        blockId: String
+    ): Result<Unit> = runCatching {
+        val currentUid = auth.currentUser?.uid
+            ?: throw SecurityException("인증되지 않은 사용자입니다.")
+        require(currentUid == uid) { "본인의 학습기록만 삭제할 수 있습니다." }
+        require(blockId.isNotBlank()) { "blockId가 비어있습니다." }
+
+        val snapshot = studyRecordsRef(uid)
+            .whereEqualTo("blockId", blockId)
+            .get()
+            .await()
+
+        for (doc in snapshot.documents) {
+            doc.reference.delete().await()
+        }
     }
 }

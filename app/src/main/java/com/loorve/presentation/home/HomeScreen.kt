@@ -157,7 +157,7 @@ fun HomeScreen(
                         HomeMiniCalendar(
                             displayYearMonth = displayYearMonth,
                             selectedDate = selectedDate,
-                            scheduledDates = uiState.scheduledDates + uiState.reviewScheduleDates + uiState.studyRecordDates,
+                            scheduledDates = uiState.studyRecordDates,
                             onDateSelected = { selectedDate = it }
                         )
                     }

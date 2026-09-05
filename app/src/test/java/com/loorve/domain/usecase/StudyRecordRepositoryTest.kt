@@ -72,4 +72,26 @@ class StudyRecordRepositoryTest {
         assertEquals(2, result.getOrNull()?.size)
         coVerify(exactly = 1) { repository.getAllStudyRecords(uid) }
     }
+
+    @Test
+    fun `observeStudyRecords() - 실시간 Flow 반환 검증`() = runTest {
+        val records = listOf(makeStudyRecord("rec-1", LocalDate.of(2026, 9, 1)))
+        io.mockk.every { repository.observeStudyRecords(uid) } returns kotlinx.coroutines.flow.flowOf(records)
+
+        val result = kotlinx.coroutines.flow.first(repository.observeStudyRecords(uid))
+
+        assertEquals(1, result.size)
+        assertEquals("rec-1", result.first().id)
+        coVerify(exactly = 1) { repository.observeStudyRecords(uid) }
+    }
+
+    @Test
+    fun `deleteStudyRecordsByBlockId() - 블록 연관 학습기록 삭제 성공`() = runTest {
+        coEvery { repository.deleteStudyRecordsByBlockId(uid, "block-001") } returns Result.success(Unit)
+
+        val result = repository.deleteStudyRecordsByBlockId(uid, "block-001")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { repository.deleteStudyRecordsByBlockId(uid, "block-001") }
+    }
 }

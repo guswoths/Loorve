@@ -2,6 +2,8 @@
 package com.loorve.domain.repository
 
 import com.loorve.domain.model.StudyRecord
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 interface StudyRecordRepository {
 
@@ -35,4 +37,15 @@ interface StudyRecordRepository {
     suspend fun getAllStudyRecords(
         uid: String
     ): Result<List<StudyRecord>> = Result.success(emptyList())
+
+    // ✅ [추가] 실시간 학습기록 관찰 (스냅샷 리스너)
+    fun observeStudyRecords(
+        uid: String
+    ): Flow<List<StudyRecord>> = emptyFlow()
+
+    // ✅ [추가] 특정 블록에 속한 모든 학습기록 일괄 삭제
+    suspend fun deleteStudyRecordsByBlockId(
+        uid: String,
+        blockId: String
+    ): Result<Unit> = Result.success(Unit)
 }

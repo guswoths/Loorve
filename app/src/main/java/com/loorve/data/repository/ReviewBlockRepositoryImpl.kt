@@ -103,10 +103,33 @@ class ReviewBlockRepositoryImpl @Inject constructor(
             require(uid.isNotBlank()) { "uid가 비어있습니다." }
             require(reviewBlockId.isNotBlank()) { "reviewBlockId가 비어있습니다." }
 
+            // 1) 블록 문서 삭제
             reviewBlocksRef(uid)
                 .document(reviewBlockId)
                 .delete()
                 .await()
+
+            // 2) 연관된 학습기록(studyRecords) 삭제하여 캘린더 dot 완전 동기화
+            val recordsSnapshot = firestore.collection("users")
+                .document(uid)
+                .collection("studyRecords")
+                .whereEqualTo("blockId", reviewBlockId)
+                .get()
+                .await()
+            for (doc in recordsSnapshot.documents) {
+                doc.reference.delete().await()
+            }
+
+            // 3) 연관된 복습 일정 항목(reviewScheduleItems) 삭제
+            val schedulesSnapshot = firestore.collection("users")
+                .document(uid)
+                .collection("reviewScheduleItems")
+                .whereEqualTo("blockId", reviewBlockId)
+                .get()
+                .await()
+            for (doc in schedulesSnapshot.documents) {
+                doc.reference.delete().await()
+            }
         }
     }
 }

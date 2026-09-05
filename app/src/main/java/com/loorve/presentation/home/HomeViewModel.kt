@@ -119,6 +119,7 @@ class HomeViewModel @Inject constructor(
             }
             loadExams()
             loadReviewBlocks(uid)
+            observeStudyRecordDates(uid)
             loadProgressListAndThenSchedules(uid, _displayYearMonth.value)
         }
         // ✅ 다른 화면(복습기록 생성/삭제)에서 이벤트 수신 시 캘린더 자동 갱신
@@ -245,49 +246,85 @@ class HomeViewModel @Inject constructor(
     }
 
     private var studyRecordJob: Job? = null
+    private var observeStudyRecordsJob: Job? = null
+
+    // ✅ Firestore 실시간 스냅샷 리스너를 통해 StudyRecord 변경 시 캘린더 dot 즉각 반영
+    private fun observeStudyRecordDates(uid: String) {
+        observeStudyRecordsJob?.cancel()
+        observeStudyRecordsJob = viewModelScope.launch {
+            studyRecordRepository.observeStudyRecords(uid)
+                .catch { }
+                .collect { records ->
+                    syncStudyRecordDates(records, uid)
+                }
+        }
+    }
+
+    private suspend fun syncStudyRecordDates(records: List<StudyRecord>, uid: String) {
+        // 실제 존재하는 활성 블록들의 ID 목록 조회 (삭제된 블록의 잔여 레코드 제외)
+        val activeBlockIds = reviewBlockRepository.getReviewBlocks(uid)
+            .getOrNull()
+            ?.map { it.blockId }
+            ?.toSet() ?: emptySet()
+
+        val validRecords = if (activeBlockIds.isEmpty()) {
+            emptyList()
+        } else {
+            records.filter { it.blockId in activeBlockIds }
+        }
+
+        val dates = validRecords.mapNotNull { record ->
+            runCatching {
+                Instant.ofEpochMilli(record.learningDate)
+                    .atZone(seoulZone)
+                    .toLocalDate()
+            }.getOrNull()
+        }.toSet()
+
+        _uiState.update { state ->
+            state.copy(studyRecordDates = dates)
+        }
+    }
 
     // ✅ 복습 블록에서 저장된 StudyRecord의 learningDate 조회하여 캘린더 dot 연동
     fun loadStudyRecordDatesByMonth(uid: String, yearMonth: YearMonth) {
         studyRecordJob?.cancel()
         studyRecordJob = viewModelScope.launch {
-            val startMillis = yearMonth.atDay(1).minusDays(1)
-                .atStartOfDay(seoulZone).toInstant().toEpochMilli()
-            val endMillis = yearMonth.atEndOfMonth().plusDays(1)
-                .atTime(23, 59, 59, 999).atZone(seoulZone).toInstant().toEpochMilli()
-
-            studyRecordRepository.getStudyRecordsByDateRange(uid, startMillis, endMillis)
-                .onSuccess { records ->
-                    val dates = records.mapNotNull { record ->
-                        runCatching {
-                            Instant.ofEpochMilli(record.learningDate)
-                                .atZone(seoulZone)
-                                .toLocalDate()
-                        }.getOrNull()
-                    }.filter { date ->
-                        date.year == yearMonth.year && date.monthValue == yearMonth.monthValue
-                    }.toSet()
-
-                    _uiState.update { state ->
-                        state.copy(studyRecordDates = dates)
-                    }
+            studyRecordRepository.getAllStudyRecords(uid)
+                .onSuccess { allRecords ->
+                    syncStudyRecordDates(allRecords, uid)
                 }
                 .onFailure {
-                    // 폴백: 전체 조회
-                    studyRecordRepository.getAllStudyRecords(uid).onSuccess { allRecords ->
-                        val dates = allRecords.mapNotNull { record ->
-                            runCatching {
-                                Instant.ofEpochMilli(record.learningDate)
-                                    .atZone(seoulZone)
-                                    .toLocalDate()
-                            }.getOrNull()
-                        }.filter { date ->
-                            date.year == yearMonth.year && date.monthValue == yearMonth.monthValue
-                        }.toSet()
+                    val activeBlockIds = reviewBlockRepository.getReviewBlocks(uid)
+                        .getOrNull()
+                        ?.map { it.blockId }
+                        ?.toSet() ?: emptySet()
 
-                        _uiState.update { state ->
-                            state.copy(studyRecordDates = dates)
-                        }
+                    if (activeBlockIds.isEmpty()) {
+                        _uiState.update { it.copy(studyRecordDates = emptySet()) }
+                        return@launch
                     }
+
+                    val startMillis = yearMonth.atDay(1).minusDays(1)
+                        .atStartOfDay(seoulZone).toInstant().toEpochMilli()
+                    val endMillis = yearMonth.atEndOfMonth().plusDays(1)
+                        .atTime(23, 59, 59, 999).atZone(seoulZone).toInstant().toEpochMilli()
+
+                    studyRecordRepository.getStudyRecordsByDateRange(uid, startMillis, endMillis)
+                        .onSuccess { records ->
+                            val validRecords = records.filter { it.blockId in activeBlockIds }
+                            val dates = validRecords.mapNotNull { record ->
+                                runCatching {
+                                    Instant.ofEpochMilli(record.learningDate)
+                                        .atZone(seoulZone)
+                                        .toLocalDate()
+                                }.getOrNull()
+                            }.toSet()
+
+                            _uiState.update { state ->
+                                state.copy(studyRecordDates = dates)
+                            }
+                        }
                 }
         }
     }
@@ -460,6 +497,7 @@ class HomeViewModel @Inject constructor(
     fun refreshCalendar() {
         viewModelScope.launch {
             val uid = getUidSafely() ?: return@launch
+            loadReviewBlocks(uid)
             loadReviewScheduleDatesByMonth(uid, _displayYearMonth.value)
         }
     }
