@@ -2,6 +2,7 @@
 package com.loorve.domain.repository
 
 import com.loorve.domain.model.ReviewScheduleItem
+import kotlinx.coroutines.flow.Flow
 
 interface ReviewScheduleItemRepository {
 
@@ -30,4 +31,8 @@ interface ReviewScheduleItemRepository {
         uid: String,
         items: List<ReviewScheduleItem>
     ): Result<Unit>
+
+    fun observeReviewScheduleItems(
+        uid: String
+    ): Flow<List<ReviewScheduleItem>>
 }

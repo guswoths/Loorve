@@ -181,8 +181,13 @@ fun HomeScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 todaySchedules.forEach { schedule ->
+                                    val subjectName = schedule.subjectName.ifBlank {
+                                        uiState.exams.find { it.id == schedule.examId }?.subjectName
+                                            ?: uiState.reviewBlocks.find { it.blockId == schedule.examId }?.examName
+                                            ?: ""
+                                    }
                                     HomeScheduleCard(
-                                        subjectName = uiState.exams.find { it.id == schedule.examId }?.subjectName ?: "",
+                                        subjectName = subjectName,
                                         content = schedule.content,
                                         onStart = { onNavigateToProgressDetail(schedule.originProgressId) }
                                     )
@@ -345,7 +350,8 @@ private fun HomeScheduleCard(subjectName: String, content: String, onStart: () -
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "오늘 · $subjectName", style = LoorveTypography.labelMedium, color = Primary, fontWeight = FontWeight.SemiBold)
+                val headerTitle = if (subjectName.isNotBlank()) "오늘 · $subjectName" else "오늘 · 복습 일정"
+                Text(text = headerTitle, style = LoorveTypography.labelMedium, color = Primary, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(text = content, style = LoorveTypography.bodyMedium, color = OnBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(4.dp))

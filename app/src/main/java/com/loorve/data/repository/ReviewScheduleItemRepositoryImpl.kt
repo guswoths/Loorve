@@ -7,6 +7,9 @@ import com.loorve.data.model.ReviewScheduleItemDto
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.repository.ReviewScheduleItemRepository
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
@@ -97,6 +100,35 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
                 ))
             }
         }.await()
+    }
+
+    override fun observeReviewScheduleItems(
+        uid: String
+    ): Flow<List<ReviewScheduleItem>> = callbackFlow {
+        if (uid.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val registration = schedulesRef(uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+
+                val items = snapshot?.documents.orEmpty().mapNotNull { doc ->
+                    doc.toObject(ReviewScheduleItemDto::class.java)
+                        ?.copy(id = doc.id)
+                        ?.toDomain()
+                }
+                trySend(items)
+            }
+
+        awaitClose {
+            registration.remove()
+        }
     }
 
     private fun validateAuth(uid: String) {

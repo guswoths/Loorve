@@ -6,12 +6,14 @@ import com.google.firebase.auth.FirebaseAuth
 import com.loorve.domain.model.Exam
 import com.loorve.domain.model.Progress
 import com.loorve.domain.model.ReviewBlock
+import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.StudyRecord
 import com.loorve.domain.usecase.GetExamsUseCase
 import com.loorve.domain.usecase.GetProgressListUseCase
 import com.loorve.domain.usecase.SaveProgressAndScheduleUseCase
 import com.loorve.domain.repository.ReviewBlockRepository
 import com.loorve.domain.repository.ReviewScheduleRepository
+import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.util.CalendarRefreshBus  // ✅ 추가
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -56,7 +58,8 @@ data class ReviewScheduleUiModel(
     val examId: String,
     val content: String,
     val reviewDate: LocalDate,
-    val reviewOrder: Int
+    val reviewOrder: Int,
+    val subjectName: String = ""
 )
 
 data class ReviewBlockUiModel(
@@ -95,6 +98,7 @@ class HomeViewModel @Inject constructor(
     private val getProgressListUseCase: GetProgressListUseCase,
     private val reviewBlockRepository: ReviewBlockRepository,
     private val reviewScheduleRepository: ReviewScheduleRepository,
+    private val reviewScheduleItemRepository: ReviewScheduleItemRepository,
     private val studyRecordRepository: StudyRecordRepository,
     private val calendarRefreshBus: CalendarRefreshBus  // ✅ 추가
 ) : ViewModel() {
@@ -110,6 +114,13 @@ class HomeViewModel @Inject constructor(
     private val dateRangeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
     private var reviewScheduleJob: Job? = null
+    private var observeReviewScheduleItemsJob: Job? = null
+
+    // 복습 일정(ReviewScheduleItem 및 구 ReviewSchedule) 통합 상태 관리
+    private var reviewScheduleItemDates = emptySet<LocalDate>()
+    private var legacyReviewScheduleDates = emptySet<LocalDate>()
+    private var reviewScheduleItemUiModels = emptyList<ReviewScheduleUiModel>()
+    private var legacyReviewScheduleUiModels = emptyList<ReviewScheduleUiModel>()
 
     init {
         // ✅ uid를 반드시 토큰 갱신 후 확보, 그 다음 모든 데이터 로드
@@ -121,6 +132,7 @@ class HomeViewModel @Inject constructor(
             loadExams()
             loadReviewBlocks(uid)
             observeStudyRecordDates(uid)
+            observeReviewScheduleItems(uid) // ✅ 복습 일정 실시간 감시 및 캘린더 dot 동기화
             loadProgressListAndThenSchedules(uid, _displayYearMonth.value)
         }
         // ✅ 다른 화면(복습기록 생성/삭제)에서 이벤트 수신 시 캘린더 자동 갱신
@@ -246,6 +258,75 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun updateCombinedReviewSchedules() {
+        val combinedDates = reviewScheduleItemDates + legacyReviewScheduleDates
+        val combinedSchedules = (reviewScheduleItemUiModels + legacyReviewScheduleUiModels)
+            .distinctBy { it.scheduleId }
+            .sortedWith(compareBy<ReviewScheduleUiModel> { it.reviewDate }.thenBy { it.reviewOrder })
+
+        _uiState.update { state ->
+            state.copy(
+                reviewScheduleDates = combinedDates,
+                reviewSchedules = combinedSchedules
+            )
+        }
+    }
+
+    // ✅ Firestore 실시간 스냅샷 리스너를 통해 ReviewScheduleItem 변경 시 캘린더 dot 즉각 반영
+    private fun observeReviewScheduleItems(uid: String) {
+        observeReviewScheduleItemsJob?.cancel()
+        observeReviewScheduleItemsJob = viewModelScope.launch {
+            reviewScheduleItemRepository.observeReviewScheduleItems(uid)
+                .catch { }
+                .collect { items ->
+                    syncReviewScheduleItems(items, uid)
+                }
+        }
+    }
+
+    private suspend fun syncReviewScheduleItems(items: List<ReviewScheduleItem>, uid: String) {
+        val activeBlockIds = reviewBlockRepository.getReviewBlocks(uid)
+            .getOrNull()
+            ?.map { it.blockId }
+            ?.toSet() ?: emptySet()
+
+        val validItems = if (activeBlockIds.isEmpty()) {
+            items
+        } else {
+            items.filter { it.blockId.isBlank() || it.blockId in activeBlockIds }
+        }
+
+        val blockMap = _uiState.value.reviewBlocks.associateBy { it.blockId }
+        val examMap = _uiState.value.exams.associateBy { it.id }
+
+        val uiModels = validItems.mapNotNull { item ->
+            val localDate = runCatching {
+                Instant.ofEpochMilli(item.reviewDate)
+                    .atZone(seoulZone)
+                    .toLocalDate()
+            }.getOrNull() ?: return@mapNotNull null
+
+            val block = blockMap[item.blockId]
+            val subjectName = block?.examName
+                ?: examMap[item.blockId]?.subjectName
+                ?: ""
+
+            ReviewScheduleUiModel(
+                scheduleId = item.id,
+                originProgressId = item.studyRecordId,
+                examId = item.blockId,
+                content = item.title,
+                reviewDate = localDate,
+                reviewOrder = item.reviewOrder,
+                subjectName = subjectName
+            )
+        }
+
+        reviewScheduleItemUiModels = uiModels
+        reviewScheduleItemDates = uiModels.map { it.reviewDate }.toSet()
+        updateCombinedReviewSchedules()
+    }
+
     private var studyRecordJob: Job? = null
     private var observeStudyRecordsJob: Job? = null
 
@@ -367,15 +448,12 @@ class HomeViewModel @Inject constructor(
                     }
 
                     val reviewDates = reviewScheduleUiModels.map { it.reviewDate }.toSet()
-                    _uiState.update { state ->
-                        val otherMonthsDates = state.reviewScheduleDates.filter {
-                            it.year != yearMonth.year || it.monthValue != yearMonth.monthValue
-                        }
-                        state.copy(
-                            reviewScheduleDates = (otherMonthsDates + reviewDates).toSet(),
-                            reviewSchedules = reviewScheduleUiModels
-                        )
+                    val otherMonthsDates = legacyReviewScheduleDates.filter {
+                        it.year != yearMonth.year || it.monthValue != yearMonth.monthValue
                     }
+                    legacyReviewScheduleDates = (otherMonthsDates + reviewDates).toSet()
+                    legacyReviewScheduleUiModels = reviewScheduleUiModels
+                    updateCombinedReviewSchedules()
                 }
         }
     }
@@ -403,11 +481,8 @@ class HomeViewModel @Inject constructor(
                     }.getOrNull()
                 }.toSet()
 
-                _uiState.update { state ->
-                    state.copy(
-                        reviewScheduleDates = (state.reviewScheduleDates + allDates).toSet()
-                    )
-                }
+                legacyReviewScheduleDates = (legacyReviewScheduleDates + allDates).toSet()
+                updateCombinedReviewSchedules()
             } catch (_: Exception) { }
         }
     }
@@ -443,6 +518,16 @@ class HomeViewModel @Inject constructor(
                         )
                     }
                     _uiState.update { it.copy(reviewBlocks = uiBlocks) }
+                    val blockMap = uiBlocks.associateBy { it.blockId }
+                    if (reviewScheduleItemUiModels.isNotEmpty()) {
+                        reviewScheduleItemUiModels = reviewScheduleItemUiModels.map { model ->
+                            if (model.subjectName.isBlank()) {
+                                val name = blockMap[model.examId]?.examName ?: ""
+                                if (name.isNotBlank()) model.copy(subjectName = name) else model
+                            } else model
+                        }
+                        updateCombinedReviewSchedules()
+                    }
                 }
                 .onFailure { }
         }
@@ -534,6 +619,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val uid = getUidSafely() ?: return@launch
             loadReviewBlocks(uid)
+            observeReviewScheduleItems(uid)
             loadReviewScheduleDatesByMonth(uid, _displayYearMonth.value)
         }
     }
