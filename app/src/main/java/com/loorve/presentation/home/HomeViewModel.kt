@@ -460,8 +460,7 @@ class HomeViewModel @Inject constructor(
     fun refreshCalendar() {
         viewModelScope.launch {
             val uid = getUidSafely() ?: return@launch
-            loadProgressListAndThenSchedules(uid, _displayYearMonth.value)
-            loadStudyRecordDatesByMonth(uid, _displayYearMonth.value)
+            loadReviewScheduleDatesByMonth(uid, _displayYearMonth.value)
         }
     }
 

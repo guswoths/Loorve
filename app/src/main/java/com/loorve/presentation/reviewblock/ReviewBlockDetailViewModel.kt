@@ -195,6 +195,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
             }
 
             loadBlockData(uid, item.blockId)
+            calendarRefreshBus.notifyRefresh()
         }
     }
 
@@ -220,6 +221,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             reviewBlockRepository.deleteReviewBlock(uid, blockId)
                 .onSuccess {
+                    calendarRefreshBus.notifyRefresh()
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         deleteSuccess = true,
