@@ -368,12 +368,47 @@ class HomeViewModel @Inject constructor(
 
                     val reviewDates = reviewScheduleUiModels.map { it.reviewDate }.toSet()
                     _uiState.update { state ->
+                        val otherMonthsDates = state.reviewScheduleDates.filter {
+                            it.year != yearMonth.year || it.monthValue != yearMonth.monthValue
+                        }
                         state.copy(
-                            reviewScheduleDates = reviewDates,
+                            reviewScheduleDates = (otherMonthsDates + reviewDates).toSet(),
                             reviewSchedules = reviewScheduleUiModels
                         )
                     }
                 }
+        }
+    }
+
+    /**
+     * 학습 진도 저장 직후 전체 기간(현재 월 및 이후 월 포함)의 복습 일정 날짜를 한 번에 조회하여
+     * reviewScheduleDates에 합집합으로 반영합니다.
+     */
+    fun loadAllReviewScheduleDates(uid: String) {
+        viewModelScope.launch {
+            val currentMonth = YearMonth.now()
+            val startDate = currentMonth.minusMonths(6).atDay(1).format(dateRangeFormatter)
+            val endDate = currentMonth.plusMonths(12).atEndOfMonth().format(dateRangeFormatter)
+
+            try {
+                val schedules = reviewScheduleRepository
+                    .getReviewSchedulesByDateRange(uid, startDate, endDate)
+                    .first()
+
+                val allDates = schedules.mapNotNull { schedule ->
+                    runCatching {
+                        Instant.ofEpochMilli(schedule.reviewDate)
+                            .atZone(seoulZone)
+                            .toLocalDate()
+                    }.getOrNull()
+                }.toSet()
+
+                _uiState.update { state ->
+                    state.copy(
+                        reviewScheduleDates = (state.reviewScheduleDates + allDates).toSet()
+                    )
+                }
+            } catch (_: Exception) { }
         }
     }
 
@@ -480,8 +515,8 @@ class HomeViewModel @Inject constructor(
                 _uiState.update { it.copy(isSaving = false, saveMessage = "학습 진도가 저장되었습니다.") }
                 // ✅ 진도 + 복습 일정 모두 최신 상태로 갱신 (캘린더 도트 즉시 반영)
                 loadProgressListAndThenSchedules(uid, _displayYearMonth.value)
-                // ✅ 현재 월 외에 다음 달 일정도 캘린더에 즉시 반영되도록 추가 트리거
-                loadReviewScheduleDatesByMonth(uid, _displayYearMonth.value)
+                // ✅ 현재 월 외에 다음 달 일정도 캘린더에 즉시 반영되도록 전체 복습 일정 날짜 동기화
+                loadAllReviewScheduleDates(uid)
             } else {
                 _uiState.update {
                     it.copy(
