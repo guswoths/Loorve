@@ -14,7 +14,6 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -188,8 +187,7 @@ fun HomeScreen(
                                     }
                                     HomeScheduleCard(
                                         subjectName = subjectName,
-                                        content = schedule.content,
-                                        onStart = { onNavigateToProgressDetail(schedule.originProgressId) }
+                                        content = schedule.content
                                     )
                                 }
                             }
@@ -342,28 +340,25 @@ private fun HomeMiniCalendar(
 
 /** 복습 일정 카드 */
 @Composable
-private fun HomeScheduleCard(subjectName: String, content: String, onStart: () -> Unit) {
+private fun HomeScheduleCard(subjectName: String, content: String) {
+    var checked by remember { mutableStateOf(false) }
+
     LoorveCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Checkbox(
+                checked = checked,
+                onCheckedChange = { checked = it },
+                colors = CheckboxDefaults.colors(checkedColor = Primary)
+            )
+            Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 val headerTitle = if (subjectName.isNotBlank()) "오늘 · $subjectName" else "오늘 · 복습 일정"
                 Text(text = headerTitle, style = LoorveTypography.labelMedium, color = Primary, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(text = content, style = LoorveTypography.bodyMedium, color = OnBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "예상 20분", style = LoorveTypography.labelSmall, color = Primary.copy(alpha = 0.8f))
-                    Text(text = "·", style = LoorveTypography.labelSmall, color = OnSurfaceVariant)
-                    Text(text = "지금 바로 시작할 수 있어요", style = LoorveTypography.labelSmall, color = OnSurfaceVariant)
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            FilledIconButton(onClick = onStart, colors = IconButtonDefaults.filledIconButtonColors(containerColor = Primary)) {
-                Icon(Icons.Outlined.PlayArrow, contentDescription = "시작", tint = Color.White)
             }
         }
     }
