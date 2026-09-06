@@ -14,7 +14,6 @@ data class StudyRecord(
     val stage: Int = 0,
     val successCount: Int = 0,
     val stability: Double = 1.0,
-    val completionRate: Double = 0.0,
     val plannedReviewCount: Int = 0,
     val completedReviewCount: Int = 0,
     val isAtRisk: Boolean = false,

@@ -105,7 +105,6 @@ class ReviewBlockDetailViewModel @Inject constructor(
         examId: String,
         title: String,
         content: String,
-        completionRate: Float = 1.0f,
         learningDateMillis: Long,
         dailyCap: Int = 5
     ) {
@@ -139,7 +138,6 @@ class ReviewBlockDetailViewModel @Inject constructor(
                     examId = examId,
                     title = title,
                     content = content,
-                    completionRate = completionRate.coerceIn(0f, 1f),
                     learningDateMillis = learningDateMillis,
                     examDateMillis = examDateMillis,
                     prepStartDateMillis = prepStartDateMillis,
