@@ -307,21 +307,22 @@ fun ReviewBlockDetailScreen(
             }
 
             // ── 기록 리스트 (탭 조건 분기) ──
-            item {
-                when (selectedTab) {
-                    ReviewBlockTab.STUDY_RECORD -> {
-                        StudyRecordListSection(
-                            records = uiState.studyRecords,
-                            isLoading = uiState.isLoading,
-                            onDeleteRecord = { record -> viewModel.setRecordToDelete(record) }
-                        )
-                    }
-                    ReviewBlockTab.REVIEW_RECORD -> {
-                        ReviewRecordListSection(
-                            records = uiState.reviewRecords,
-                            isLoading = uiState.isLoading
-                        )
-                    }
+            if (selectedTab == ReviewBlockTab.STUDY_RECORD) {
+                item {
+                    StudyRecordListSection(
+                        records = uiState.studyRecords,
+                        isLoading = uiState.isLoading,
+                        onDeleteRecord = { record -> viewModel.setRecordToDelete(record) }
+                    )
+                }
+            }
+
+            if (selectedTab == ReviewBlockTab.REVIEW_RECORD) {
+                item {
+                    ReviewRecordListSection(
+                        records = uiState.reviewRecords,
+                        isLoading = uiState.isLoading
+                    )
                 }
             }
 
@@ -403,14 +404,6 @@ fun StudyRecordListSection(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Text(
-            text = "📝 학습 기록",
-            style = LoorveTypography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = OnBackground
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
         if (records.isEmpty()) {
             Text(
                 text = "아직 기록된 학습이 없어요. 첫 학습을 입력해보세요!",
