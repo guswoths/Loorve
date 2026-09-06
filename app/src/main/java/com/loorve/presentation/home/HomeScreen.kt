@@ -182,7 +182,13 @@ fun HomeScreen(
                         Spacer(Modifier.height(16.dp))
 
                         // 선택 날짜의 복습 일정 인라인 표시
-                        val todaySchedules = uiState.reviewSchedules.filter { it.reviewDate == selectedDate }
+                        val todaySchedules = uiState.reviewSchedules
+                            .filter { it.reviewDate == selectedDate }
+                            .distinctBy { schedule ->
+                                schedule.scheduleId.ifBlank {
+                                    "${schedule.reviewDate}_${schedule.examId}_${schedule.reviewOrder}"
+                                }
+                            }
 
                         if (todaySchedules.isNotEmpty()) {
                             Text(
@@ -349,15 +355,15 @@ private fun HomeMiniCalendar(
                                     if (isCompleted) {
                                         Box(
                                             modifier = Modifier
-                                                .size(4.dp)
+                                                .size(6.dp)
                                                 .clip(CircleShape)
                                                 .background(dotColor)
                                         )
                                     } else {
                                         Box(
                                             modifier = Modifier
-                                                .size(4.dp)
-                                                .border(BorderStroke(1.dp, dotColor), CircleShape)
+                                                .size(6.dp)
+                                                .border(BorderStroke(1.5.dp, dotColor), CircleShape)
                                         )
                                     }
                                 }
