@@ -326,14 +326,6 @@ fun ReviewBlockDetailScreen(
                 }
             }
 
-            // ── 복습 일정 리스트 ──
-            item {
-                ReviewScheduleList(
-                    items = uiState.scheduleItems,
-                    overdueItems = uiState.overdueItems,
-                    reviewOverloadWarning = uiState.reviewOverloadWarning
-                )
-            }
         }
     }
 }
@@ -442,61 +434,84 @@ fun StudyRecordMiniCard(
                 contentDescription = "학습기록: ${record.title}, 날짜: $dateText"
             }
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(SurfaceVariant, shape = MaterialTheme.shapes.medium),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left accent bar
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(Primary, shape = MaterialTheme.shapes.medium)
+            )
+
+            Surface(
+                color = SurfaceVariant,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             ) {
-                Text(
-                    text = dateText,
-                    style = LoorveTypography.labelSmall,
-                    color = OnSurfaceVariant
-                )
-                IconButton(
-                    onClick = onDeleteClick,
-                    enabled = !isLoading,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "학습기록 삭제",
-                        tint = OnSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "📖 $dateText",
+                            style = LoorveTypography.labelSmall,
+                            color = OnSurfaceVariant
+                        )
+                        IconButton(
+                            onClick = onDeleteClick,
+                            enabled = !isLoading,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "학습기록 삭제",
+                                tint = OnSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    if (record.title.isNotBlank()) {
+                        Text(
+                            text = record.title,
+                            style = LoorveTypography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = OnBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                    }
+
+                    if (record.content.isNotBlank()) {
+                        Text(
+                            text = record.content,
+                            style = LoorveTypography.bodySmall,
+                            color = OnSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    if (record.title.isBlank() && record.content.isBlank()) {
+                        Text(
+                            text = "내용 없음",
+                            style = LoorveTypography.bodySmall,
+                            color = OnSurfaceVariant
+                        )
+                    }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            if (record.title.isNotBlank()) {
-                Text(
-                    text = record.title,
-                    style = LoorveTypography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = OnBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-            }
-
-            if (record.content.isNotBlank()) {
-                Text(
-                    text = record.content,
-                    style = LoorveTypography.bodySmall,
-                    color = OnSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            if (record.title.isBlank() && record.content.isBlank()) {
-                Text(
-                    text = "내용 없음",
-                    style = LoorveTypography.bodySmall,
-                    color = OnSurfaceVariant
-                )
             }
         }
     }
@@ -543,83 +558,86 @@ fun ReviewRecordMiniCard(
             SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(item.reviewDate))
         else "-"
     }
-    val reviewLabel = "복습 ${item.reviewOrder}회차"
 
     LoorveCard(
         modifier = modifier
             .fillMaxWidth()
             .semantics {
-                contentDescription = "복습기록: ${item.title}, $reviewLabel, ${item.status}, ${dateText}"
+                contentDescription = "복습기록: ${item.title}, 복습 ${item.reviewOrder}회차, ${item.status}, ${dateText}"
             }
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = dateText,
-                    style = LoorveTypography.labelSmall,
-                    color = OnSurfaceVariant
+        Surface(
+            color = Primary.copy(alpha = 0.07f),
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Top accent strip
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .background(Primary)
                 )
-                Surface(
-                    color = Primary.copy(alpha = 0.15f),
-                    shape = MaterialTheme.shapes.extraSmall
-                ) {
-                    Text(
-                        text = reviewLabel,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        style = LoorveTypography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Primary
-                    )
-                }
-            }
 
-            Spacer(modifier = Modifier.height(4.dp))
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = dateText,
+                            style = LoorveTypography.labelSmall,
+                            color = Primary
+                        )
+                    }
 
-            if (item.title.isNotBlank()) {
-                Text(
-                    text = item.title,
-                    style = LoorveTypography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = OnBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-            }
+                    Spacer(modifier = Modifier.height(4.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    color = when (item.status) {
-                        ReviewStatus.COMPLETED -> Primary.copy(alpha = 0.15f)
-                        ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> Error.copy(alpha = 0.15f)
-                        else -> SurfaceVariant
-                    },
-                    shape = MaterialTheme.shapes.extraSmall
-                ) {
-                    Text(
-                        text = when (item.status) {
-                            ReviewStatus.PENDING -> "대기 중"
-                            ReviewStatus.COMPLETED -> "완료"
-                            ReviewStatus.OVERDUE -> "지연"
-                            ReviewStatus.FINAL_URGENT_REVIEW -> "최종"
-                        },
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = LoorveTypography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = when (item.status) {
-                            ReviewStatus.COMPLETED -> Primary
-                            ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> Error
-                            else -> OnSurface
+                    if (item.title.isNotBlank()) {
+                        Text(
+                            text = item.title,
+                            style = LoorveTypography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = OnBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            color = when (item.status) {
+                                ReviewStatus.COMPLETED -> Primary.copy(alpha = 0.15f)
+                                ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> Error.copy(alpha = 0.15f)
+                                else -> SurfaceVariant
+                            },
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Text(
+                                text = when (item.status) {
+                                    ReviewStatus.PENDING -> "대기 중"
+                                    ReviewStatus.COMPLETED -> "완료"
+                                    ReviewStatus.OVERDUE -> "지연"
+                                    ReviewStatus.FINAL_URGENT_REVIEW -> "최종"
+                                },
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = LoorveTypography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = when (item.status) {
+                                    ReviewStatus.COMPLETED -> Primary
+                                    ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> Error
+                                    else -> OnSurface
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
         }
