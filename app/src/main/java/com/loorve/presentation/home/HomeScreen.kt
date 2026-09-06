@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -358,7 +359,14 @@ private fun HomeScheduleCard(subjectName: String, content: String) {
                 val headerTitle = if (subjectName.isNotBlank()) "오늘 · $subjectName" else "오늘 · 복습 일정"
                 Text(text = headerTitle, style = LoorveTypography.labelMedium, color = Primary, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
-                Text(text = content, style = LoorveTypography.bodyMedium, color = OnBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = content,
+                    style = LoorveTypography.bodyMedium,
+                    color = OnBackground,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None
+                )
             }
         }
     }
