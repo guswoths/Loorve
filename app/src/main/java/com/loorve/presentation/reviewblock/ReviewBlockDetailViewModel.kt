@@ -22,9 +22,15 @@ import java.time.LocalDate
 import javax.inject.Inject
 import com.loorve.util.CalendarRefreshBus
 
+enum class ReviewBlockTab {
+    STUDY_RECORD,
+    REVIEW_RECORD
+}
+
 data class ReviewBlockDetailUiState(
     val isLoading: Boolean = false,
     val studyRecords: List<StudyRecord> = emptyList(),
+    val reviewRecords: List<StudyRecord> = emptyList(),
     val scheduleItems: List<ReviewScheduleItem> = emptyList(),
     val overdueItems: List<ReviewScheduleItem> = emptyList(),
     val recommendedCompletionDate: Long? = null,
@@ -34,7 +40,8 @@ data class ReviewBlockDetailUiState(
     val reviewBlock: ReviewBlock? = null,
     val deleteSuccess: Boolean = false,
     val showDeleteConfirm: Boolean = false,
-    val recordToDelete: StudyRecord? = null
+    val recordToDelete: StudyRecord? = null,
+    val selectedTab: ReviewBlockTab = ReviewBlockTab.STUDY_RECORD
 )
 
 @HiltViewModel
@@ -48,6 +55,26 @@ class ReviewBlockDetailViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ReviewBlockDetailUiState())
     val uiState: StateFlow<ReviewBlockDetailUiState> = _uiState.asStateFlow()
+
+    private val _selectedTab = MutableStateFlow(ReviewBlockTab.STUDY_RECORD)
+    val selectedTab: StateFlow<ReviewBlockTab> = _selectedTab.asStateFlow()
+
+    fun selectTab(tab: ReviewBlockTab, uid: String = "", blockId: String = "") {
+        _selectedTab.value = tab
+        _uiState.value = _uiState.value.copy(selectedTab = tab)
+        if (tab == ReviewBlockTab.REVIEW_RECORD && uid.isNotBlank() && blockId.isNotBlank()) {
+            loadReviewRecords(uid, blockId)
+        }
+    }
+
+    fun loadReviewRecords(uid: String, blockId: String) {
+        viewModelScope.launch {
+            val records = studyRecordRepository.getStudyRecords(uid, blockId)
+                .getOrDefault(emptyList())
+                .sortedByDescending { it.learningDate }
+            _uiState.value = _uiState.value.copy(reviewRecords = records)
+        }
+    }
 
     fun loadBlockData(uid: String, blockId: String, externalBlock: ReviewBlock? = null) {
         // externalBlock이 있으면 isLoading = true와 동시에 reviewBlock도 함께 세팅
@@ -93,6 +120,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
                 isLoading = false,
                 reviewBlock = resolvedBlock,
                 studyRecords = records,
+                reviewRecords = records,
                 scheduleItems = updatedSchedules,
                 overdueItems = overdueResult.overdueQueue
             )

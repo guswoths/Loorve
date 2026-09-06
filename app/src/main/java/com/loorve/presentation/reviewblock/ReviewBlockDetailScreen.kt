@@ -1,6 +1,8 @@
 package com.loorve.presentation.reviewblock
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -47,6 +49,7 @@ fun ReviewBlockDetailScreen(
     homeViewModel: HomeViewModel = hiltViewModel()          // ✅ [추가]
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val selectedTab by viewModel.selectedTab.collectAsState()
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -277,14 +280,13 @@ fun ReviewBlockDetailScreen(
             // ── 학습 진도 입력 섹션 ──
             item {
                 StudyProgressInputSection(
-                    onSave = { learningDateMillis, title, content, completionRate ->
+                    onSave = { learningDateMillis, title, content ->
                         viewModel.saveProgress(
                             uid = uid,
                             blockId = blockId,
                             examId = resolvedBlock?.blockId ?: blockId,
                             title = title,
                             content = content,
-                            completionRate = completionRate,
                             learningDateMillis = learningDateMillis,
                             dailyCap = dailyCap
                         )
@@ -294,13 +296,33 @@ fun ReviewBlockDetailScreen(
                 )
             }
 
-            // ── 학습 기록 섹션 ──
+            // ── 학습기록 / 복습기록 탭 전환 UI ──
             item {
-                StudyRecordListSection(
-                    records = uiState.studyRecords,
-                    isLoading = uiState.isLoading,
-                    onDeleteRecord = { record -> viewModel.setRecordToDelete(record) }
+                RecordTabRow(
+                    selectedTab = selectedTab,
+                    onTabSelected = { tab ->
+                        viewModel.selectTab(tab, uid = uid, blockId = blockId)
+                    }
                 )
+            }
+
+            // ── 기록 리스트 (탭 조건 분기) ──
+            item {
+                when (selectedTab) {
+                    ReviewBlockTab.STUDY_RECORD -> {
+                        StudyRecordListSection(
+                            records = uiState.studyRecords,
+                            isLoading = uiState.isLoading,
+                            onDeleteRecord = { record -> viewModel.setRecordToDelete(record) }
+                        )
+                    }
+                    ReviewBlockTab.REVIEW_RECORD -> {
+                        ReviewRecordListSection(
+                            records = uiState.reviewRecords,
+                            isLoading = uiState.isLoading
+                        )
+                    }
+                }
             }
 
             // ── 복습 일정 리스트 ──
@@ -315,6 +337,56 @@ fun ReviewBlockDetailScreen(
                 )
             }
         }
+    }
+}
+
+// ── 학습기록 / 복습기록 탭 전환 UI ─────────────────────────────
+@Composable
+fun RecordTabRow(
+    selectedTab: ReviewBlockTab,
+    onTabSelected: (ReviewBlockTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "학습기록",
+            style = LoorveTypography.titleMedium,
+            fontWeight = if (selectedTab == ReviewBlockTab.STUDY_RECORD) FontWeight.Bold else FontWeight.Medium,
+            color = if (selectedTab == ReviewBlockTab.STUDY_RECORD) OnBackground else OnSurfaceVariant,
+            modifier = Modifier
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    onTabSelected(ReviewBlockTab.STUDY_RECORD)
+                }
+                .semantics { contentDescription = "학습기록 탭" }
+        )
+        Text(
+            text = "|",
+            style = LoorveTypography.titleMedium,
+            color = Divider
+        )
+        Text(
+            text = "복습기록",
+            style = LoorveTypography.titleMedium,
+            fontWeight = if (selectedTab == ReviewBlockTab.REVIEW_RECORD) FontWeight.Bold else FontWeight.Medium,
+            color = if (selectedTab == ReviewBlockTab.REVIEW_RECORD) OnBackground else OnSurfaceVariant,
+            modifier = Modifier
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    onTabSelected(ReviewBlockTab.REVIEW_RECORD)
+                }
+                .semantics { contentDescription = "복습기록 탭" }
+        )
     }
 }
 
@@ -373,27 +445,11 @@ fun StudyRecordMiniCard(
         else "-"
     }
 
-    val ratePercent = remember(record.completionRate) {
-        when {
-            record.completionRate <= 0.0  -> 0
-            record.completionRate <= 1.0  -> (record.completionRate * 100).toInt()
-            else                          -> record.completionRate.toInt().coerceIn(0, 100)
-        }
-    }
-
-    val badgeText = if (ratePercent == 0) "기록 없음" else "완료 $ratePercent%"
-    val badgeColor = when {
-        ratePercent == 0  -> OnSurfaceVariant
-        ratePercent >= 80 -> Color(0xFF388E3C)
-        ratePercent >= 50 -> Color(0xFFFF9800)
-        else              -> MaterialTheme.colorScheme.error
-    }
-
     LoorveCard(
         modifier = modifier
             .fillMaxWidth()
             .semantics {
-                contentDescription = "학습기록: ${record.title}, 날짜: $dateText, 완료율: $ratePercent%"
+                contentDescription = "학습기록: ${record.title}, 날짜: $dateText"
             }
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -407,32 +463,17 @@ fun StudyRecordMiniCard(
                     style = LoorveTypography.labelSmall,
                     color = OnSurfaceVariant
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        color = badgeColor.copy(alpha = 0.15f),
-                        shape = MaterialTheme.shapes.extraSmall
-                    ) {
-                        Text(
-                            text = badgeText,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            style = LoorveTypography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = badgeColor
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    IconButton(
-                        onClick = onDeleteClick,
-                        enabled = !isLoading,
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "학습기록 삭제",
-                            tint = OnSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
+                IconButton(
+                    onClick = onDeleteClick,
+                    enabled = !isLoading,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "학습기록 삭제",
+                        tint = OnSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
 
@@ -466,6 +507,166 @@ fun StudyRecordMiniCard(
                     style = LoorveTypography.bodySmall,
                     color = OnSurfaceVariant
                 )
+            }
+        }
+    }
+}
+
+// ── 복습 기록 섹션 (헤더 + 목록) ──────────────────────────────
+@Composable
+fun ReviewRecordListSection(
+    records: List<StudyRecord>,
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        if (records.isEmpty()) {
+            Text(
+                text = "아직 복습 기록이 없어요.",
+                style = LoorveTypography.bodySmall,
+                color = OnSurfaceVariant,
+                modifier = Modifier.padding(vertical = 12.dp)
+            )
+        } else {
+            records.forEach { record ->
+                ReviewRecordMiniCard(
+                    record = record
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+// ── ReviewRecordMiniCard ───────────────────────────────────────
+@Composable
+fun ReviewRecordMiniCard(
+    record: StudyRecord,
+    modifier: Modifier = Modifier
+) {
+    val dateText = remember(record.learningDate) {
+        if (record.learningDate > 0L)
+            SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(record.learningDate))
+        else "-"
+    }
+
+    val reviewCountText = if (record.plannedReviewCount > 0) {
+        "복습 ${record.completedReviewCount}/${record.plannedReviewCount}회"
+    } else {
+        "복습 ${record.completedReviewCount}회 완료"
+    }
+
+    LoorveCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = "복습기록: ${record.title}, $reviewCountText, ${record.stage}단계, 성공 ${record.successCount}회"
+            }
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = dateText,
+                    style = LoorveTypography.labelSmall,
+                    color = OnSurfaceVariant
+                )
+                Surface(
+                    color = Primary.copy(alpha = 0.15f),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(
+                        text = reviewCountText,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        style = LoorveTypography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Primary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            if (record.title.isNotBlank()) {
+                Text(
+                    text = record.title,
+                    style = LoorveTypography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = OnBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+            }
+
+            if (record.content.isNotBlank()) {
+                Text(
+                    text = record.content,
+                    style = LoorveTypography.bodySmall,
+                    color = OnSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            if (record.title.isBlank() && record.content.isBlank()) {
+                Text(
+                    text = "내용 없음",
+                    style = LoorveTypography.bodySmall,
+                    color = OnSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = SurfaceVariant,
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(
+                        text = "${record.stage}단계",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = LoorveTypography.labelSmall,
+                        color = OnSurface
+                    )
+                }
+                Surface(
+                    color = SurfaceVariant,
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(
+                        text = "성공 ${record.successCount}회",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = LoorveTypography.labelSmall,
+                        color = OnSurface
+                    )
+                }
+                if (record.isAtRisk) {
+                    Surface(
+                        color = Error.copy(alpha = 0.15f),
+                        shape = MaterialTheme.shapes.extraSmall
+                    ) {
+                        Text(
+                            text = "망각 주의",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = LoorveTypography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Error
+                        )
+                    }
+                }
             }
         }
     }
@@ -520,14 +721,13 @@ fun RecommendedCompletionCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudyProgressInputSection(
-    onSave: (learningDateMillis: Long, title: String, content: String, completionRate: Float) -> Unit,
+    onSave: (learningDateMillis: Long, title: String, content: String) -> Unit,
     isLoading: Boolean,
     isSaveEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var titleText by remember { mutableStateOf("") }
     var contentText by remember { mutableStateOf("") }
-    var completionRate by remember { mutableFloatStateOf(1.0f) }
 
     val kstZone = remember { ZoneId.of("Asia/Seoul") }
     val todayMillis = remember {
@@ -623,39 +823,12 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        Text(
-            text = "완료율: ${(completionRate * 100).toInt()}%",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.semantics {
-                contentDescription = "완료율 ${(completionRate * 100).toInt()}퍼센트"
-            }
-        )
-        Slider(
-            value = completionRate,
-            onValueChange = { completionRate = it },
-            valueRange = 0f..1f,
-            steps = 9,
-            enabled = !isLoading,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = "완료율 슬라이더" },
-            colors = SliderDefaults.colors(
-                thumbColor = Primary,
-                activeTrackColor = Primary,
-                inactiveTrackColor = Primary.copy(alpha = 0.24f)
-            )
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
         Button(
             onClick = {
                 if (canSave) {
-                    onSave(selectedDateMillis, titleText.trim(), contentText.trim(), completionRate)
+                    onSave(selectedDateMillis, titleText.trim(), contentText.trim())
                     titleText = ""
                     contentText = ""
-                    completionRate = 1.0f
                 }
             },
             modifier = Modifier
