@@ -320,7 +320,7 @@ fun ReviewBlockDetailScreen(
             if (selectedTab == ReviewBlockTab.REVIEW_RECORD) {
                 item {
                     ReviewRecordListSection(
-                        records = uiState.reviewRecords,
+                        scheduleItems = uiState.reviewScheduleRecords,
                         isLoading = uiState.isLoading
                     )
                 }
@@ -331,10 +331,7 @@ fun ReviewBlockDetailScreen(
                 ReviewScheduleList(
                     items = uiState.scheduleItems,
                     overdueItems = uiState.overdueItems,
-                    reviewOverloadWarning = uiState.reviewOverloadWarning,
-                    onComplete = { scheduleItem, result ->
-                        viewModel.completeReview(uid, scheduleItem, result, examDateMillis)
-                    }
+                    reviewOverloadWarning = uiState.reviewOverloadWarning
                 )
             }
         }
@@ -508,7 +505,7 @@ fun StudyRecordMiniCard(
 // ── 복습 기록 섹션 (헤더 + 목록) ──────────────────────────────
 @Composable
 fun ReviewRecordListSection(
-    records: List<StudyRecord>,
+    scheduleItems: List<ReviewScheduleItem>,
     modifier: Modifier = Modifier,
     isLoading: Boolean = false
 ) {
@@ -517,17 +514,17 @@ fun ReviewRecordListSection(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        if (records.isEmpty()) {
+        if (scheduleItems.isEmpty()) {
             Text(
-                text = "아직 복습 기록이 없어요.",
+                text = "아직 복습 일정이 없어요.",
                 style = LoorveTypography.bodySmall,
                 color = OnSurfaceVariant,
                 modifier = Modifier.padding(vertical = 12.dp)
             )
         } else {
-            records.forEach { record ->
+            scheduleItems.forEach { item ->
                 ReviewRecordMiniCard(
-                    record = record
+                    item = item
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -538,26 +535,21 @@ fun ReviewRecordListSection(
 // ── ReviewRecordMiniCard ───────────────────────────────────────
 @Composable
 fun ReviewRecordMiniCard(
-    record: StudyRecord,
+    item: ReviewScheduleItem,
     modifier: Modifier = Modifier
 ) {
-    val dateText = remember(record.learningDate) {
-        if (record.learningDate > 0L)
-            SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(record.learningDate))
+    val dateText = remember(item.reviewDate) {
+        if (item.reviewDate > 0L)
+            SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(item.reviewDate))
         else "-"
     }
-
-    val reviewCountText = if (record.plannedReviewCount > 0) {
-        "복습 ${record.completedReviewCount}/${record.plannedReviewCount}회"
-    } else {
-        "복습 ${record.completedReviewCount}회 완료"
-    }
+    val reviewLabel = "복습 ${item.reviewOrder}회차"
 
     LoorveCard(
         modifier = modifier
             .fillMaxWidth()
             .semantics {
-                contentDescription = "복습기록: ${record.title}, $reviewCountText, ${record.stage}단계, 성공 ${record.successCount}회"
+                contentDescription = "복습기록: ${item.title}, $reviewLabel, ${item.status}, ${dateText}"
             }
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -576,7 +568,7 @@ fun ReviewRecordMiniCard(
                     shape = MaterialTheme.shapes.extraSmall
                 ) {
                     Text(
-                        text = reviewCountText,
+                        text = reviewLabel,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                         style = LoorveTypography.labelSmall,
                         fontWeight = FontWeight.Bold,
@@ -587,9 +579,9 @@ fun ReviewRecordMiniCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            if (record.title.isNotBlank()) {
+            if (item.title.isNotBlank()) {
                 Text(
-                    text = record.title,
+                    text = item.title,
                     style = LoorveTypography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = OnBackground,
@@ -599,66 +591,35 @@ fun ReviewRecordMiniCard(
                 Spacer(modifier = Modifier.height(2.dp))
             }
 
-            if (record.content.isNotBlank()) {
-                Text(
-                    text = record.content,
-                    style = LoorveTypography.bodySmall,
-                    color = OnSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-            }
-
-            if (record.title.isBlank() && record.content.isBlank()) {
-                Text(
-                    text = "내용 없음",
-                    style = LoorveTypography.bodySmall,
-                    color = OnSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-            }
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    color = SurfaceVariant,
+                    color = when (item.status) {
+                        ReviewStatus.COMPLETED -> Primary.copy(alpha = 0.15f)
+                        ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> Error.copy(alpha = 0.15f)
+                        else -> SurfaceVariant
+                    },
                     shape = MaterialTheme.shapes.extraSmall
                 ) {
                     Text(
-                        text = "${record.stage}단계",
+                        text = when (item.status) {
+                            ReviewStatus.PENDING -> "대기 중"
+                            ReviewStatus.COMPLETED -> "완료"
+                            ReviewStatus.OVERDUE -> "지연"
+                            ReviewStatus.FINAL_URGENT_REVIEW -> "최종"
+                        },
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         style = LoorveTypography.labelSmall,
-                        color = OnSurface
+                        fontWeight = FontWeight.Bold,
+                        color = when (item.status) {
+                            ReviewStatus.COMPLETED -> Primary
+                            ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> Error
+                            else -> OnSurface
+                        }
                     )
-                }
-                Surface(
-                    color = SurfaceVariant,
-                    shape = MaterialTheme.shapes.extraSmall
-                ) {
-                    Text(
-                        text = "성공 ${record.successCount}회",
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = LoorveTypography.labelSmall,
-                        color = OnSurface
-                    )
-                }
-                if (record.isAtRisk) {
-                    Surface(
-                        color = Error.copy(alpha = 0.15f),
-                        shape = MaterialTheme.shapes.extraSmall
-                    ) {
-                        Text(
-                            text = "망각 주의",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = LoorveTypography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Error
-                        )
-                    }
                 }
             }
         }
@@ -847,8 +808,8 @@ fun ReviewScheduleList(
     items: List<ReviewScheduleItem>,
     overdueItems: List<ReviewScheduleItem>,
     reviewOverloadWarning: Boolean,
-    onComplete: (ReviewScheduleItem, CompletionResult) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onComplete: ((ReviewScheduleItem, CompletionResult) -> Unit)? = null
 ) {
     val sdf = remember { SimpleDateFormat("MM/dd (E)", Locale.KOREA) }
 
@@ -865,8 +826,7 @@ fun ReviewScheduleList(
             overdueItems.forEach { item ->
                 ReviewScheduleItemCard(
                     item = item,
-                    dateText = sdf.format(Date(item.reviewDate)),
-                    onComplete = onComplete
+                    dateText = sdf.format(Date(item.reviewDate))
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -878,8 +838,7 @@ fun ReviewScheduleList(
         pendingItems.forEach { item ->
             ReviewScheduleItemCard(
                 item = item,
-                dateText = sdf.format(Date(item.reviewDate)),
-                onComplete = onComplete
+                dateText = sdf.format(Date(item.reviewDate))
             )
         }
     }
@@ -888,8 +847,7 @@ fun ReviewScheduleList(
 @Composable
 fun ReviewScheduleItemCard(
     item: ReviewScheduleItem,
-    dateText: String,
-    onComplete: (ReviewScheduleItem, CompletionResult) -> Unit
+    dateText: String
 ) {
     val (bgColor, statusLabel, statusDesc) = when (item.status) {
         ReviewStatus.OVERDUE ->
@@ -945,23 +903,6 @@ fun ReviewScheduleItemCard(
                             item.status == ReviewStatus.FINAL_URGENT_REVIEW)
                             MaterialTheme.colorScheme.error else Color.Unspecified
                     )
-                }
-            }
-
-            if (item.status != ReviewStatus.COMPLETED) {
-                Column {
-                    TextButton(
-                        onClick = { onComplete(item, CompletionResult.REMEMBERED) },
-                        modifier = Modifier.semantics {
-                            contentDescription = "기억함 버튼 - ${item.title}"
-                        }
-                    ) { Text("기억함", color = Color(0xFF2E7D32)) }
-                    TextButton(
-                        onClick = { onComplete(item, CompletionResult.FORGOT) },
-                        modifier = Modifier.semantics {
-                            contentDescription = "잊어버림 버튼 - ${item.title}"
-                        }
-                    ) { Text("잊어버림", color = MaterialTheme.colorScheme.error) }
                 }
             }
         }

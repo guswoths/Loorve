@@ -30,7 +30,7 @@ enum class ReviewBlockTab {
 data class ReviewBlockDetailUiState(
     val isLoading: Boolean = false,
     val studyRecords: List<StudyRecord> = emptyList(),
-    val reviewRecords: List<StudyRecord> = emptyList(),
+    val reviewScheduleRecords: List<ReviewScheduleItem> = emptyList(),
     val scheduleItems: List<ReviewScheduleItem> = emptyList(),
     val overdueItems: List<ReviewScheduleItem> = emptyList(),
     val recommendedCompletionDate: Long? = null,
@@ -71,8 +71,11 @@ class ReviewBlockDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val records = studyRecordRepository.getStudyRecords(uid, blockId)
                 .getOrDefault(emptyList())
-                .sortedByDescending { it.learningDate }
-            _uiState.value = _uiState.value.copy(reviewRecords = records)
+            val allSchedules = records.flatMap { record ->
+                scheduleRepository.getSchedulesByStudyRecord(uid, record.id)
+                    .getOrDefault(emptyList())
+            }.sortedBy { it.reviewDate }
+            _uiState.value = _uiState.value.copy(reviewScheduleRecords = allSchedules)
         }
     }
 
@@ -120,7 +123,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
                 isLoading = false,
                 reviewBlock = resolvedBlock,
                 studyRecords = records,
-                reviewRecords = records,
+                reviewScheduleRecords = updatedSchedules,
                 scheduleItems = updatedSchedules,
                 overdueItems = overdueResult.overdueQueue
             )
