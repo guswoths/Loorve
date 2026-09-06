@@ -1,14 +1,22 @@
 package com.loorve.data.repository
 
+import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.repository.ReviewBlockRepository
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 class ReviewBlockRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : ReviewBlockRepository {
+
+    companion object {
+        private const val TAG = "ReviewBlockRepo"
+    }
 
     private fun reviewBlocksRef(uid: String) =
         firestore.collection("users")
@@ -74,6 +82,34 @@ class ReviewBlockRepositoryImpl @Inject constructor(
                     val data = snapshot.data ?: return@mapNotNull null
                     mapToReviewBlock(data, snapshot.id)
                 }
+        }
+    }
+
+    override fun observeReviewBlocks(uid: String): Flow<List<ReviewBlock>> = callbackFlow {
+        if (uid.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val registration = reviewBlocksRef(uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w(TAG, "복습 블록 스냅샷 오류: ${error.message}")
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+
+                val blocks = snapshot?.documents.orEmpty().mapNotNull { doc ->
+                    val data = doc.data ?: return@mapNotNull null
+                    mapToReviewBlock(data, doc.id)
+                }
+                Log.d(TAG, "복습 블록 스냅샷 수신: ${blocks.size}건")
+                trySend(blocks)
+            }
+
+        awaitClose {
+            registration.remove()
         }
     }
 

@@ -115,6 +115,7 @@ class HomeViewModel @Inject constructor(
 
     private var reviewScheduleJob: Job? = null
     private var observeReviewScheduleItemsJob: Job? = null
+    private var observeReviewBlocksJob: Job? = null
 
     // 복습 일정(ReviewScheduleItem 및 구 ReviewSchedule) 통합 상태 관리
     private var rawReviewScheduleItems: List<ReviewScheduleItem> = emptyList()
@@ -131,7 +132,7 @@ class HomeViewModel @Inject constructor(
                 return@launch
             }
             loadExams()
-            loadReviewBlocks(uid)
+            observeReviewBlocks(uid)  // ✅ 복습 블록 실시간 감시 (삭제 이벤트 즉시 반영)
             observeStudyRecordDates(uid)
             observeReviewScheduleItems(uid) // ✅ 복습 일정 실시간 감시 및 캘린더 dot 동기화
             loadProgressListAndThenSchedules(uid, _displayYearMonth.value)
@@ -522,12 +523,15 @@ class HomeViewModel @Inject constructor(
         _uiState.update { it.copy(reviewSchedules = refreshed) }
     }
 
-    private fun loadReviewBlocks(uid: String) {
-        viewModelScope.launch {
-            reviewBlockRepository.getReviewBlocks(uid)
-                .onSuccess { blocks: List<ReviewBlock> ->
+    // ✅ 복습 블록을 실시간으로 감시하여 블록 삭제 시 즉시 반영
+    private fun observeReviewBlocks(uid: String) {
+        observeReviewBlocksJob?.cancel()
+        observeReviewBlocksJob = viewModelScope.launch {
+            reviewBlockRepository.observeReviewBlocks(uid)
+                .catch { }
+                .collect { blocks ->
                     val today = LocalDate.now()
-                    val uiBlocks = blocks.map { block: ReviewBlock ->
+                    val uiBlocks = blocks.map { block ->
                         val examLocalDate = Instant.ofEpochMilli(block.examDate)
                             .atZone(seoulZone).toLocalDate()
                         val dDay = ChronoUnit.DAYS.between(today, examLocalDate).toInt()
@@ -542,12 +546,10 @@ class HomeViewModel @Inject constructor(
                         )
                     }
                     _uiState.update { it.copy(reviewBlocks = uiBlocks) }
-                    // ✅ 복습캘린더의 현재 존재하는 복습블록 ID 목록 추출
+                    // ✅ 활성 블록 ID 추출 후 즉시 필터 적용
                     val activeBlockIds = uiBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
-                    // ✅ 블록 삭제 또는 갱신 시, 현재 존재하는 블록의 복습기록만 dot 데이터에 남도록 즉시 동기화
                     applyActiveBlocksFilter(activeBlockIds)
                 }
-                .onFailure { }
         }
     }
 
@@ -578,7 +580,7 @@ class HomeViewModel @Inject constructor(
             reviewBlockRepository.saveReviewBlock(block)
                 .onSuccess {
                     _uiState.update { it.copy(isCreatingBlock = false, saveMessage = "복습 블록이 생성되었습니다.") }
-                    loadReviewBlocks(uid)
+                    // ✅ 실시간 리스너가 자동으로 새 블록을 감지하므로 명시적 호출 불필요
                 }
                 .onFailure { e ->
                     _uiState.update {
@@ -636,7 +638,7 @@ class HomeViewModel @Inject constructor(
     fun refreshCalendar() {
         viewModelScope.launch {
             val uid = getUidSafely() ?: return@launch
-            loadReviewBlocks(uid)
+            observeReviewBlocks(uid)
             observeReviewScheduleItems(uid)
             loadReviewScheduleDatesByMonth(uid, _displayYearMonth.value)
         }

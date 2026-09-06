@@ -71,7 +71,6 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
-                // ✅ filter 제거, apply로 scheduleId 보장
                 val schedules = snapshot?.documents.orEmpty()
                     .mapNotNull { document ->
                         runCatching {
@@ -80,6 +79,10 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
                                     if (scheduleId.isBlank()) scheduleId = document.id
                                 }
                         }.getOrNull()
+                    }
+                    // ✅ 중복 제거: (reviewDate, originProgressId, reviewOrder) 조합으로 유일성 보장
+                    .distinctBy { schedule ->
+                        Triple(schedule.reviewDate, schedule.originProgressId, schedule.reviewOrder)
                     }
                 Log.d(TAG, "복습일정 스냅샷 수신: ${schedules.size}건 (${startDate}~${endDate})")
                 trySend(schedules)
