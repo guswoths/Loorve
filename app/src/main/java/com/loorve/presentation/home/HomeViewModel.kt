@@ -271,8 +271,13 @@ class HomeViewModel @Inject constructor(
         val filteredLegacyDates = filteredLegacyUiModels.map { it.reviewDate }.toSet()
 
         val combinedDates = reviewScheduleItemDates + filteredLegacyDates
+        // ✅ 복합 키로 중복 제거: (reviewDate, originProgressId, reviewOrder)
+        // reviewScheduleItems와 reviewSchedules 두 컬렉션에서 온 데이터가 같은 논리적 스케줄을
+        // 나타내는 경우에도 제거할 수 있도록 함. scheduleId만으로는 부족함.
         val combinedSchedules = (reviewScheduleItemUiModels + filteredLegacyUiModels)
-            .distinctBy { it.scheduleId }
+            .distinctBy { schedule ->
+                Triple(schedule.reviewDate, schedule.originProgressId, schedule.reviewOrder)
+            }
             .sortedWith(compareBy<ReviewScheduleUiModel> { it.reviewDate }.thenBy { it.reviewOrder })
 
         _uiState.update { state ->
