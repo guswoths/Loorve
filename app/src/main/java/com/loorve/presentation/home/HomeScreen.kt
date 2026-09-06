@@ -2,8 +2,10 @@ package com.loorve.presentation.home
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -52,6 +54,19 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    val checkedStates = remember { mutableStateMapOf<String, Boolean>() }
+
+    val completedDates = uiState.reviewSchedules
+        .groupBy { it.reviewDate }
+        .filter { (_, schedules) ->
+            schedules.isNotEmpty() && schedules.all { schedule ->
+                val key = schedule.scheduleId.ifBlank {
+                    "${schedule.reviewDate}_${schedule.examId}_${schedule.reviewOrder}"
+                }
+                checkedStates[key] == true
+            }
+        }
+        .keys
 
     val displayYearMonth by viewModel.displayYearMonth.collectAsState()
 
@@ -158,6 +173,7 @@ fun HomeScreen(
                             displayYearMonth = displayYearMonth,
                             selectedDate = selectedDate,
                             scheduledDates = uiState.reviewScheduleDates,
+                            completedDates = completedDates,
                             onDateSelected = { selectedDate = it }
                         )
 
@@ -186,9 +202,14 @@ fun HomeScreen(
                                             ?: uiState.reviewBlocks.find { it.blockId == schedule.examId }?.examName
                                             ?: ""
                                     }
+                                    val scheduleKey = schedule.scheduleId.ifBlank {
+                                        "${schedule.reviewDate}_${schedule.examId}_${schedule.reviewOrder}"
+                                    }
                                     HomeScheduleCard(
                                         subjectName = subjectName,
-                                        content = schedule.content
+                                        content = schedule.content,
+                                        checked = checkedStates[scheduleKey] ?: false,
+                                        onCheckedChange = { checkedStates[scheduleKey] = it }
                                     )
                                 }
                             }
@@ -264,6 +285,7 @@ private fun HomeMiniCalendar(
     displayYearMonth: YearMonth,
     selectedDate: LocalDate,
     scheduledDates: Set<LocalDate>,
+    completedDates: Set<LocalDate>,
     onDateSelected: (LocalDate) -> Unit
 ) {
     val today = LocalDate.now()
@@ -322,12 +344,22 @@ private fun HomeMiniCalendar(
                                 )
                                 if (hasSchedule) {
                                     Spacer(Modifier.height(1.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .size(4.dp)
-                                            .clip(CircleShape)
-                                            .background(if (isSelected) Color.White else Primary)
-                                    )
+                                    val isCompleted = completedDates.contains(date)
+                                    val dotColor = if (isSelected) Color.White else Primary
+                                    if (isCompleted) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(4.dp)
+                                                .clip(CircleShape)
+                                                .background(dotColor)
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(4.dp)
+                                                .border(BorderStroke(1.dp, dotColor), CircleShape)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -341,9 +373,12 @@ private fun HomeMiniCalendar(
 
 /** 복습 일정 카드 */
 @Composable
-private fun HomeScheduleCard(subjectName: String, content: String) {
-    var checked by remember { mutableStateOf(false) }
-
+private fun HomeScheduleCard(
+    subjectName: String,
+    content: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
     LoorveCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -351,7 +386,7 @@ private fun HomeScheduleCard(subjectName: String, content: String) {
         ) {
             Checkbox(
                 checked = checked,
-                onCheckedChange = { checked = it },
+                onCheckedChange = onCheckedChange,
                 colors = CheckboxDefaults.colors(checkedColor = Primary)
             )
             Spacer(Modifier.width(8.dp))
