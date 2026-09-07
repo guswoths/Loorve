@@ -20,5 +20,6 @@ data class ReviewScheduleItem(
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
     val completionResult: CompletionResult? = null,
-    val completedAt: Long? = null
+    val completedAt: Long? = null,
+    val customAlarmTime: Pair<Int, Int>? = null
 )

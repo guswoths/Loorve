@@ -30,7 +30,7 @@ fun NotificationTimeSettingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = "알림 시간 설정") },
+                title = { Text(text = "기본 알림 시간 설정") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(

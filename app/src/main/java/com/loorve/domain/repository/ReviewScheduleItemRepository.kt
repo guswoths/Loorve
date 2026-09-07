@@ -22,9 +22,19 @@ interface ReviewScheduleItemRepository {
         blockId: String
     ): Result<List<ReviewScheduleItem>>
 
+    suspend fun getAllScheduleItems(
+        uid: String
+    ): Result<List<ReviewScheduleItem>>
+
     suspend fun updateScheduleItem(
         uid: String,
         item: ReviewScheduleItem
+    ): Result<Unit>
+
+    suspend fun updateScheduleCompletion(
+        uid: String,
+        scheduleId: String,
+        isCompleted: Boolean
     ): Result<Unit>
 
     suspend fun batchUpdatePendingSchedules(

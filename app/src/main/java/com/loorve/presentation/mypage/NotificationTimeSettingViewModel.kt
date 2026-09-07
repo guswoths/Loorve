@@ -2,13 +2,18 @@ package com.loorve.presentation.mypage
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
+import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.data.local.NotificationTimePreferences
+import com.loorve.domain.repository.ReviewScheduleItemRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
 import javax.inject.Inject
 
 data class NotificationTimeUiState(
@@ -20,7 +25,10 @@ data class NotificationTimeUiState(
 
 @HiltViewModel
 class NotificationTimeSettingViewModel @Inject constructor(
-    private val notificationTimePreferences: NotificationTimePreferences
+    private val notificationTimePreferences: NotificationTimePreferences,
+    private val scheduleRepository: ReviewScheduleItemRepository,
+    private val firebaseAuth: FirebaseAuth,
+    private val reviewAlarmScheduler: ReviewAlarmScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NotificationTimeUiState())
@@ -59,6 +67,27 @@ class NotificationTimeSettingViewModel @Inject constructor(
                     hour   = _uiState.value.hour,
                     minute = _uiState.value.minute
                 )
+                val uid = firebaseAuth.currentUser?.uid
+                    ?: throw IllegalStateException("로그인된 사용자를 찾을 수 없습니다.")
+                val allSchedules = scheduleRepository.getAllScheduleItems(uid)
+                    .getOrThrow()
+                allSchedules
+                    .filter { it.customAlarmTime == null }
+                    .forEach { item ->
+                        scheduleRepository.updateScheduleItem(uid, item).getOrThrow()
+                        val reviewDate = Instant.ofEpochMilli(item.reviewDate)
+                            .atZone(ZoneId.of("Asia/Seoul"))
+                            .toLocalDate()
+                        val triggerAtMillis = reviewDate
+                            .atTime(_uiState.value.hour, _uiState.value.minute)
+                            .atZone(ZoneId.of("Asia/Seoul"))
+                            .toInstant()
+                            .toEpochMilli()
+                        reviewAlarmScheduler.scheduleReviewAlarm(
+                            reviewScheduleId = item.id,
+                            triggerAtMillis = triggerAtMillis
+                        )
+                    }
             }.onSuccess {
                 _uiState.update { it.copy(isSaved = true, errorMessage = null) }
             }.onFailure { throwable ->
