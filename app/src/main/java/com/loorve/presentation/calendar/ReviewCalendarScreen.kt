@@ -79,7 +79,8 @@ fun ReviewCalendarScreen(
                     .atStartOfDay(java.time.ZoneId.of("Asia/Seoul"))
                     .toInstant()
                     .toEpochMilli(),
-                reviewOrder = schedule.reviewOrder
+                reviewOrder = schedule.reviewOrder,
+                isCompleted = schedule.isCompleted
             )
         }
 

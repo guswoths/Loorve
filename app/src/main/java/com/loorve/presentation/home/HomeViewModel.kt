@@ -59,7 +59,8 @@ data class ReviewScheduleUiModel(
     val content: String,
     val reviewDate: LocalDate,
     val reviewOrder: Int,
-    val subjectName: String = ""
+    val subjectName: String = "",
+    val isCompleted: Boolean = false
 )
 
 data class ReviewBlockUiModel(
@@ -336,7 +337,8 @@ class HomeViewModel @Inject constructor(
                 content = item.title,
                 reviewDate = localDate,
                 reviewOrder = item.reviewOrder,
-                subjectName = subjectName
+                subjectName = subjectName,
+                isCompleted = item.status == com.loorve.domain.model.ReviewStatus.COMPLETED
             )
         }
 
@@ -473,7 +475,8 @@ class HomeViewModel @Inject constructor(
                             examId = displayExamId,
                             content = displayContent,
                             reviewDate = localDate,
-                            reviewOrder = schedule.reviewOrder
+                            reviewOrder = schedule.reviewOrder,
+                            isCompleted = schedule.isCompleted
                         )
                     }
 
@@ -484,6 +487,32 @@ class HomeViewModel @Inject constructor(
                     legacyReviewScheduleDates = (otherMonthsDates + reviewDates).toSet()
                     legacyReviewScheduleUiModels = reviewScheduleUiModels
                     updateCombinedReviewSchedules()
+                }
+        }
+    }
+
+    fun toggleScheduleCompletion(scheduleId: String, isCompleted: Boolean) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val scheduleKey = scheduleId.ifBlank { return }
+        val previousSchedules = _uiState.value.reviewSchedules
+        _uiState.update { state ->
+            state.copy(
+                reviewSchedules = state.reviewSchedules.map { schedule ->
+                    val key = schedule.scheduleId.ifBlank {
+                        "${schedule.reviewDate}_${schedule.examId}_${schedule.reviewOrder}"
+                    }
+                    if (key == scheduleKey) schedule.copy(isCompleted = isCompleted) else schedule
+                }
+            )
+        }
+
+        viewModelScope.launch {
+            reviewScheduleRepository.updateReviewCompletion(uid, scheduleKey, isCompleted)
+                .onFailure { exception ->
+                    _uiState.update { it.copy(reviewSchedules = previousSchedules) }
+                    _uiState.update {
+                        it.copy(errorMessage = exception.message ?: "복습 상태 변경에 실패했습니다.")
+                    }
                 }
         }
     }

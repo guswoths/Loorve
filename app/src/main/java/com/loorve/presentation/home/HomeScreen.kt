@@ -54,16 +54,12 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    val checkedStates = remember { mutableStateMapOf<String, Boolean>() }
 
     val completedDates = uiState.reviewSchedules
         .groupBy { it.reviewDate }
         .filter { (_, schedules) ->
             schedules.isNotEmpty() && schedules.all { schedule ->
-                val key = schedule.scheduleId.ifBlank {
-                    "${schedule.reviewDate}_${schedule.examId}_${schedule.reviewOrder}"
-                }
-                checkedStates[key] == true
+                schedule.isCompleted
             }
         }
         .keys
@@ -214,8 +210,10 @@ fun HomeScreen(
                                     HomeScheduleCard(
                                         subjectName = subjectName,
                                         content = schedule.content,
-                                        checked = checkedStates[scheduleKey] ?: false,
-                                        onCheckedChange = { checkedStates[scheduleKey] = it }
+                                        checked = schedule.isCompleted,
+                                        onCheckedChange = {
+                                            viewModel.toggleScheduleCompletion(scheduleKey, it)
+                                        }
                                     )
                                 }
                             }

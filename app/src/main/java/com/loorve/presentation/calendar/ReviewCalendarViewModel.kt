@@ -114,15 +114,32 @@ class ReviewCalendarViewModel @Inject constructor(
 
     fun toggleReviewCompletion(scheduleId: String, currentState: Boolean) {
         val uid = _currentUid.value ?: return
+        val updatedState = !currentState
+        val previousSchedules = _uiState.value.selectedDateSchedules
+        _uiState.update { state ->
+            state.copy(
+                selectedDateSchedules = state.selectedDateSchedules.map { schedule ->
+                    if (schedule.scheduleId == scheduleId) {
+                        schedule.copy(isCompleted = updatedState)
+                    } else {
+                        schedule
+                    }
+                }
+            )
+        }
         viewModelScope.launch {
             val result = updateReviewCompletionUseCase(
                 uid = uid,
                 scheduleId = scheduleId,
-                isCompleted = !currentState
+                isCompleted = updatedState
             )
             if (result.isFailure) {
                 _uiState.update {
-                    it.copy(errorMessage = result.exceptionOrNull()?.message ?: "복습 상태 변경에 실패했습니다.")
+                    it.copy(
+                        selectedDateSchedules = previousSchedules,
+                        errorMessage = result.exceptionOrNull()?.message
+                            ?: "복습 상태 변경에 실패했습니다."
+                    )
                 }
             }
         }
