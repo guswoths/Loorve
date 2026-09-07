@@ -49,6 +49,7 @@ import com.loorve.domain.model.ReviewSchedule
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.presentation.reviewblock.ReviewRecordMiniCard
+import com.loorve.presentation.home.HomeViewModel
 import com.loorve.ui.component.BannerAdView
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -64,6 +65,23 @@ fun ReviewCalendarScreen(
     reviewCalendarViewModel: ReviewCalendarViewModel = hiltViewModel()
 ) {
     val uiState by reviewCalendarViewModel.uiState.collectAsState()
+    val homeViewModel: HomeViewModel = hiltViewModel()
+    val homeUiState by homeViewModel.uiState.collectAsState()
+    val selectedDateSchedules = homeUiState.reviewSchedules
+        .filter { it.reviewDate == uiState.selectedDate }
+        .map { schedule ->
+            ReviewSchedule(
+                scheduleId = schedule.scheduleId,
+                originProgressId = schedule.originProgressId,
+                blockId = schedule.examId,
+                title = schedule.content,
+                reviewDate = schedule.reviewDate
+                    .atStartOfDay(java.time.ZoneId.of("Asia/Seoul"))
+                    .toInstant()
+                    .toEpochMilli(),
+                reviewOrder = schedule.reviewOrder
+            )
+        }
 
     LaunchedEffect(Unit) {
         reviewCalendarViewModel.refreshUid()
@@ -147,13 +165,13 @@ fun ReviewCalendarScreen(
                         )
                     }
 
-                    if (uiState.selectedDateSchedules.isEmpty()) {
+                    if (selectedDateSchedules.isEmpty()) {
                         item {
                             EmptyScheduleMessage("금일 예정된 복습은 없습니다")
                         }
                     } else {
                         items(
-                            items = uiState.selectedDateSchedules,
+                            items = selectedDateSchedules,
                             key = { it.scheduleId }
                         ) { schedule ->
                             ReviewScheduleItem(
