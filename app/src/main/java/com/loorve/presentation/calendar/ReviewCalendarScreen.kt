@@ -46,6 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.model.ReviewSchedule
+import com.loorve.domain.model.ReviewScheduleItem
+import com.loorve.domain.model.ReviewStatus
+import com.loorve.presentation.reviewblock.ReviewRecordMiniCard
 import com.loorve.ui.component.BannerAdView
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -189,6 +192,10 @@ fun ReviewCalendarScreen(
                                 CircularProgressIndicator(modifier = Modifier.size(28.dp))
                             }
                         }
+                    } else if (uiState.selectedDateSchedules.isEmpty()) {
+                        item {
+                            EmptyScheduleMessage("금일 예정된 복습은 없습니다")
+                        }
                     } else if (uiState.reviewBlocks.isEmpty()) {
                         item {
                             EmptyScheduleMessage("아직 생성된 복습 블록이 없습니다.")
@@ -203,6 +210,21 @@ fun ReviewCalendarScreen(
                                 // ✅ 핵심 수정: 네비게이션으로 변경
                                 onClick = { onNavigateToReviewBlockDetail(block.blockId) }
                             )
+                            val blockSchedules = uiState.selectedDateSchedules.filter {
+                                it.blockId == block.blockId
+                            }
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp)
+                            ) {
+                                blockSchedules.forEach { schedule ->
+                                    ReviewRecordMiniCard(
+                                        item = schedule.toReviewScheduleItem()
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                            }
                         }
                     }
 
@@ -217,6 +239,19 @@ fun ReviewCalendarScreen(
 }
 
 // ── Private Composables ────────────────────────────────────────────────────────
+
+private fun ReviewSchedule.toReviewScheduleItem(): ReviewScheduleItem =
+    ReviewScheduleItem(
+        id = scheduleId,
+        blockId = blockId,
+        uid = userId,
+        title = title,
+        reviewDate = reviewDate,
+        reviewOrder = reviewOrder,
+        status = if (isCompleted) ReviewStatus.COMPLETED else ReviewStatus.PENDING,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
 
 @Composable
 private fun ReviewScheduleItem(
