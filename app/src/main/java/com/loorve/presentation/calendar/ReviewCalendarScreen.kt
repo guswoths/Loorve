@@ -192,10 +192,6 @@ fun ReviewCalendarScreen(
                                 CircularProgressIndicator(modifier = Modifier.size(28.dp))
                             }
                         }
-                    } else if (uiState.selectedDateSchedules.isEmpty()) {
-                        item {
-                            EmptyScheduleMessage("금일 예정된 복습은 없습니다")
-                        }
                     } else if (uiState.reviewBlocks.isEmpty()) {
                         item {
                             EmptyScheduleMessage("아직 생성된 복습 블록이 없습니다.")
