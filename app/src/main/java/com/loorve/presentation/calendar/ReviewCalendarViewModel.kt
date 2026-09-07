@@ -121,15 +121,32 @@ class ReviewCalendarViewModel @Inject constructor(
         val previousSchedules = _uiState.value.selectedDateSchedules
         val scheduleKey = scheduleId.ifBlank { return }
         _uiState.update { state ->
+            val updatedSchedules = state.selectedDateSchedules.map { schedule ->
+                val key = schedule.scheduleId.ifBlank {
+                    "${schedule.reviewDate}_${schedule.blockId}_${schedule.reviewOrder}"
+                }
+                if (key == scheduleKey) {
+                    schedule.copy(isCompleted = updatedState)
+                } else {
+                    schedule
+                }
+            }
             state.copy(
-                selectedDateSchedules = state.selectedDateSchedules.map { schedule ->
-                    val key = schedule.scheduleId.ifBlank {
-                        "${schedule.reviewDate}_${schedule.blockId}_${schedule.reviewOrder}"
-                    }
-                    if (key == scheduleKey) {
-                        schedule.copy(isCompleted = updatedState)
+                selectedDateSchedules = updatedSchedules,
+                schedulesMap = state.schedulesMap.mapValues { (date, schedules) ->
+                    if (date == state.selectedDate) {
+                        schedules.map { schedule ->
+                            val key = schedule.scheduleId.ifBlank {
+                                "${schedule.reviewDate}_${schedule.blockId}_${schedule.reviewOrder}"
+                            }
+                            if (key == scheduleKey) {
+                                schedule.copy(isCompleted = updatedState)
+                            } else {
+                                schedule
+                            }
+                        }
                     } else {
-                        schedule
+                        schedules
                     }
                 }
             )
@@ -159,6 +176,8 @@ class ReviewCalendarViewModel @Inject constructor(
                         selectedDateSchedules = previousSchedules,
                     )
                 }
+            } else {
+                calendarRefreshBus.notifyRefresh()
             }
         }
     }

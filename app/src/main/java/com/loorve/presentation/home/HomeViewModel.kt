@@ -560,8 +560,10 @@ class HomeViewModel @Inject constructor(
                     isCompleted = isCompleted
                 )
             }
-            result
-                .onFailure { exception ->
+            if (result.isSuccess) {
+                calendarRefreshBus.notifyRefresh()
+            } else {
+                result.onFailure { exception ->
                     completionOverrides.remove(scheduleKey)
                     completionOverrides.remove(legacyScheduleKey)
                     _uiState.update { it.copy(reviewSchedules = previousSchedules) }
@@ -569,6 +571,7 @@ class HomeViewModel @Inject constructor(
                         it.copy(errorMessage = exception.message ?: "복습 상태 변경에 실패했습니다.")
                     }
                 }
+            }
         }
     }
 
