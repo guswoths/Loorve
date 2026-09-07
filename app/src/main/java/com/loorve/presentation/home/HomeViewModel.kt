@@ -547,7 +547,20 @@ class HomeViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            reviewScheduleRepository.updateReviewCompletion(uid, legacyScheduleKey, isCompleted)
+            val result = if (rawReviewScheduleItems.any { it.id == scheduleKey }) {
+                reviewScheduleItemRepository.updateScheduleCompletion(
+                    uid = uid,
+                    scheduleId = scheduleKey,
+                    isCompleted = isCompleted
+                )
+            } else {
+                reviewScheduleRepository.updateReviewCompletion(
+                    uid = uid,
+                    scheduleId = legacyScheduleKey,
+                    isCompleted = isCompleted
+                )
+            }
+            result
                 .onFailure { exception ->
                     completionOverrides.remove(scheduleKey)
                     completionOverrides.remove(legacyScheduleKey)

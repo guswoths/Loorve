@@ -7,6 +7,7 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.loorve.domain.model.ReviewSchedule
 import com.loorve.domain.repository.ReviewScheduleRepository
+import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.loorve.domain.usecase.UpdateReviewCompletionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -43,6 +44,7 @@ data class ReviewCalendarUiState(
 @HiltViewModel
 class ReviewCalendarViewModel @Inject constructor(
     private val reviewScheduleRepository: ReviewScheduleRepository,
+    private val reviewScheduleItemRepository: ReviewScheduleItemRepository,
     private val updateReviewCompletionUseCase: UpdateReviewCompletionUseCase,
     private val reviewBlockRepository: ReviewBlockRepository,
     private val calendarRefreshBus: CalendarRefreshBus
@@ -133,11 +135,20 @@ class ReviewCalendarViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            val result = updateReviewCompletionUseCase(
+            val itemResult = reviewScheduleItemRepository.updateScheduleCompletion(
                 uid = uid,
                 scheduleId = scheduleKey,
                 isCompleted = updatedState
             )
+            val result = if (itemResult.isSuccess) {
+                itemResult
+            } else {
+                updateReviewCompletionUseCase(
+                    uid = uid,
+                    scheduleId = scheduleKey,
+                    isCompleted = updatedState
+                )
+            }
             if (result.isFailure) {
                 Log.e(
                     "ReviewCalendarViewModel",
