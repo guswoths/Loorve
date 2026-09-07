@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.loorve.domain.model.CompletionResult
@@ -548,6 +549,7 @@ fun ReviewRecordListSection(
 }
 
 // ── ReviewRecordMiniCard ───────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewRecordMiniCard(
     item: ReviewScheduleItem,
@@ -561,13 +563,7 @@ fun ReviewRecordMiniCard(
             SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(item.reviewDate))
         else "-"
     }
-    var isEditing by remember(savedTime) { mutableStateOf(false) }
-    var draftTime by remember(savedTime) { mutableStateOf(savedTime.orEmpty()) }
-    val isValidTime = remember(draftTime) {
-        Regex("""\d{2}:\d{2}""").matches(draftTime) &&
-            draftTime.substringBefore(":").toIntOrNull()?.let { it in 0..23 } == true &&
-            draftTime.substringAfter(":").toIntOrNull()?.let { it in 0..59 } == true
-    }
+    var showTimePicker by remember { mutableStateOf(false) }
 
     LoorveCard(
         modifier = modifier
@@ -648,38 +644,14 @@ fun ReviewRecordMiniCard(
                             )
                         }
                         Spacer(modifier = Modifier.weight(1f))
-                        if (isEditing) {
-                            OutlinedTextField(
-                                value = draftTime,
-                                onValueChange = { value ->
-                                    if (value.length <= 5 &&
-                                        value.all { it.isDigit() || it == ':' }
-                                    ) {
-                                        draftTime = value
-                                    }
-                                },
-                                modifier = Modifier.width(80.dp),
-                                singleLine = true,
-                                isError = draftTime.isNotEmpty() && !isValidTime,
-                                textStyle = LoorveTypography.labelSmall
-                            )
-                            TextButton(
-                                onClick = {
-                                    if (isValidTime) {
-                                        onTimeSave?.invoke(draftTime)
-                                        isEditing = false
-                                    }
-                                }
-                            ) {
-                                Text("Save", style = LoorveTypography.labelSmall)
-                            }
-                        } else {
+                        Surface(
+                            modifier = Modifier.clickable { showTimePicker = true },
+                            shape = MaterialTheme.shapes.small,
+                            color = SurfaceVariant
+                        ) {
                             Text(
                                 text = savedTime.orEmpty().ifBlank { "--:--" },
-                                modifier = Modifier.clickable {
-                                    draftTime = savedTime.orEmpty()
-                                    isEditing = true
-                                },
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 style = LoorveTypography.labelSmall,
                                 color = OnSurfaceVariant
                             )
@@ -688,6 +660,58 @@ fun ReviewRecordMiniCard(
                             checked = item.status == ReviewStatus.COMPLETED,
                             onCheckedChange = onCheckedChange
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showTimePicker) {
+        val (initialHour, initialMinute) = savedTime.orEmpty()
+            .split(":")
+            .takeIf { it.size == 2 }
+            ?.let { parts ->
+                val hour = parts[0].toIntOrNull()
+                val minute = parts[1].toIntOrNull()
+                if (hour != null && minute != null && hour in 0..23 && minute in 0..59) {
+                    hour to minute
+                } else {
+                    0 to 0
+                }
+            }
+            ?: (0 to 0)
+        val timePickerState = rememberTimePickerState(
+            initialHour = initialHour,
+            initialMinute = initialMinute
+        )
+
+        Dialog(onDismissRequest = { showTimePicker = false }) {
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(modifier = Modifier.padding(24.dp)) {
+                    TimePicker(state = timePickerState)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showTimePicker = false }) {
+                            Text("Cancel")
+                        }
+                        TextButton(
+                            onClick = {
+                                onTimeSave?.invoke(
+                                    "%02d:%02d".format(
+                                        timePickerState.hour,
+                                        timePickerState.minute
+                                    )
+                                )
+                                showTimePicker = false
+                            }
+                        ) {
+                            Text("OK")
+                        }
                     }
                 }
             }
