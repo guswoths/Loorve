@@ -149,23 +149,23 @@ fun ReviewCalendarScreen(
 
                     if (uiState.selectedDateSchedules.isEmpty()) {
                         item {
-                            EmptyScheduleMessage("선택한 날짜에는 예정된 복습이 없습니다.")
+                            EmptyScheduleMessage("금일 예정된 복습은 없습니다")
                         }
                     } else {
-                        items(
-                            items = uiState.selectedDateSchedules,
-                            key = { it.scheduleId }
-                        ) { schedule ->
-                            ReviewScheduleItem(
-                                schedule = schedule,
-                                onToggleCompleted = {
-                                    reviewCalendarViewModel.toggleReviewCompletion(
-                                        scheduleId = schedule.scheduleId,
-                                        currentState = schedule.isCompleted
-                                    )
+                        uiState.selectedDateSchedules
+                            .groupBy { it.blockId }
+                            .forEach { (_, schedules) ->
+                                item {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        schedules.forEach { schedule ->
+                                            ReviewRecordMiniCard(
+                                                item = schedule.toReviewScheduleItem()
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                        }
+                                    }
                                 }
-                            )
-                        }
+                            }
                     }
 
                     // ── 섹션 2: 복습 블록 목록
