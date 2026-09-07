@@ -538,9 +538,17 @@ fun ReviewRecordListSection(
                 modifier = Modifier.padding(vertical = 12.dp)
             )
         } else {
+            val timeMap = remember { mutableStateMapOf<String, String>() }
             scheduleItems.forEach { item ->
+                val itemKey = item.id.ifBlank {
+                    "${item.reviewDate}_${item.blockId}_${item.reviewOrder}"
+                }
                 ReviewRecordMiniCard(
-                    item = item
+                    item = item,
+                    savedTime = timeMap[itemKey],
+                    onTimeSave = { time ->
+                        timeMap[itemKey] = time
+                    }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -691,7 +699,7 @@ fun ReviewRecordMiniCard(
                 color = MaterialTheme.colorScheme.surface
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    TimePicker(state = timePickerState)
+                    TimeInput(state = timePickerState)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
