@@ -551,12 +551,22 @@ fun ReviewRecordListSection(
 @Composable
 fun ReviewRecordMiniCard(
     item: ReviewScheduleItem,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    savedTime: String? = null,
+    onTimeSave: ((String) -> Unit)? = null,
+    onCheckedChange: ((Boolean) -> Unit)? = null
 ) {
     val dateText = remember(item.reviewDate) {
         if (item.reviewDate > 0L)
             SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(item.reviewDate))
         else "-"
+    }
+    var isEditing by remember(savedTime) { mutableStateOf(false) }
+    var draftTime by remember(savedTime) { mutableStateOf(savedTime.orEmpty()) }
+    val isValidTime = remember(draftTime) {
+        Regex("""\d{2}:\d{2}""").matches(draftTime) &&
+            draftTime.substringBefore(":").toIntOrNull()?.let { it in 0..23 } == true &&
+            draftTime.substringAfter(":").toIntOrNull()?.let { it in 0..59 } == true
     }
 
     LoorveCard(
@@ -637,6 +647,47 @@ fun ReviewRecordMiniCard(
                                 }
                             )
                         }
+                        Spacer(modifier = Modifier.weight(1f))
+                        if (isEditing) {
+                            OutlinedTextField(
+                                value = draftTime,
+                                onValueChange = { value ->
+                                    if (value.length <= 5 &&
+                                        value.all { it.isDigit() || it == ':' }
+                                    ) {
+                                        draftTime = value
+                                    }
+                                },
+                                modifier = Modifier.width(80.dp),
+                                singleLine = true,
+                                isError = draftTime.isNotEmpty() && !isValidTime,
+                                textStyle = LoorveTypography.labelSmall
+                            )
+                            TextButton(
+                                onClick = {
+                                    if (isValidTime) {
+                                        onTimeSave?.invoke(draftTime)
+                                        isEditing = false
+                                    }
+                                }
+                            ) {
+                                Text("Save", style = LoorveTypography.labelSmall)
+                            }
+                        } else {
+                            Text(
+                                text = savedTime.orEmpty().ifBlank { "--:--" },
+                                modifier = Modifier.clickable {
+                                    draftTime = savedTime.orEmpty()
+                                    isEditing = true
+                                },
+                                style = LoorveTypography.labelSmall,
+                                color = OnSurfaceVariant
+                            )
+                        }
+                        Checkbox(
+                            checked = item.status == ReviewStatus.COMPLETED,
+                            onCheckedChange = onCheckedChange
+                        )
                     }
                 }
             }
