@@ -657,12 +657,22 @@ fun ReviewRecordMiniCard(
                             shape = MaterialTheme.shapes.small,
                             color = SurfaceVariant
                         ) {
-                            Text(
-                                text = savedTime.orEmpty().ifBlank { "--:--" },
+                            Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = LoorveTypography.labelSmall,
-                                color = OnSurfaceVariant
-                            )
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "🔔 Alarm",
+                                    style = LoorveTypography.labelSmall,
+                                    color = OnSurfaceVariant
+                                )
+                                Text(
+                                    text = savedTime.orEmpty().ifBlank { "--:--" },
+                                    style = LoorveTypography.labelSmall,
+                                    color = OnSurfaceVariant
+                                )
+                            }
                         }
                         Checkbox(
                             checked = item.status == ReviewStatus.COMPLETED,
@@ -699,6 +709,13 @@ fun ReviewRecordMiniCard(
                 color = MaterialTheme.colorScheme.surface
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
+                    Text(
+                        text = "Alarm",
+                        style = LoorveTypography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = OnBackground
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
                     TimeInput(state = timePickerState)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
