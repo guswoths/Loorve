@@ -21,6 +21,8 @@ data class ReviewScheduleItemDto(
     val compressedReview: Boolean = false,
     val completionResult: String? = null,
     val completedAt: Long? = null,
+    val customAlarmHour: Int? = null,
+    val customAlarmMinute: Int? = null,
     val createdAt: Timestamp? = null,
     val updatedAt: Timestamp? = null
 ) {
@@ -37,6 +39,11 @@ data class ReviewScheduleItemDto(
             runCatching { CompletionResult.valueOf(it) }.getOrNull()
         },
         completedAt = completedAt,
+        customAlarmTime = if (customAlarmHour != null && customAlarmMinute != null) {
+            customAlarmHour to customAlarmMinute
+        } else {
+            null
+        },
         createdAt = createdAt?.toDate()?.time ?: 0L,
         updatedAt = updatedAt?.toDate()?.time ?: 0L
     )

@@ -1,0 +1,178 @@
+
+> Configure project :app
+?좑툘 WARNING: ADMOB_BANNER_UNIT_ID is not set in local.properties. Test ID will be used in release build! Set the real Ad Unit ID before publishing to the Play Store.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:processDebugGoogleServices UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:kspDebugKotlin UP-TO-DATE
+> Task :app:compileDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:compileDebugJavaWithJavac UP-TO-DATE
+> Task :app:hiltSyncDebug UP-TO-DATE
+> Task :app:hiltAggregateDepsDebug UP-TO-DATE
+> Task :app:hiltJavaCompileDebug UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:bundleDebugClassesToCompileJar UP-TO-DATE
+> Task :app:kspDebugUnitTestKotlin SKIPPED
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+
+> Task :app:compileDebugUnitTestKotlin FAILED
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:17:35 Unresolved reference 'generate'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:23:35 Unresolved reference 'generate'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:25:36 Cannot infer type for value parameter 'index'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:25:43 Cannot infer type for value parameter 'schedule'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:28:52 Unresolved reference 'reviewDate'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:36:36 Unresolved reference 'generate'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:37:36 Unresolved reference 'generate'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:41:25 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:41:39 Unresolved reference 'reviewScheduleId'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:41:57 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:41:71 Unresolved reference 'reviewScheduleId'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:46:35 Unresolved reference 'generate'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:47:29 Cannot infer type for value parameter 'schedule'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:48:47 Unresolved reference 'originProgressId'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:54:35 Unresolved reference 'generate'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:55:36 Cannot infer type for value parameter 'index'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:55:43 Cannot infer type for value parameter 'schedule'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:56:46 Unresolved reference 'reviewRound'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:62:19 Unresolved reference 'generate'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:67:35 Unresolved reference 'generate'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:68:29 Cannot infer type for value parameter 'schedule'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:69:64 Unresolved reference 'isCompleted'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:75:35 Unresolved reference 'generate'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:76:29 Cannot infer type for value parameter 'schedule'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:77:55 Unresolved reference 'createdAt'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:79:26 Unresolved reference 'createdAt'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleGeneratorTest.kt:79:46 Unresolved reference 'updatedAt'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:5:11 Unresolved reference 'mockk'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:6:11 Unresolved reference 'mockk'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:7:11 Unresolved reference 'mockk'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:10:27 Unresolved reference 'test'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:34:26 Unresolved reference 'generate'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:39:22 Unresolved reference 'mockk'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:47:52 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:49:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:49:30 Unresolved reference 'saveReviewSchedules'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:51:33 Unresolved reference 'saveReviewSchedules'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:54:9 Unresolved reference 'coVerify'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:54:44 Unresolved reference 'saveReviewSchedules'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:58:72 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:61:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:61:30 Unresolved reference 'saveReviewSchedules'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:61:83 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:63:33 Unresolved reference 'saveReviewSchedules'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:71:9 Unresolved reference 'coVerify'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:71:44 Unresolved reference 'saveReviewSchedules'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:75:68 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:78:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:78:30 Unresolved reference 'saveReviewSchedules'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:80:33 Unresolved reference 'saveReviewSchedules'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:90:54 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:93:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:99:14 Suspend function 'suspend fun <T> Flow<T>.first(): T' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:104:34 Unresolved reference 'reviewRound'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:105:23 Unresolved reference 'reviewRound'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:110:61 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:112:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:114:19 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:114:26 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:118:14 Suspend function 'suspend fun <T> Flow<T>.first(): T' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:124:60 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:128:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:134:14 Suspend function 'suspend fun <T> Flow<T>.first(): T' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:148:65 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:150:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:151:24 Suspend function 'suspend fun updateReviewCompletion(uid: String, scheduleId: String, isCompleted: Boolean): Result<Unit>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:154:33 Suspend function 'suspend fun updateReviewCompletion(uid: String, scheduleId: String, isCompleted: Boolean): Result<Unit>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:157:9 Unresolved reference 'coVerify'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:157:44 Suspend function 'suspend fun updateReviewCompletion(uid: String, scheduleId: String, isCompleted: Boolean): Result<Unit>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:163:70 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:165:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:166:24 Suspend function 'suspend fun updateReviewCompletion(uid: String, scheduleId: String, isCompleted: Boolean): Result<Unit>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:169:33 Suspend function 'suspend fun updateReviewCompletion(uid: String, scheduleId: String, isCompleted: Boolean): Result<Unit>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:172:9 Unresolved reference 'coVerify'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:172:44 Suspend function 'suspend fun updateReviewCompletion(uid: String, scheduleId: String, isCompleted: Boolean): Result<Unit>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:176:84 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:179:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:180:24 Suspend function 'suspend fun updateReviewCompletion(uid: String, scheduleId: String, isCompleted: Boolean): Result<Unit>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:181:26 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:183:33 Suspend function 'suspend fun updateReviewCompletion(uid: String, scheduleId: String, isCompleted: Boolean): Result<Unit>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:198:49 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:200:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:200:30 Unresolved reference 'createReviewSchedule'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:202:33 Unresolved reference 'createReviewSchedule'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:205:9 Unresolved reference 'coVerify'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:205:44 Unresolved reference 'createReviewSchedule'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:209:73 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:212:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:212:30 Unresolved reference 'createReviewSchedule'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:212:83 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/ReviewScheduleRepositoryTest.kt:214:33 Unresolved reference 'createReviewSchedule'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:5:11 Unresolved reference 'mockk'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:6:11 Unresolved reference 'mockk'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:7:11 Unresolved reference 'mockk'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:8:27 Unresolved reference 'test'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:23:22 Unresolved reference 'mockk'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:43:62 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:48:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:49:24 Suspend function 'suspend fun getStudyRecordsByDateRange(uid: String, startDateMillis: Long, endDateMillis: Long): Result<List<StudyRecord>>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:52:33 Suspend function 'suspend fun getStudyRecordsByDateRange(uid: String, startDateMillis: Long, endDateMillis: Long): Result<List<StudyRecord>>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:57:9 Unresolved reference 'coVerify'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:57:44 Suspend function 'suspend fun getStudyRecordsByDateRange(uid: String, startDateMillis: Long, endDateMillis: Long): Result<List<StudyRecord>>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:61:56 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:67:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:67:30 Suspend function 'suspend fun getAllStudyRecords(uid: String): Result<List<StudyRecord>>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:69:33 Suspend function 'suspend fun getAllStudyRecords(uid: String): Result<List<StudyRecord>>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:73:9 Unresolved reference 'coVerify'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:73:44 Suspend function 'suspend fun getAllStudyRecords(uid: String): Result<List<StudyRecord>>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:77:54 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:79:12 Unresolved reference 'mockk'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:81:46 Unresolved reference 'first'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:84:46 Unresolved reference 'id'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:85:9 Unresolved reference 'coVerify'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:89:64 Unresolved reference 'runTest'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:90:9 Unresolved reference 'coEvery'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:90:30 Suspend function 'suspend fun deleteStudyRecordsByBlockId(uid: String, blockId: String): Result<Unit>' can only be called from a coroutine or another suspend function.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:92:33 Suspend function 'suspend fun deleteStudyRecordsByBlockId(uid: String, blockId: String): Result<Unit>' can only be called from a coroutine or another suspend function.
+
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:95:9 Unresolved reference 'coVerify'.
+e: file:///C:/Users/hjson/Loorve/app/src/test/java/com/loorve/domain/usecase/StudyRecordRepositoryTest.kt:95:44 Suspend function 'suspend fun deleteStudyRecordsByBlockId(uid: String, blockId: String): Result<Unit>' can only be called from a coroutine or another suspend function.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugUnitTestKotlin' (registered by plugin 'com.android.internal.application').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 4s
+[Incubating] Problems report is available at: file:///C:/Users/hjson/Loorve/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.7.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+25 actionable tasks: 1 executed, 24 up-to-date

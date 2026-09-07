@@ -74,6 +74,21 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
             }
     }
 
+    override suspend fun getAllScheduleItems(
+        uid: String
+    ): Result<List<ReviewScheduleItem>> = runCatching {
+        validateAuth(uid)
+        schedulesRef(uid)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { doc ->
+                doc.toObject(ReviewScheduleItemDto::class.java)
+                    ?.copy(id = doc.id)
+                    ?.toDomain()
+            }
+    }
+
     override suspend fun updateScheduleItem(
         uid: String,
         item: ReviewScheduleItem
@@ -81,6 +96,27 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
         validateAuth(uid)
         schedulesRef(uid).document(item.id)
             .update(buildItemMap(item) + mapOf("updatedAt" to FieldValue.serverTimestamp()))
+            .await()
+    }
+
+    override suspend fun updateScheduleCompletion(
+        uid: String,
+        scheduleId: String,
+        isCompleted: Boolean
+    ): Result<Unit> = runCatching {
+        validateAuth(uid)
+        require(scheduleId.isNotBlank()) { "복습 일정 ID가 비어 있습니다." }
+        schedulesRef(uid).document(scheduleId)
+            .update(
+                mapOf(
+                    "status" to if (isCompleted) {
+                        ReviewStatus.COMPLETED.name
+                    } else {
+                        ReviewStatus.PENDING.name
+                    },
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            )
             .await()
     }
 
@@ -153,6 +189,8 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
         "compressedReview" to item.compressedReview,
         "completionResult" to item.completionResult?.name,
         "completedAt" to item.completedAt,
+        "customAlarmHour" to item.customAlarmTime?.first,
+        "customAlarmMinute" to item.customAlarmTime?.second,
         "createdAt" to FieldValue.serverTimestamp(),
         "updatedAt" to FieldValue.serverTimestamp()
     )

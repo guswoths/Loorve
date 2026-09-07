@@ -2,14 +2,15 @@ package com.loorve.ui.theme
 
 import android.app.Activity
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val LorveDarkColorScheme = darkColorScheme(
+private val LoorveLightColorScheme = lightColorScheme(
     primary          = Primary,
     secondary        = Secondary,
     tertiary         = Tertiary,
@@ -19,7 +20,12 @@ private val LorveDarkColorScheme = darkColorScheme(
     onBackground     = OnBackground,
     onSurface        = OnSurface,
     onSurfaceVariant = OnSurfaceVariant,
-    error            = Error
+    onPrimary        = Color.White,
+    primaryContainer  = Color(0xFFDDF4F1),
+    onPrimaryContainer = Color(0xFF0B3D39),
+    outline          = Divider,
+    error            = Error,
+    onError          = Color.White
 )
 
 @Composable
@@ -29,15 +35,15 @@ fun LoorveTheme(content: @Composable () -> Unit) {
         SideEffect {
             val window = (view.context as Activity).window
             @Suppress("DEPRECATION")
-            window.statusBarColor     = Background.toArgb()  // 0xFF0F0F14
+            window.statusBarColor     = Background.toArgb()
             @Suppress("DEPRECATION")
-            window.navigationBarColor = Background.toArgb()  // 하단 내비 바도 동일 배경
+            window.navigationBarColor = Background.toArgb()
             WindowCompat.getInsetsController(window, view)
-                .isAppearanceLightStatusBars = false
+                .isAppearanceLightStatusBars = true
         }
     }
     MaterialTheme(
-        colorScheme = LorveDarkColorScheme,
+        colorScheme = LoorveLightColorScheme,
         typography  = LoorveTypography,
         shapes      = LoorveShapes,
         content     = content

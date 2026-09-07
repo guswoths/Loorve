@@ -38,7 +38,6 @@ data class StudyRecordDto(
         stage = stage,
         successCount = successCount,
         stability = stability,
-        completionRate = completionRate,
         plannedReviewCount = plannedReviewCount,
         completedReviewCount = completedReviewCount,
         isAtRisk = isAtRisk,
@@ -61,7 +60,6 @@ fun StudyRecord.toDto(): StudyRecordDto = StudyRecordDto(
     stage = stage,
     successCount = successCount,
     stability = stability,
-    completionRate = completionRate,
     plannedReviewCount = plannedReviewCount,
     completedReviewCount = completedReviewCount,
     isAtRisk = isAtRisk
