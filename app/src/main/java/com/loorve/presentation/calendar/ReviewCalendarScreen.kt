@@ -38,6 +38,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -231,6 +234,15 @@ fun ReviewCalendarScreen(
                                 // ✅ 핵심 수정: 네비게이션으로 변경
                                 onClick = { onNavigateToReviewBlockDetail(block.blockId) }
                             )
+                            ReviewBlockNotificationEditor(
+                                savedTime = uiState.reviewBlockNotificationTimes[block.blockId],
+                                onSave = { time ->
+                                    reviewCalendarViewModel.setReviewBlockNotificationTime(
+                                        block.blockId,
+                                        time
+                                    )
+                                }
+                            )
                             val blockSchedules = uiState.selectedDateSchedules.filter {
                                 it.blockId == block.blockId
                             }
@@ -260,6 +272,75 @@ fun ReviewCalendarScreen(
 }
 
 // ── Private Composables ────────────────────────────────────────────────────────
+
+@Composable
+private fun ReviewBlockNotificationEditor(
+    savedTime: String?,
+    onSave: (String) -> Unit
+) {
+    var time by remember(savedTime) { mutableStateOf(savedTime.orEmpty()) }
+    val parsedMinutes = time.toMinutesOrNull()
+    val canSave = time != savedTime.orEmpty() && parsedMinutes != null
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 2.dp, end = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.End
+    ) {
+        TextButton(
+            onClick = {
+                val nextMinutes = ((parsedMinutes ?: 0) - 30 + 24 * 60) % (24 * 60)
+                time = nextMinutes.toTimeText()
+            }
+        ) {
+            Text("-")
+        }
+        androidx.compose.material3.OutlinedTextField(
+            value = time,
+            onValueChange = { value ->
+                if (value.length <= 5 && value.all { it.isDigit() || it == ':' }) {
+                    time = value
+                }
+            },
+            modifier = Modifier.width(86.dp),
+            singleLine = true,
+            placeholder = { Text("--:--") },
+            textStyle = MaterialTheme.typography.labelMedium
+        )
+        TextButton(
+            onClick = {
+                val nextMinutes = ((parsedMinutes ?: 0) + 30) % (24 * 60)
+                time = nextMinutes.toTimeText()
+            }
+        ) {
+            Text("+")
+        }
+        Button(
+            onClick = { onSave(time) },
+            enabled = canSave,
+            modifier = Modifier.height(36.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                horizontal = 10.dp,
+                vertical = 0.dp
+            )
+        ) {
+            Text("Save")
+        }
+    }
+}
+
+private fun String.toMinutesOrNull(): Int? {
+    if (!matches(Regex("""\d{2}:\d{2}"""))) return null
+    val hour = substring(0, 2).toIntOrNull() ?: return null
+    val minute = substring(3, 5).toIntOrNull() ?: return null
+    if (hour !in 0..23 || minute !in 0..59) return null
+    return hour * 60 + minute
+}
+
+private fun Int.toTimeText(): String =
+    "%02d:%02d".format(this / 60, this % 60)
 
 private fun ReviewSchedule.toReviewScheduleItem(): ReviewScheduleItem =
     ReviewScheduleItem(

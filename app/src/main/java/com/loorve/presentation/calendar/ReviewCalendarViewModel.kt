@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.loorve.domain.model.ReviewSchedule
 import com.loorve.domain.repository.ReviewScheduleRepository
 import com.loorve.domain.repository.ReviewScheduleItemRepository
@@ -35,6 +36,7 @@ data class ReviewCalendarUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val reviewBlocks: List<ReviewBlock> = emptyList(),
+    val reviewBlockNotificationTimes: Map<String, String> = emptyMap(),
     val isBlocksLoading: Boolean = false,
     val selectedBlock: ReviewBlock? = null,   // 클릭된 블록 (바텀시트용)
     val showBlockDetail: Boolean = false,      // 바텀시트 표시 여부
@@ -47,7 +49,8 @@ class ReviewCalendarViewModel @Inject constructor(
     private val reviewScheduleItemRepository: ReviewScheduleItemRepository,
     private val updateReviewCompletionUseCase: UpdateReviewCompletionUseCase,
     private val reviewBlockRepository: ReviewBlockRepository,
-    private val calendarRefreshBus: CalendarRefreshBus
+    private val calendarRefreshBus: CalendarRefreshBus,
+    private val firestore: FirebaseFirestore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewCalendarUiState())
@@ -201,7 +204,27 @@ class ReviewCalendarViewModel @Inject constructor(
             _uiState.update { it.copy(isBlocksLoading = true) }
             reviewBlockRepository.getReviewBlocks(uid)
                 .onSuccess { blocks ->
-                    _uiState.update { it.copy(reviewBlocks = blocks, isBlocksLoading = false) }
+                    val notificationTimes = runCatching {
+                        firestore.collection("users")
+                            .document(uid)
+                            .collection("reviewBlocks")
+                            .get()
+                            .await()
+                            .documents
+                            .mapNotNull { document ->
+                                document.getString("notificationTime")
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { document.id to it }
+                            }
+                            .toMap()
+                    }.getOrElse { emptyMap() }
+                    _uiState.update {
+                        it.copy(
+                            reviewBlocks = blocks,
+                            reviewBlockNotificationTimes = notificationTimes,
+                            isBlocksLoading = false
+                        )
+                    }
                 }
                 .onFailure { e ->
                     _uiState.update {
@@ -211,6 +234,33 @@ class ReviewCalendarViewModel @Inject constructor(
                         )
                     }
                 }
+
+        }
+    }
+
+    fun setReviewBlockNotificationTime(blockId: String, time: String) {
+        val uid = _currentUid.value ?: return
+        if (blockId.isBlank()) return
+        _uiState.update {
+            it.copy(
+                reviewBlockNotificationTimes =
+                    it.reviewBlockNotificationTimes + (blockId to time)
+            )
+        }
+        viewModelScope.launch {
+            runCatching {
+                firestore.collection("users")
+                    .document(uid)
+                    .collection("reviewBlocks")
+                    .document(blockId)
+                    .update("notificationTime", time)
+                    .await()
+            }.onFailure { exception ->
+                Log.e(
+                    "ReviewCalendarViewModel",
+                    "알림 시간 저장 실패: ${exception.message}"
+                )
+            }
         }
     }
 
