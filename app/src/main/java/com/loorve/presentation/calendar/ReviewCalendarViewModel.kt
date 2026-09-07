@@ -3,6 +3,7 @@ package com.loorve.presentation.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.loorve.domain.model.ReviewSchedule
 import com.loorve.domain.repository.ReviewScheduleRepository
@@ -116,10 +117,14 @@ class ReviewCalendarViewModel @Inject constructor(
         val uid = _currentUid.value ?: return
         val updatedState = !currentState
         val previousSchedules = _uiState.value.selectedDateSchedules
+        val scheduleKey = scheduleId.ifBlank { return }
         _uiState.update { state ->
             state.copy(
                 selectedDateSchedules = state.selectedDateSchedules.map { schedule ->
-                    if (schedule.scheduleId == scheduleId) {
+                    val key = schedule.scheduleId.ifBlank {
+                        "${schedule.reviewDate}_${schedule.blockId}_${schedule.reviewOrder}"
+                    }
+                    if (key == scheduleKey) {
                         schedule.copy(isCompleted = updatedState)
                     } else {
                         schedule
@@ -130,15 +135,17 @@ class ReviewCalendarViewModel @Inject constructor(
         viewModelScope.launch {
             val result = updateReviewCompletionUseCase(
                 uid = uid,
-                scheduleId = scheduleId,
+                scheduleId = scheduleKey,
                 isCompleted = updatedState
             )
             if (result.isFailure) {
+                Log.e(
+                    "ReviewCalendarViewModel",
+                    "복습 상태 저장 실패: ${result.exceptionOrNull()?.message}"
+                )
                 _uiState.update {
                     it.copy(
                         selectedDateSchedules = previousSchedules,
-                        errorMessage = result.exceptionOrNull()?.message
-                            ?: "복습 상태 변경에 실패했습니다."
                     )
                 }
             }

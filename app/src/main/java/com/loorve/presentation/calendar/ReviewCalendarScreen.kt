@@ -173,13 +173,19 @@ fun ReviewCalendarScreen(
                     } else {
                         items(
                             items = selectedDateSchedules,
-                            key = { it.scheduleId }
+                            key = {
+                                it.scheduleId.ifBlank {
+                                    "${it.reviewDate}_${it.blockId}_${it.reviewOrder}"
+                                }
+                            }
                         ) { schedule ->
                             ReviewScheduleItem(
                                 schedule = schedule,
                                 onToggleCompleted = {
                                     reviewCalendarViewModel.toggleReviewCompletion(
-                                        scheduleId = schedule.scheduleId,
+                                        scheduleId = schedule.scheduleId.ifBlank {
+                                            "${schedule.reviewDate}_${schedule.blockId}_${schedule.reviewOrder}"
+                                        },
                                         currentState = schedule.isCompleted
                                     )
                                 }

@@ -2,6 +2,7 @@ package com.loorve.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.loorve.domain.model.Exam
 import com.loorve.domain.model.Progress
@@ -124,6 +125,7 @@ class HomeViewModel @Inject constructor(
     private var legacyReviewScheduleDates = emptySet<LocalDate>()
     private var reviewScheduleItemUiModels = emptyList<ReviewScheduleUiModel>()
     private var legacyReviewScheduleUiModels = emptyList<ReviewScheduleUiModel>()
+    private val completionOverrides = mutableMapOf<String, Boolean>()
 
     init {
         // ✅ uid를 반드시 토큰 갱신 후 확보, 그 다음 모든 데이터 로드
@@ -275,7 +277,30 @@ class HomeViewModel @Inject constructor(
         // ✅ 복합 키로 중복 제거: (reviewDate, originProgressId, reviewOrder)
         // reviewScheduleItems와 reviewSchedules 두 컬렉션에서 온 데이터가 같은 논리적 스케줄을
         // 나타내는 경우에도 제거할 수 있도록 함. scheduleId만으로는 부족함.
-        val combinedSchedules = (reviewScheduleItemUiModels + filteredLegacyUiModels)
+        val legacyCompletionByIdentity = filteredLegacyUiModels.associateBy(
+            keySelector = { Triple(it.reviewDate, it.originProgressId, it.reviewOrder) },
+            valueTransform = { it.isCompleted }
+        )
+        val combinedSchedules = (
+            reviewScheduleItemUiModels.map { schedule ->
+                val identity = Triple(
+                    schedule.reviewDate,
+                    schedule.originProgressId,
+                    schedule.reviewOrder
+                )
+                schedule.copy(
+                    isCompleted = completionOverrides[schedule.scheduleId]
+                        ?: legacyCompletionByIdentity[identity]
+                        ?: schedule.isCompleted
+                )
+            } + filteredLegacyUiModels
+                .map { schedule ->
+                    schedule.copy(
+                        isCompleted = completionOverrides[schedule.scheduleId]
+                            ?: schedule.isCompleted
+                    )
+                }
+            )
             .distinctBy { schedule ->
                 Triple(schedule.reviewDate, schedule.originProgressId, schedule.reviewOrder)
             }
@@ -493,7 +518,22 @@ class HomeViewModel @Inject constructor(
 
     fun toggleScheduleCompletion(scheduleId: String, isCompleted: Boolean) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        val scheduleKey = scheduleId.ifBlank { return }
+        val scheduleKey = scheduleId
+        if (scheduleKey.isBlank()) return
+        val schedule = _uiState.value.reviewSchedules.firstOrNull { item ->
+            val key = item.scheduleId.ifBlank {
+                "${item.reviewDate}_${item.examId}_${item.reviewOrder}"
+            }
+            key == scheduleKey
+        }
+        val legacyScheduleKey = schedule?.let { item ->
+            legacyReviewScheduleUiModels.firstOrNull { legacy ->
+                Triple(legacy.reviewDate, legacy.originProgressId, legacy.reviewOrder) ==
+                    Triple(item.reviewDate, item.originProgressId, item.reviewOrder)
+            }?.scheduleId
+        }?.takeIf { it.isNotBlank() } ?: scheduleKey
+        completionOverrides[scheduleKey] = isCompleted
+        completionOverrides[legacyScheduleKey] = isCompleted
         val previousSchedules = _uiState.value.reviewSchedules
         _uiState.update { state ->
             state.copy(
@@ -507,8 +547,10 @@ class HomeViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            reviewScheduleRepository.updateReviewCompletion(uid, scheduleKey, isCompleted)
+            reviewScheduleRepository.updateReviewCompletion(uid, legacyScheduleKey, isCompleted)
                 .onFailure { exception ->
+                    completionOverrides.remove(scheduleKey)
+                    completionOverrides.remove(legacyScheduleKey)
                     _uiState.update { it.copy(reviewSchedules = previousSchedules) }
                     _uiState.update {
                         it.copy(errorMessage = exception.message ?: "복습 상태 변경에 실패했습니다.")
