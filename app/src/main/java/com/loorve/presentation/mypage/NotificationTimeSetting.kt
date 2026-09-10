@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import java.util.Locale
 
@@ -50,51 +51,48 @@ fun NotificationTimeSettingScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-
-                Text(
-                    text = "기본 알림 시간",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "%02d:%02d".format(Locale.KOREA, uiState.hour, uiState.minute),
-                    style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showTimePicker = true },
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.surfaceVariant
+            Text(
+                text = "기본 알림 시간",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showTimePicker = true },
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                tonalElevation = 1.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(vertical = 28.dp, horizontal = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Text(
+                        text = formatDisplayTime(uiState.hour, uiState.minute),
+                        style = MaterialTheme.typography.displayMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = "복습 알림이 울릴 시간을 선택하세요",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    OutlinedButton(
+                        onClick = { showTimePicker = true },
+                        modifier = Modifier.heightIn(min = 48.dp)
                     ) {
-                        Text(
-                            text = "시간 선택",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "시와 분을 직접 입력하세요",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        OutlinedButton(onClick = { showTimePicker = true }) {
-                            Text("시간 변경")
-                        }
+                        Text("시간 변경")
                     }
                 }
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ── 저장 버튼 ──────────────────────────────────────────────
             Button(
                 onClick = { viewModel.saveNotificationTime() },
                 enabled = !uiState.isSaving,
@@ -118,24 +116,49 @@ fun NotificationTimeSettingScreen(
         val timePickerState = rememberTimePickerState(
             initialHour = uiState.hour,
             initialMinute = uiState.minute,
-            is24Hour = true
+            is24Hour = false
         )
 
-        Dialog(onDismissRequest = { showTimePicker = false }) {
+        Dialog(
+            onDismissRequest = { showTimePicker = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
             Surface(
-                shape = MaterialTheme.shapes.large,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surface
             ) {
-                Column(modifier = Modifier.padding(24.dp)) {
+                Column(
+                    modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "기본 알림 시간",
-                        style = MaterialTheme.typography.titleMedium
+                        text = formatPickerTime(timePickerState.hour, timePickerState.minute),
+                        style = MaterialTheme.typography.displayMedium,
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(Modifier.height(16.dp))
-                    TimeInput(state = timePickerState)
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(8.dp))
+                    TimePicker(
+                        state = timePickerState,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        colors = TimePickerDefaults.colors(
+                            clockDialColor = MaterialTheme.colorScheme.surfaceVariant,
+                            selectorColor = MaterialTheme.colorScheme.primary,
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            clockDialSelectedContentColor = MaterialTheme.colorScheme.onPrimary,
+                            clockDialUnselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            periodSelectorSelectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                            periodSelectorSelectedContentColor = MaterialTheme.colorScheme.primary,
+                            periodSelectorUnselectedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            periodSelectorUnselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(onClick = { showTimePicker = false }) {
@@ -148,11 +171,23 @@ fun NotificationTimeSettingScreen(
                                 showTimePicker = false
                             }
                         ) {
-                            Text("확인")
+                            Text("완료")
                         }
                     }
                 }
             }
         }
     }
+}
+
+private fun formatDisplayTime(hour: Int, minute: Int): String =
+    "%02d:%02d".format(Locale.KOREA, hour, minute)
+
+private fun formatPickerTime(hour: Int, minute: Int): String {
+    val period = if (hour < 12) "오전" else "오후"
+    val hour12 = when (val normalizedHour = hour % 12) {
+        0 -> 12
+        else -> normalizedHour
+    }
+    return "%s %d:%02d".format(Locale.KOREA, period, hour12, minute)
 }
