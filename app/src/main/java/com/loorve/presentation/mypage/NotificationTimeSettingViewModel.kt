@@ -5,11 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.data.local.NotificationTimePreferences
+import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.repository.ReviewScheduleItemRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -19,6 +21,7 @@ import javax.inject.Inject
 data class NotificationTimeUiState(
     val hour: Int = 9,
     val minute: Int = 0,
+    val isSaving: Boolean = false,
     val isSaved: Boolean = false,      // 저장 완료 one-shot 이벤트용
     val errorMessage: String? = null   // 저장 실패 시 one-shot 에러 이벤트용
 )
@@ -61,38 +64,52 @@ class NotificationTimeSettingViewModel @Inject constructor(
      * 성공 시 isSaved = true, 실패 시 errorMessage 세팅 (IOException 등 예외 방어)
      */
     fun saveNotificationTime() {
+        if (_uiState.value.isSaving) return
         viewModelScope.launch {
+            val state = _uiState.value
+            _uiState.update { it.copy(isSaving = true, errorMessage = null) }
             runCatching {
                 notificationTimePreferences.setNotificationTime(
-                    hour   = _uiState.value.hour,
-                    minute = _uiState.value.minute
+                    hour   = state.hour,
+                    minute = state.minute
                 )
                 val uid = firebaseAuth.currentUser?.uid
                     ?: throw IllegalStateException("로그인된 사용자를 찾을 수 없습니다.")
                 val allSchedules = scheduleRepository.getAllScheduleItems(uid)
                     .getOrThrow()
-                allSchedules
-                    .filter { it.customAlarmTime == null }
-                    .forEach { item ->
-                        scheduleRepository.updateScheduleItem(uid, item).getOrThrow()
-                        val reviewDate = Instant.ofEpochMilli(item.reviewDate)
-                            .atZone(ZoneId.of("Asia/Seoul"))
-                            .toLocalDate()
-                        val triggerAtMillis = reviewDate
-                            .atTime(_uiState.value.hour, _uiState.value.minute)
-                            .atZone(ZoneId.of("Asia/Seoul"))
-                            .toInstant()
-                            .toEpochMilli()
+                scheduleRepository.updateAlarmTimes(
+                    uid = uid,
+                    scheduleIds = allSchedules.map { it.id },
+                    hour = state.hour,
+                    minute = state.minute
+                ).getOrThrow()
+
+                val zoneId = ZoneId.of("Asia/Seoul")
+                val now = System.currentTimeMillis()
+                allSchedules.forEach { item ->
+                    val reviewDate = Instant.ofEpochMilli(item.reviewDate)
+                        .atZone(zoneId)
+                        .toLocalDate()
+                    val triggerAtMillis = reviewDate
+                        .atTime(state.hour, state.minute)
+                        .atZone(zoneId)
+                        .toInstant()
+                        .toEpochMilli()
+                    if (item.status == ReviewStatus.COMPLETED || triggerAtMillis <= now) {
+                        reviewAlarmScheduler.cancelReviewAlarm(item.id)
+                    } else {
                         reviewAlarmScheduler.scheduleReviewAlarm(
                             reviewScheduleId = item.id,
                             triggerAtMillis = triggerAtMillis
                         )
                     }
+                }
             }.onSuccess {
-                _uiState.update { it.copy(isSaved = true, errorMessage = null) }
+                _uiState.update { it.copy(isSaving = false, isSaved = true, errorMessage = null) }
             }.onFailure { throwable ->
                 _uiState.update {
                     it.copy(
+                        isSaving = false,
                         isSaved = false,
                         errorMessage = throwable.message ?: "알림 시간 저장에 실패했습니다."
                     )

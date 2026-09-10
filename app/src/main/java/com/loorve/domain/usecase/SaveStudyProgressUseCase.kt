@@ -1,10 +1,13 @@
 package com.loorve.domain.usecase
 
+import com.loorve.data.local.NotificationTimePreferences
+import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.domain.model.StudyRecord
 import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.domain.review.ReviewScheduler
 import com.loorve.domain.review.toLocalDate
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -24,7 +27,9 @@ data class SaveStudyProgressRequest(
 
 class SaveStudyProgressUseCase @Inject constructor(
     private val studyRecordRepository: StudyRecordRepository,
-    private val scheduleRepository: ReviewScheduleItemRepository
+    private val scheduleRepository: ReviewScheduleItemRepository,
+    private val notificationTimePreferences: NotificationTimePreferences,
+    private val reviewAlarmScheduler: ReviewAlarmScheduler
 ) {
     suspend operator fun invoke(request: SaveStudyProgressRequest): Result<String> =
         runCatching {
@@ -48,6 +53,10 @@ class SaveStudyProgressUseCase @Inject constructor(
                 uid = request.uid,
                 prepStartDate = prepStart
             )
+            val defaultAlarmTime = notificationTimePreferences.notificationTime.first()
+            val schedulesWithDefaultAlarm = scheduleResult.items.map { item ->
+                item.copy(customAlarmTime = defaultAlarmTime)
+            }
 
             val record = StudyRecord(
                 id = studyRecordId,
@@ -63,14 +72,26 @@ class SaveStudyProgressUseCase @Inject constructor(
                 recommendedCompletionDate =
                     scheduleResult.recommendedCompletionDate.atStartOfDay(
                         ZoneId.of("Asia/Seoul")).toInstant().toEpochMilli(),
-                plannedReviewCount = scheduleResult.items.size,
+                plannedReviewCount = schedulesWithDefaultAlarm.size,
                 createdAt = System.currentTimeMillis()
             )
 
             studyRecordRepository.saveStudyRecord(record).getOrThrow()
             scheduleRepository.saveSchedules(
-                request.uid, studyRecordId, scheduleResult.items
+                request.uid, studyRecordId, schedulesWithDefaultAlarm
             ).getOrThrow()
+            val now = System.currentTimeMillis()
+            schedulesWithDefaultAlarm.forEach { item ->
+                val triggerAtMillis = item.reviewDate
+                    .toLocalDate()
+                    .atTime(defaultAlarmTime.first, defaultAlarmTime.second)
+                    .atZone(ZoneId.of("Asia/Seoul"))
+                    .toInstant()
+                    .toEpochMilli()
+                if (triggerAtMillis > now) {
+                    reviewAlarmScheduler.scheduleReviewAlarm(item.id, triggerAtMillis)
+                }
+            }
 
             studyRecordId
         }

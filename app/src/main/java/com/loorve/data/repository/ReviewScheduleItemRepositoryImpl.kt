@@ -99,6 +99,36 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
             .await()
     }
 
+    override suspend fun updateAlarmTimes(
+        uid: String,
+        scheduleIds: List<String>,
+        hour: Int,
+        minute: Int
+    ): Result<Unit> = runCatching {
+        validateAuth(uid)
+        require(hour in 0..23) { "알림 시간이 올바르지 않습니다." }
+        require(minute in 0..59) { "알림 분이 올바르지 않습니다." }
+
+        scheduleIds
+            .filter { it.isNotBlank() }
+            .distinct()
+            .chunked(500)
+            .forEach { chunk ->
+                firestore.runBatch { batch ->
+                    chunk.forEach { scheduleId ->
+                        batch.update(
+                            schedulesRef(uid).document(scheduleId),
+                            mapOf(
+                                "customAlarmHour" to hour,
+                                "customAlarmMinute" to minute,
+                                "updatedAt" to FieldValue.serverTimestamp()
+                            )
+                        )
+                    }
+                }.await()
+            }
+    }
+
     override suspend fun updateScheduleCompletion(
         uid: String,
         scheduleId: String,

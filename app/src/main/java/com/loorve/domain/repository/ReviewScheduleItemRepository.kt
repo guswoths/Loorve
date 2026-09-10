@@ -31,6 +31,13 @@ interface ReviewScheduleItemRepository {
         item: ReviewScheduleItem
     ): Result<Unit>
 
+    suspend fun updateAlarmTimes(
+        uid: String,
+        scheduleIds: List<String>,
+        hour: Int,
+        minute: Int
+    ): Result<Unit>
+
     suspend fun updateScheduleCompletion(
         uid: String,
         scheduleId: String,

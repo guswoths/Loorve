@@ -545,7 +545,10 @@ fun ReviewRecordListSection(
                 }
                 ReviewRecordMiniCard(
                     item = item,
-                    savedTime = timeMap[itemKey],
+                    savedTime = timeMap[itemKey]
+                        ?: item.customAlarmTime?.let { (hour, minute) ->
+                            "%02d:%02d".format(hour, minute)
+                        },
                     onTimeSave = { time ->
                         timeMap[itemKey] = time
                     }
