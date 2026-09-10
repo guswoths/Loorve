@@ -1,9 +1,6 @@
 package com.loorve.presentation.home
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,12 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -123,12 +115,14 @@ fun HomeScreen(
                 HomeMotivationHeader()
             }
 
-            // ── 2) 전체 복습률 카드 ──
+            // ── 2) 지연된 복습 영역 ──
             item {
-                HomeReviewRateCard(
-                    rate = uiState.weeklyCompletionRate,
-                    completed = uiState.weeklyCompleted,
-                    total = uiState.weeklyTotal
+                HomeOverdueReviewSection(
+                    schedules = uiState.reviewSchedules,
+                    exams = uiState.exams,
+                    reviewBlocks = uiState.reviewBlocks,
+                    isLoaded = uiState.isReviewSchedulesLoaded,
+                    onCheckedChange = viewModel::toggleScheduleCompletion
                 )
             }
 
@@ -253,32 +247,77 @@ private fun HomeMotivationHeader() {
     }
 }
 
-/** 전체 복습률 카드 */
+/** 지연된 복습 일정 */
 @Composable
-private fun HomeReviewRateCard(rate: Float, completed: Int, total: Int) {
-    val safeRate = if (rate.isNaN() || rate < 0f) 0f else rate.coerceAtMost(1f)
-    val percent = (safeRate * 100).toInt()
-    val animatedRate by animateFloatAsState(targetValue = safeRate, animationSpec = tween(800), label = "reviewRateAnim")
+private fun HomeOverdueReviewSection(
+    schedules: List<ReviewScheduleUiModel>,
+    exams: List<com.loorve.domain.model.Exam>,
+    reviewBlocks: List<ReviewBlockUiModel>,
+    isLoaded: Boolean,
+    onCheckedChange: (String, Boolean) -> Unit
+) {
+    val today = LocalDate.now()
+    val overdueSchedules = schedules
+        .filter { it.reviewDate.isBefore(today) && !it.isCompleted }
+        .sortedWith(
+            compareBy<ReviewScheduleUiModel> { it.reviewDate }
+                .thenBy { it.reviewOrder }
+                .thenBy { it.scheduleId }
+        )
 
     LoorveCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "전체 복습률", style = LoorveTypography.labelMedium, color = OnSurfaceVariant)
-            Spacer(Modifier.height(16.dp))
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
-                Canvas(modifier = Modifier.size(120.dp)) {
-                    val strokeWidth = 10.dp.toPx()
-                    val inset = strokeWidth / 2f
-                    val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
-                    drawArc(color = Primary.copy(alpha = 0.15f), startAngle = 0f, sweepAngle = 360f, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
-                    if (animatedRate > 0f) {
-                        val gradientBrush = Brush.sweepGradient(colors = listOf(GradientStart, GradientEnd), center = Offset(size.width / 2f, size.height / 2f))
-                        drawArc(brush = gradientBrush, startAngle = -90f, sweepAngle = 360f * animatedRate, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
-                    }
-                }
-                Text(text = "$percent%", fontWeight = FontWeight.Bold, color = Primary, fontSize = 28.sp)
+        if (!isLoaded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 176.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Primary)
             }
-            Spacer(Modifier.height(8.dp))
-            Text(text = "전체 복습률", style = LoorveTypography.labelSmall, color = OnSurfaceVariant)
+        } else if (overdueSchedules.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 176.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "지연된 복습이 없습니다 👍",
+                    style = LoorveTypography.bodyMedium,
+                    color = OnSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "지연된 복습이 존재합니다! 🚨",
+                    style = LoorveTypography.titleMedium,
+                    color = Warning,
+                    fontWeight = FontWeight.Bold
+                )
+                overdueSchedules.forEach { schedule ->
+                    val subjectName = schedule.subjectName.ifBlank {
+                        exams.find { it.id == schedule.examId }?.subjectName
+                            ?: reviewBlocks.find { it.blockId == schedule.examId }?.examName
+                            ?: ""
+                    }
+                    val scheduleKey = schedule.scheduleId.ifBlank {
+                        "${schedule.reviewDate}_${schedule.examId}_${schedule.reviewOrder}"
+                    }
+                    HomeScheduleCard(
+                        subjectName = subjectName,
+                        content = schedule.content,
+                        dateLabel = schedule.reviewDate.format(DateTimeFormatter.ofPattern("M월 d일")),
+                        checked = schedule.isCompleted,
+                        onCheckedChange = { onCheckedChange(scheduleKey, it) }
+                    )
+                }
+            }
         }
     }
 }
@@ -380,6 +419,7 @@ private fun HomeMiniCalendar(
 private fun HomeScheduleCard(
     subjectName: String,
     content: String,
+    dateLabel: String = "오늘",
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
@@ -395,7 +435,7 @@ private fun HomeScheduleCard(
             )
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
-                val headerTitle = if (subjectName.isNotBlank()) "오늘 · $subjectName" else "오늘 · 복습 일정"
+                val headerTitle = if (subjectName.isNotBlank()) "$dateLabel · $subjectName" else "$dateLabel · 복습 일정"
                 Text(text = headerTitle, style = LoorveTypography.labelMedium, color = Primary, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(

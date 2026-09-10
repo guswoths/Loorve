@@ -89,6 +89,7 @@ data class HomeUiState(
     val reviewScheduleDates: Set<LocalDate> = emptySet(),
     val studyRecordDates: Set<LocalDate> = emptySet(),
     val reviewSchedules: List<ReviewScheduleUiModel> = emptyList(),
+    val isReviewSchedulesLoaded: Boolean = false,
     val reviewBlocks: List<ReviewBlockUiModel> = emptyList(),
     val isCreatingBlock: Boolean = false
 )
@@ -126,12 +127,14 @@ class HomeViewModel @Inject constructor(
     private var reviewScheduleItemUiModels = emptyList<ReviewScheduleUiModel>()
     private var legacyReviewScheduleUiModels = emptyList<ReviewScheduleUiModel>()
     private val completionOverrides = mutableMapOf<String, Boolean>()
+    private var reviewScheduleItemsLoaded = false
+    private var legacyReviewSchedulesLoaded = false
 
     init {
         // ✅ uid를 반드시 토큰 갱신 후 확보, 그 다음 모든 데이터 로드
         viewModelScope.launch {
             val uid = getUidSafely() ?: run {
-                _uiState.update { it.copy(isLoading = false) }
+                _uiState.update { it.copy(isLoading = false, isReviewSchedulesLoaded = true) }
                 return@launch
             }
             loadExams()
@@ -309,7 +312,8 @@ class HomeViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 reviewScheduleDates = combinedDates,
-                reviewSchedules = combinedSchedules
+                reviewSchedules = combinedSchedules,
+                isReviewSchedulesLoaded = reviewScheduleItemsLoaded && legacyReviewSchedulesLoaded
             )
         }
     }
@@ -321,6 +325,7 @@ class HomeViewModel @Inject constructor(
             reviewScheduleItemRepository.observeReviewScheduleItems(uid)
                 .catch { }
                 .collect { items ->
+                    reviewScheduleItemsLoaded = true
                     syncReviewScheduleItems(items, uid)
                 }
         }
@@ -471,6 +476,8 @@ class HomeViewModel @Inject constructor(
     // ✅ uid를 파라미터로 받아서 절대 null 상황이 생기지 않도록 변경
     fun loadReviewScheduleDatesByMonth(uid: String, yearMonth: YearMonth) {
         loadStudyRecordDatesByMonth(uid, yearMonth)
+        legacyReviewSchedulesLoaded = false
+        _uiState.update { it.copy(isReviewSchedulesLoaded = false) }
         reviewScheduleJob?.cancel()
         reviewScheduleJob = viewModelScope.launch {
             val startDate = yearMonth.atDay(1).format(dateRangeFormatter)
@@ -511,6 +518,7 @@ class HomeViewModel @Inject constructor(
                     }
                     legacyReviewScheduleDates = (otherMonthsDates + reviewDates).toSet()
                     legacyReviewScheduleUiModels = reviewScheduleUiModels
+                    legacyReviewSchedulesLoaded = true
                     updateCombinedReviewSchedules()
                 }
         }
