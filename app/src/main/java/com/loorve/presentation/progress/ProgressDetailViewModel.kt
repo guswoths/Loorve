@@ -4,12 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.loorve.data.notification.ReviewAlarmScheduler
+import com.loorve.data.local.NotificationTimePreferences
 import com.loorve.domain.model.Progress
 import com.loorve.domain.model.ReviewSchedule
 import com.loorve.domain.repository.ProgressRepository
 import com.loorve.domain.repository.ReviewScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
+import kotlinx.coroutines.flow.first
+import com.loorve.domain.review.alarmTriggerAtMillis
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +31,8 @@ class ProgressDetailViewModel @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val progressRepository: ProgressRepository,
     private val reviewScheduleRepository: ReviewScheduleRepository,
-    private val reviewAlarmScheduler: ReviewAlarmScheduler
+    private val reviewAlarmScheduler: ReviewAlarmScheduler,
+    private val notificationTimePreferences: NotificationTimePreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProgressDetailUiState())
@@ -112,6 +116,7 @@ class ProgressDetailViewModel @Inject constructor(
             }
 
             val now = System.currentTimeMillis()
+            val defaultAlarmTime = notificationTimePreferences.notificationTime.first()
 
             reviewDates.forEachIndexed { index, reviewDate ->
                 val schedule = ReviewSchedule(
@@ -136,7 +141,7 @@ class ProgressDetailViewModel @Inject constructor(
                 if (scheduleResult.isSuccess) {
                     reviewAlarmScheduler.scheduleReviewAlarm(
                         reviewScheduleId = schedule.scheduleId,
-                        triggerAtMillis = schedule.reviewDate
+                        triggerAtMillis = alarmTriggerAtMillis(schedule.reviewDate, defaultAlarmTime)
                     )
                 }
             }

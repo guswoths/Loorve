@@ -10,7 +10,10 @@ import com.loorve.domain.repository.ReviewBlockRepository
 import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.domain.review.ReviewScheduler
+import com.loorve.domain.review.alarmTriggerAtMillis
 import com.loorve.domain.review.toLocalDate
+import com.loorve.data.local.NotificationTimePreferences
+import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.domain.usecase.SaveStudyProgressRequest
 import com.loorve.domain.usecase.SaveStudyProgressUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -41,7 +44,8 @@ data class ReviewBlockDetailUiState(
     val deleteSuccess: Boolean = false,
     val showDeleteConfirm: Boolean = false,
     val recordToDelete: StudyRecord? = null,
-    val selectedTab: ReviewBlockTab = ReviewBlockTab.STUDY_RECORD
+    val selectedTab: ReviewBlockTab = ReviewBlockTab.STUDY_RECORD,
+    val defaultAlarmTime: Pair<Int, Int> = 9 to 0
 )
 
 @HiltViewModel
@@ -50,11 +54,61 @@ class ReviewBlockDetailViewModel @Inject constructor(
     private val studyRecordRepository: StudyRecordRepository,
     private val scheduleRepository: ReviewScheduleItemRepository,
     private val reviewBlockRepository: ReviewBlockRepository,
-    private val calendarRefreshBus: CalendarRefreshBus
+    private val calendarRefreshBus: CalendarRefreshBus,
+    private val notificationTimePreferences: NotificationTimePreferences,
+    private val reviewAlarmScheduler: ReviewAlarmScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewBlockDetailUiState())
     val uiState: StateFlow<ReviewBlockDetailUiState> = _uiState.asStateFlow()
+
+    fun saveCustomAlarmTime(
+        uid: String,
+        item: ReviewScheduleItem,
+        hour: Int,
+        minute: Int
+    ) {
+        if (hour !in 0..23 || minute !in 0..59) {
+            _uiState.value = _uiState.value.copy(errorMessage = "알림 시간이 올바르지 않습니다.")
+            return
+        }
+
+        viewModelScope.launch {
+            val updatedItem = item.copy(customAlarmTime = hour to minute)
+            scheduleRepository.updateScheduleItem(uid, updatedItem)
+                .onSuccess {
+                    val triggerAtMillis = updatedItem.alarmTriggerAtMillis(
+                        _uiState.value.defaultAlarmTime
+                    )
+                    if (updatedItem.status == com.loorve.domain.model.ReviewStatus.COMPLETED ||
+                        triggerAtMillis <= System.currentTimeMillis()
+                    ) {
+                        reviewAlarmScheduler.cancelReviewAlarm(updatedItem.id)
+                    } else {
+                        reviewAlarmScheduler.cancelReviewAlarm(updatedItem.id)
+                        reviewAlarmScheduler.scheduleReviewAlarm(updatedItem.id, triggerAtMillis)
+                    }
+                    _uiState.value = _uiState.value.copy(
+                        reviewScheduleRecords = _uiState.value.reviewScheduleRecords.map {
+                            if (it.id == updatedItem.id) updatedItem else it
+                        }
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = error.message ?: "알림 시간 저장에 실패했습니다."
+                    )
+                }
+        }
+    }
+
+    init {
+        viewModelScope.launch {
+            notificationTimePreferences.notificationTime.collect { time ->
+                _uiState.value = _uiState.value.copy(defaultAlarmTime = time)
+            }
+        }
+    }
 
     private val _selectedTab = MutableStateFlow(ReviewBlockTab.STUDY_RECORD)
     val selectedTab: StateFlow<ReviewBlockTab> = _selectedTab.asStateFlow()

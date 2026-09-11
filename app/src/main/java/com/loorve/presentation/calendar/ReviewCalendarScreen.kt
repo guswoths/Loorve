@@ -249,7 +249,9 @@ fun ReviewCalendarScreen(
                                     ReviewRecordMiniCard(
                                         item = schedule.toReviewScheduleItem(),
                                         savedTime = notificationTime,
-                                        onTimeSave = { notificationTime = it },
+                                        onTimeSave = { hour, minute ->
+                                            notificationTime = "%02d:%02d".format(hour, minute)
+                                        },
                                         onCheckedChange = {
                                             reviewCalendarViewModel.toggleReviewCompletion(
                                                 scheduleId = schedule.scheduleId.ifBlank {

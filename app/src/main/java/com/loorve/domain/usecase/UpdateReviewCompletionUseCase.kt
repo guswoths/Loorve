@@ -2,12 +2,16 @@ package com.loorve.domain.usecase
 
 import android.util.Log
 import com.loorve.data.notification.ReviewAlarmScheduler
+import com.loorve.data.local.NotificationTimePreferences
 import com.loorve.domain.repository.ReviewScheduleRepository
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
+import com.loorve.domain.review.alarmTriggerAtMillis
 
 class UpdateReviewCompletionUseCase @Inject constructor(
     private val repository: ReviewScheduleRepository,
-    private val alarmScheduler: ReviewAlarmScheduler
+    private val alarmScheduler: ReviewAlarmScheduler,
+    private val notificationTimePreferences: NotificationTimePreferences
 ) {
 
     companion object {
@@ -42,7 +46,10 @@ class UpdateReviewCompletionUseCase @Inject constructor(
             // ✅ 수정: ReviewSchedule.reviewDate 필드는 Long으로 동일하게 존재
             val alarmResult = alarmScheduler.scheduleReviewAlarm(
                 reviewScheduleId = scheduleId,
-                triggerAtMillis  = schedule.reviewDate
+                triggerAtMillis  = alarmTriggerAtMillis(
+                    schedule.reviewDate,
+                    notificationTimePreferences.notificationTime.first()
+                )
             )
             when (alarmResult) {
                 ReviewAlarmScheduler.ScheduleResult.FAILED ->

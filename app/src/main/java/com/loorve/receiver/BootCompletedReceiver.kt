@@ -7,12 +7,16 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.loorve.data.local.NotificationTimePreferences
 import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.domain.repository.ReviewScheduleRepository
+import com.loorve.domain.review.alarmTriggerAtMillis
+import com.loorve.domain.repository.ReviewScheduleItemRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -35,6 +39,12 @@ class BootCompletedReceiver : BroadcastReceiver() {
 
     @Inject
     lateinit var reviewScheduleRepository: ReviewScheduleRepository
+
+    @Inject
+    lateinit var reviewScheduleItemRepository: ReviewScheduleItemRepository
+
+    @Inject
+    lateinit var notificationTimePreferences: NotificationTimePreferences
 
     override fun onReceive(context: Context, intent: Intent) {
         // BOOT_COMPLETED 또는 LOCKED_BOOT_COMPLETED 이외의 인텐트는 무시
@@ -64,29 +74,31 @@ class BootCompletedReceiver : BroadcastReceiver() {
 
                 val now = System.currentTimeMillis()
 
-                // 현재 시각 이후의 미완료 복습 일정 조회
-                val result = reviewScheduleRepository.getUpcomingIncompleteSchedules(uid, now)
+                val defaultAlarmTime = notificationTimePreferences.notificationTime.first()
 
-                result
+                reviewScheduleRepository.getUpcomingIncompleteSchedules(uid, now)
                     .onSuccess { schedules ->
-                        Log.d(TAG, "조회된 미완료 복습 일정 수: ${schedules.size}")
-
                         schedules.forEach { schedule ->
                             try {
+                                val triggerAtMillis = alarmTriggerAtMillis(
+                                    schedule.reviewDate,
+                                    defaultAlarmTime
+                                )
+                                if (triggerAtMillis <= now) return@forEach
                                 val scheduleResult = reviewAlarmScheduler.scheduleReviewAlarm(
-                                    reviewScheduleId = schedule.scheduleId,  // ✅ 수정
-                                    triggerAtMillis = schedule.reviewDate
+                                    reviewScheduleId = schedule.scheduleId,
+                                    triggerAtMillis = triggerAtMillis
                                 )
                                 Log.d(
                                     TAG,
-                                    "알람 재등록: id=${schedule.scheduleId}, " +  // ✅ 수정
-                                            "reviewDate=${schedule.reviewDate}, result=$scheduleResult"
+                                    "알람 재등록: id=${schedule.scheduleId}, " +
+                                            "triggerAt=$triggerAtMillis, result=$scheduleResult"
                                 )
                             } catch (e: Exception) {
                                 // 개별 알람 실패가 전체를 중단하지 않도록 개별 예외 처리
                                 Log.e(
                                     TAG,
-                                    "알람 재등록 실패: id=${schedule.scheduleId}, " +  // ✅ 수정
+                                    "알람 재등록 실패: id=${schedule.scheduleId}, " +
                                             "error=${e.message}"
                                 )
                             }
@@ -97,6 +109,21 @@ class BootCompletedReceiver : BroadcastReceiver() {
                     .onFailure { error ->
                         // 네트워크 불안정 등 Firestore 조회 실패 처리
                         Log.e(TAG, "복습 일정 조회 실패: ${error.message}")
+                    }
+
+                reviewScheduleItemRepository.getAllScheduleItems(uid)
+                    .onSuccess { schedules ->
+                        schedules
+                            .filter { it.status != com.loorve.domain.model.ReviewStatus.COMPLETED }
+                            .forEach { schedule ->
+                                val triggerAtMillis = schedule.alarmTriggerAtMillis(defaultAlarmTime)
+                                if (triggerAtMillis > now) {
+                                    reviewAlarmScheduler.scheduleReviewAlarm(schedule.id, triggerAtMillis)
+                                }
+                            }
+                    }
+                    .onFailure { error ->
+                        Log.e(TAG, "복습 기록 조회 실패: ${error.message}")
                     }
 
             } catch (e: Exception) {

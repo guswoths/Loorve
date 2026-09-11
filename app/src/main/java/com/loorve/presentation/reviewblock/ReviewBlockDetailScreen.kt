@@ -322,6 +322,10 @@ fun ReviewBlockDetailScreen(
                 item {
                     ReviewRecordListSection(
                         scheduleItems = uiState.reviewScheduleRecords,
+                        defaultAlarmTime = uiState.defaultAlarmTime,
+                        onTimeSave = { item, hour, minute ->
+                            viewModel.saveCustomAlarmTime(uid, item, hour, minute)
+                        },
                         isLoading = uiState.isLoading
                     )
                 }
@@ -522,6 +526,8 @@ fun StudyRecordMiniCard(
 @Composable
 fun ReviewRecordListSection(
     scheduleItems: List<ReviewScheduleItem>,
+    defaultAlarmTime: Pair<Int, Int> = 9 to 0,
+    onTimeSave: ((ReviewScheduleItem, Int, Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
     isLoading: Boolean = false
 ) {
@@ -545,12 +551,12 @@ fun ReviewRecordListSection(
                 }
                 ReviewRecordMiniCard(
                     item = item,
-                    savedTime = timeMap[itemKey]
-                        ?: item.customAlarmTime?.let { (hour, minute) ->
-                            "%02d:%02d".format(hour, minute)
-                        },
-                    onTimeSave = { time ->
-                        timeMap[itemKey] = time
+                    savedTime = timeMap[itemKey] ?: item.customAlarmTime
+                        ?.let { (hour, minute) -> "%02d:%02d".format(hour, minute) }
+                        ?: "%02d:%02d".format(defaultAlarmTime.first, defaultAlarmTime.second),
+                    onTimeSave = { hour, minute ->
+                        timeMap[itemKey] = "%02d:%02d".format(hour, minute)
+                        onTimeSave?.invoke(item, hour, minute)
                     }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -566,7 +572,7 @@ fun ReviewRecordMiniCard(
     item: ReviewScheduleItem,
     modifier: Modifier = Modifier,
     savedTime: String? = null,
-    onTimeSave: ((String) -> Unit)? = null,
+    onTimeSave: ((Int, Int) -> Unit)? = null,
     onCheckedChange: ((Boolean) -> Unit)? = null
 ) {
     val dateText = remember(item.reviewDate) {
@@ -729,12 +735,7 @@ fun ReviewRecordMiniCard(
                         }
                         TextButton(
                             onClick = {
-                                onTimeSave?.invoke(
-                                    "%02d:%02d".format(
-                                        timePickerState.hour,
-                                        timePickerState.minute
-                                    )
-                                )
+                                onTimeSave?.invoke(timePickerState.hour, timePickerState.minute)
                                 showTimePicker = false
                             }
                         ) {

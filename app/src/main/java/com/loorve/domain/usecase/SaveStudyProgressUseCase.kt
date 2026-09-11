@@ -6,6 +6,7 @@ import com.loorve.domain.model.StudyRecord
 import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.domain.review.ReviewScheduler
+import com.loorve.domain.review.alarmTriggerAtMillis
 import com.loorve.domain.review.toLocalDate
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
@@ -54,9 +55,7 @@ class SaveStudyProgressUseCase @Inject constructor(
                 prepStartDate = prepStart
             )
             val defaultAlarmTime = notificationTimePreferences.notificationTime.first()
-            val schedulesWithDefaultAlarm = scheduleResult.items.map { item ->
-                item.copy(customAlarmTime = defaultAlarmTime)
-            }
+            val schedulesWithDefaultAlarm = scheduleResult.items
 
             val record = StudyRecord(
                 id = studyRecordId,
@@ -82,12 +81,7 @@ class SaveStudyProgressUseCase @Inject constructor(
             ).getOrThrow()
             val now = System.currentTimeMillis()
             schedulesWithDefaultAlarm.forEach { item ->
-                val triggerAtMillis = item.reviewDate
-                    .toLocalDate()
-                    .atTime(defaultAlarmTime.first, defaultAlarmTime.second)
-                    .atZone(ZoneId.of("Asia/Seoul"))
-                    .toInstant()
-                    .toEpochMilli()
+                val triggerAtMillis = item.alarmTriggerAtMillis(defaultAlarmTime)
                 if (triggerAtMillis > now) {
                     reviewAlarmScheduler.scheduleReviewAlarm(item.id, triggerAtMillis)
                 }

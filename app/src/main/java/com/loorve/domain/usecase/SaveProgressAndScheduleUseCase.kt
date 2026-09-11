@@ -1,6 +1,7 @@
 package com.loorve.domain.usecase
 
 import android.util.Log
+import com.loorve.data.local.NotificationTimePreferences
 import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.domain.model.Progress
 import com.loorve.domain.model.ReviewSchedule
@@ -8,6 +9,8 @@ import com.loorve.domain.repository.ExamRepository
 import com.loorve.domain.repository.ReviewScheduleRepository
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.first
+import com.loorve.domain.review.alarmTriggerAtMillis
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -19,7 +22,8 @@ class SaveProgressAndScheduleUseCase @Inject constructor(
     private val calculateReviewScheduleUseCase: CalculateReviewScheduleUseCase,
     private val reviewScheduleRepository: ReviewScheduleRepository,
     private val examRepository: ExamRepository,
-    private val alarmScheduler: ReviewAlarmScheduler
+    private val alarmScheduler: ReviewAlarmScheduler,
+    private val notificationTimePreferences: NotificationTimePreferences
 ) {
     companion object {
         private const val TAG = "SaveProgressAndSchedule"
@@ -77,6 +81,7 @@ class SaveProgressAndScheduleUseCase @Inject constructor(
             }
 
             val now = System.currentTimeMillis()
+            val defaultAlarmTime = notificationTimePreferences.notificationTime.first()
             reviewDates.forEachIndexed { index, localDate ->
                 val reviewDateMs = localDate
                     .atStartOfDay(KST)
@@ -107,7 +112,7 @@ class SaveProgressAndScheduleUseCase @Inject constructor(
 
                 val alarmResult = alarmScheduler.scheduleReviewAlarm(
                     reviewScheduleId = schedule.scheduleId,
-                    triggerAtMillis  = reviewDateMs
+                    triggerAtMillis  = alarmTriggerAtMillis(reviewDateMs, defaultAlarmTime)
                 )
                 when (alarmResult) {
                     ReviewAlarmScheduler.ScheduleResult.FAILED ->

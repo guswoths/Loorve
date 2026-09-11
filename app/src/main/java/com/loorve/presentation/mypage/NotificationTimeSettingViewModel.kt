@@ -7,6 +7,7 @@ import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.data.local.NotificationTimePreferences
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.repository.ReviewScheduleItemRepository
+import com.loorve.domain.review.alarmTriggerAtMillis
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -77,24 +78,9 @@ class NotificationTimeSettingViewModel @Inject constructor(
                     ?: throw IllegalStateException("로그인된 사용자를 찾을 수 없습니다.")
                 val allSchedules = scheduleRepository.getAllScheduleItems(uid)
                     .getOrThrow()
-                scheduleRepository.updateAlarmTimes(
-                    uid = uid,
-                    scheduleIds = allSchedules.map { it.id },
-                    hour = state.hour,
-                    minute = state.minute
-                ).getOrThrow()
-
-                val zoneId = ZoneId.of("Asia/Seoul")
                 val now = System.currentTimeMillis()
                 allSchedules.forEach { item ->
-                    val reviewDate = Instant.ofEpochMilli(item.reviewDate)
-                        .atZone(zoneId)
-                        .toLocalDate()
-                    val triggerAtMillis = reviewDate
-                        .atTime(state.hour, state.minute)
-                        .atZone(zoneId)
-                        .toInstant()
-                        .toEpochMilli()
+                    val triggerAtMillis = item.alarmTriggerAtMillis(state.hour to state.minute)
                     if (item.status == ReviewStatus.COMPLETED || triggerAtMillis <= now) {
                         reviewAlarmScheduler.cancelReviewAlarm(item.id)
                     } else {
