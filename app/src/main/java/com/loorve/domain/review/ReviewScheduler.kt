@@ -32,6 +32,105 @@ object ReviewScheduler {
     private const val MIN_GAP_DAYS = 1L
     private const val DEFAULT_MIN_REVIEWS = 5
 
+    /** 새 순수 도메인 스케줄러 API를 기존 진입점에서도 사용할 수 있게 제공하는 위임 함수입니다. */
+    fun validateExamDate(
+        today: LocalDate,
+        examDate: LocalDate,
+        finalReviewBufferDays: Int
+    ): ValidationResult = ReviewSchedulingEngine.validateExamDate(
+        today,
+        examDate,
+        finalReviewBufferDays
+    )
+
+    fun lastReviewDate(examDate: LocalDate, finalReviewBufferDays: Int): LocalDate =
+        ReviewSchedulingEngine.lastReviewDate(examDate, finalReviewBufferDays)
+
+    fun getMinimumReviewCount(effectiveStudyDays: Long): Int =
+        ReviewSchedulingEngine.getMinimumReviewCount(effectiveStudyDays)
+
+    fun getTargetReviewCount(
+        effectiveStudyDays: Long,
+        difficulty: ReviewDifficulty,
+        initialMastery: Int?,
+        optionalMinReviewCount: Int? = null
+    ): Int = ReviewSchedulingEngine.getTargetReviewCount(
+        effectiveStudyDays,
+        difficulty,
+        initialMastery,
+        optionalMinReviewCount
+    )
+
+    fun generateScaledReviewDates(
+        studyDate: LocalDate,
+        examDate: LocalDate,
+        finalReviewBufferDays: Int,
+        targetReviewCount: Int,
+        baseIntervals: List<Int> = listOf(1, 3, 7, 14, 30, 60, 120)
+    ): List<LocalDate> = ReviewSchedulingEngine.generateScaledReviewDates(
+        studyDate,
+        examDate,
+        finalReviewBufferDays,
+        targetReviewCount,
+        baseIntervals
+    )
+
+    fun createReviewSchedules(
+        record: SchedulerStudyRecord,
+        exam: SchedulerExam,
+        today: LocalDate,
+        config: SchedulerConfig = SchedulerConfig(),
+        notificationPlan: ReviewNotificationPlan = ReviewNotificationPlan()
+    ): SchedulingResult = ReviewSchedulingEngine.createReviewSchedules(
+        record,
+        exam,
+        today,
+        config,
+        notificationPlan
+    )
+
+    fun rebalanceDailyLoad(
+        schedules: List<ReviewScheduleEntry>,
+        exam: SchedulerExam,
+        reviewStartDate: LocalDate,
+        config: SchedulerConfig = SchedulerConfig()
+    ): RebalanceResult = ReviewSchedulingEngine.rebalanceDailyLoad(
+        schedules,
+        exam,
+        reviewStartDate,
+        config
+    )
+
+    fun rescheduleAfterReviewOutcome(
+        schedules: List<ReviewScheduleEntry>,
+        completedReviewId: String,
+        outcome: ReviewOutcome,
+        today: LocalDate,
+        exam: SchedulerExam,
+        config: SchedulerConfig = SchedulerConfig()
+    ): OutcomeRescheduleResult = ReviewSchedulingEngine.rescheduleAfterReviewOutcome(
+        schedules,
+        completedReviewId,
+        outcome,
+        today,
+        exam,
+        config
+    )
+
+    fun priorityScore(
+        daysUntilExam: Long,
+        importance: ReviewImportance,
+        difficulty: ReviewDifficulty,
+        initialMastery: Int?,
+        isFinalReview: Boolean
+    ): Double = ReviewSchedulingEngine.priorityScore(
+        daysUntilExam,
+        importance,
+        difficulty,
+        initialMastery,
+        isFinalReview
+    )
+
     // ──────────────────────────────────────────────────────
     // A. 기본 일정 생성
     // ──────────────────────────────────────────────────────
