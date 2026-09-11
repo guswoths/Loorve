@@ -453,9 +453,13 @@ fun LoorveNavHost(
                         1 -> ReviewCalendarScreen(
                             onNavigateBack = { },
                             onNavigateToAddReviewBlock = {
+                                navController.navigate(Screen.Calendar.route)
                                 navController.navigate(Screen.AddReviewBlock.route)
                             },
                             onNavigateToReviewBlockDetail = { blockId ->   // ✅ 핵심 연결
+                                navController.navigate(Screen.Calendar.route) {
+                                    launchSingleTop = true
+                                }
                                 navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId))
                             }
                         )
@@ -466,6 +470,7 @@ fun LoorveNavHost(
                                     selectedTabIndex = 0
                                 },
                                 onNavigateToNotificationTimeSetting = {
+                                    navController.navigate(Screen.MyPage.route)
                                     navController.navigate(Screen.NotificationTimeSetting.route)
                                 },
                                 onSignOut = {
