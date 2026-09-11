@@ -17,6 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -125,7 +128,7 @@ fun MyPageScreen(
                             icon = Icons.Default.Notifications,
                             title = "복습 알림",
                             subtitle = "저녁 8시에 오늘 블록 알림",
-                            actionLabel = "변경",
+                            actionLabel = null,
                             onAction = onNavigateToNotificationTimeSetting
                         )
                         HorizontalDivider(color = SurfaceVariant, thickness = 0.5.dp)
@@ -133,7 +136,7 @@ fun MyPageScreen(
                             icon = Icons.Default.Tune,
                             title = "기본 주기",
                             subtitle = "에빙하우스 망각주기",
-                            actionLabel = "변경",
+                            actionLabel = null,
                             onAction = { }
                         )
                     }
@@ -212,13 +215,27 @@ private fun SettingsRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
-    actionLabel: String,
+    actionLabel: String? = null,
     actionColor: Color = Primary,
     onAction: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (actionLabel == null) {
+                    Modifier
+                        .clickable(
+                            role = Role.Button,
+                            onClick = onAction
+                        )
+                        .semantics {
+                            contentDescription = "$title 설정 열기"
+                        }
+                } else {
+                    Modifier
+                }
+            )
             .padding(vertical = 14.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -244,21 +261,23 @@ private fun SettingsRow(
             )
         }
         Spacer(Modifier.width(8.dp))
-        Box(
-            modifier = Modifier
-                .background(
-                    color = actionColor.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(8.dp)
+        actionLabel?.let { label ->
+            Box(
+                modifier = Modifier
+                    .background(
+                        color = actionColor.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .clickable { onAction() }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = label,
+                    style = LoorveTypography.labelMedium,
+                    color = actionColor,
+                    fontWeight = FontWeight.SemiBold
                 )
-                .clickable { onAction() }
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-        ) {
-            Text(
-                text = actionLabel,
-                style = LoorveTypography.labelMedium,
-                color = actionColor,
-                fontWeight = FontWeight.SemiBold
-            )
+            }
         }
     }
 }
