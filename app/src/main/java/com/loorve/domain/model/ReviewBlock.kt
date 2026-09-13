@@ -12,6 +12,7 @@ data class ReviewBlock(
     val prepStartDate: Long = 0L,     // 준비 시작일 epoch ms (= 블록 생성일 기본값)
     val dailyCap: Int = 5,            // 하루 최대 복습 노출 수
     val examName: String = "",        // 시험명 (기존 title 이중화 방지용)
+    val customIntervalDays: Int? = null,
     // ──────────────────
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L

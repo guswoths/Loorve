@@ -143,6 +143,12 @@ data class ReviewCreationWindowValidation(
     val message: String
 )
 
+data class CustomReviewIntervalValidation(
+    val isValid: Boolean,
+    val maxIntervalDays: Int?,
+    val message: String? = null
+)
+
 data class OutcomeRescheduleResult(
     val schedules: List<ReviewScheduleEntry>,
     val applied: Boolean,

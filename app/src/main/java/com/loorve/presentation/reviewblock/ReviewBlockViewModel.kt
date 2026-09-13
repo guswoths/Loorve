@@ -32,7 +32,8 @@ class ReviewBlockViewModel @Inject constructor(
         uid: String,
         examName: String,
         examDateMillis: Long,
-        cycleOption: Int
+        cycleOption: Int,
+        customIntervalDays: Int? = null
     ) {
         if (_uiState.value is ReviewBlockUiState.Loading) return
 
@@ -44,7 +45,8 @@ class ReviewBlockViewModel @Inject constructor(
                     uid = uid,
                     examName = examName,
                     examDateMillis = examDateMillis,
-                    cycleOption = cycleOption
+                    cycleOption = cycleOption,
+                    customIntervalDays = customIntervalDays
                 )
             ).onSuccess {
                 _uiState.value = ReviewBlockUiState.Success

@@ -47,6 +47,55 @@ object ReviewSchedulingEngine {
         return ReviewCreationWindowValidation(valid, availableReviewDays, message)
     }
 
+    fun validateCustomReviewInterval(
+        intervalDays: Int?,
+        creationDate: LocalDate,
+        examDate: LocalDate
+    ): CustomReviewIntervalValidation {
+        val daysRemaining = ChronoUnit.DAYS.between(creationDate, examDate)
+        val maxInterval = (daysRemaining / 2L).toInt().takeIf { it > 0 }
+        if (intervalDays == null || intervalDays <= 0) {
+            return CustomReviewIntervalValidation(
+                isValid = false,
+                maxIntervalDays = maxInterval,
+                message = "복습 간격은 1 이상의 정수로 입력해주세요."
+            )
+        }
+        if (maxInterval == null) {
+            return CustomReviewIntervalValidation(
+                isValid = false,
+                maxIntervalDays = null,
+                message = "시험일까지 두 번의 복습 일정을 만들 수 있는 기간이 부족합니다."
+            )
+        }
+        if (intervalDays > maxInterval) {
+            return CustomReviewIntervalValidation(
+                isValid = false,
+                maxIntervalDays = maxInterval,
+                message = "복습 간격은 최대 ${maxInterval}일까지 설정할 수 있습니다."
+            )
+        }
+        return CustomReviewIntervalValidation(true, maxInterval)
+    }
+
+    fun generateCustomReviewDates(
+        creationDate: LocalDate,
+        examDate: LocalDate,
+        intervalDays: Int
+    ): List<LocalDate> {
+        val validation = validateCustomReviewInterval(intervalDays, creationDate, examDate)
+        require(validation.isValid) { validation.message ?: "복습 간격을 확인해주세요." }
+        val repeatedDates = generateSequence(intervalDays.toLong()) { previous ->
+            (previous + intervalDays).takeIf {
+                it < ChronoUnit.DAYS.between(creationDate, examDate)
+            }
+        }.map { creationDate.plusDays(it) }.toList()
+        return (repeatedDates + examDate.minusDays(1))
+            .filter { it.isAfter(creationDate) && it.isBefore(examDate) }
+            .distinct()
+            .sorted()
+    }
+
     fun lastReviewDate(
         examDate: LocalDate,
         finalReviewBufferDays: Int

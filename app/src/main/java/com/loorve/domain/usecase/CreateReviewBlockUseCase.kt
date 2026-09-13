@@ -15,7 +15,8 @@ data class CreateReviewBlockRequest(
     val uid: String,
     val examName: String,
     val examDateMillis: Long,
-    val cycleOption: Int
+    val cycleOption: Int,
+    val customIntervalDays: Int? = null
 )
 
 class CreateReviewBlockUseCase @Inject constructor(
@@ -44,6 +45,16 @@ class CreateReviewBlockUseCase @Inject constructor(
             require(creationWindow.isValid) {
                 creationWindow.message
             }
+            val customInterval = if (request.cycleOption == 1) {
+                ReviewSchedulingEngine.validateCustomReviewInterval(
+                    request.customIntervalDays,
+                    today,
+                    examDate
+                )
+            } else null
+            require(customInterval == null || customInterval.isValid) {
+                customInterval?.message ?: "복습 간격을 확인해주세요."
+            }
 
             val blockId = UUID.randomUUID().toString()
             val now = System.currentTimeMillis()
@@ -68,7 +79,8 @@ class CreateReviewBlockUseCase @Inject constructor(
             val reviewDates = createReviewDates(
                 today = today,
                 examDate = examDate,
-                cycleOption = request.cycleOption
+                cycleOption = request.cycleOption,
+                customIntervalDays = request.customIntervalDays
             )
 
             val batch = firestore.batch()
@@ -87,6 +99,7 @@ class CreateReviewBlockUseCase @Inject constructor(
                     "prepStartDate" to prepStartDateEpochMs,
                     "examName" to request.examName.trim(),
                     "dailyCap" to 5,
+                    "customIntervalDays" to request.customIntervalDays,
                     // ─────────────────────────────
                     "createdAt" to now,
                     "updatedAt" to now
@@ -124,10 +137,16 @@ class CreateReviewBlockUseCase @Inject constructor(
     private fun createReviewDates(
         today: LocalDate,
         examDate: LocalDate,
-        cycleOption: Int
+        cycleOption: Int,
+        customIntervalDays: Int?
     ): List<LocalDate> {
-        val standardIntervals = when (cycleOption) {
-            1 -> listOf(1L, 3L, 7L)
+        if (cycleOption == 1) {
+            val interval = customIntervalDays
+                ?: error("직접 설정 복습 간격이 필요합니다.")
+            return ReviewSchedulingEngine.generateCustomReviewDates(today, examDate, interval)
+        }
+
+        val standardIntervals: List<Long> = when (cycleOption) {
             else -> listOf(1L, 3L, 7L, 14L, 30L)
         }
 

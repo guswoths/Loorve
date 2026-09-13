@@ -41,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -51,8 +52,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.presentation.reviewblock.ReviewBlockUiState
 import com.loorve.presentation.reviewblock.ReviewBlockViewModel
+import com.loorve.domain.review.ReviewSchedulingEngine
 import com.loorve.ui.component.BannerAdView
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
@@ -67,7 +70,9 @@ fun AddReviewBlockScreen(
     val currentUid = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid }
     var examName by remember { mutableStateOf("") }
     var examDateMillis by remember { mutableStateOf<Long?>(null) }
-    var selectedCycleOption by remember { mutableStateOf(0) }
+    var selectedCycleOption by rememberSaveable { mutableStateOf(0) }
+    var customIntervalText by rememberSaveable { mutableStateOf("") }
+    var appliedCustomIntervalDays by rememberSaveable { mutableStateOf<Int?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -169,7 +174,8 @@ fun AddReviewBlockScreen(
                                     uid = uid,
                                     examName = examName.trim(),
                                     examDateMillis = safeExamDateMillis,
-                                    cycleOption = selectedCycleOption
+                                    cycleOption = selectedCycleOption,
+                                    customIntervalDays = appliedCustomIntervalDays
                                 )
                             }
                         }
@@ -289,6 +295,61 @@ fun AddReviewBlockScreen(
                         Text(text = "1일 · 3일 · 7일 · 14일 · 30일 자동 배치",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            if (selectedCycleOption == 1) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = customIntervalText,
+                        onValueChange = { value ->
+                            if (value.isEmpty() || value.all(Char::isDigit)) {
+                                customIntervalText = value
+                                appliedCustomIntervalDays = null
+                            }
+                        },
+                        label = { Text("복습 간격 (일)") },
+                        placeholder = { Text("예: 5") },
+                        supportingText = {
+                            Text("1 이상의 정수로 입력하세요. 시험일까지 두 번의 복습 일정이 필요합니다.")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = !isLoading,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                        )
+                    )
+                    TextButton(
+                        onClick = {
+                            val interval = customIntervalText.toIntOrNull()
+                            val examDate = examDateMillis?.let {
+                                Instant.ofEpochMilli(it).atZone(ZoneId.of("Asia/Seoul")).toLocalDate()
+                            }
+                            if (examDate == null) {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("시험 종료일을 먼저 선택해주세요.")
+                                }
+                            } else {
+                                val validation = ReviewSchedulingEngine.validateCustomReviewInterval(
+                                    interval,
+                                    LocalDate.now(ZoneId.of("Asia/Seoul")),
+                                    examDate
+                                )
+                                if (validation.isValid) {
+                                    appliedCustomIntervalDays = interval
+                                } else {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            validation.message ?: "복습 간격을 확인해주세요."
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !isLoading
+                    ) {
+                        Text("복습 간격 적용")
                     }
                 }
             }

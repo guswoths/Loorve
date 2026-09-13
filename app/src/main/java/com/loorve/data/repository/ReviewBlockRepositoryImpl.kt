@@ -38,6 +38,7 @@ class ReviewBlockRepositoryImpl @Inject constructor(
         prepStartDate = (data["prepStartDate"] as? Number)?.toLong() ?: 0L,
         dailyCap = (data["dailyCap"] as? Number)?.toInt() ?: 5,
         examName = data["examName"] as? String ?: "",
+        customIntervalDays = (data["customIntervalDays"] as? Number)?.toInt(),
         createdAt = (data["createdAt"] as? Number)?.toLong() ?: 0L,
         updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L
     )
@@ -61,6 +62,7 @@ class ReviewBlockRepositoryImpl @Inject constructor(
                 "prepStartDate" to reviewBlock.prepStartDate,
                 "dailyCap" to reviewBlock.dailyCap,
                 "examName" to reviewBlock.examName,
+                "customIntervalDays" to reviewBlock.customIntervalDays,
                 "createdAt" to reviewBlock.createdAt,
                 "updatedAt" to reviewBlock.updatedAt
             )
