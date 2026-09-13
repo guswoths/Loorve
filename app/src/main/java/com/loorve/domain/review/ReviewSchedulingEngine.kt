@@ -72,7 +72,8 @@ object ReviewSchedulingEngine {
             return CustomReviewIntervalValidation(
                 isValid = false,
                 maxIntervalDays = maxInterval,
-                message = "복습 간격은 최대 ${maxInterval}일까지 설정할 수 있습니다."
+                message = "시험일 기준 최소 2회의 복습이 필요하므로: " +
+                    "현재 복습간격은 최대 ${maxInterval}일까지 설정 가능합니다."
             )
         }
         val generatedDates = generateCustomReviewDatesUnchecked(

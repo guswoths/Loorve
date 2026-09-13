@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -115,6 +116,7 @@ fun AddReviewBlockScreen(
                 TextButton(
                     onClick = {
                         examDateMillis = datePickerState.selectedDateMillis
+                        appliedCustomIntervalDays = null
                         showDatePicker = false
                     }
                 ) { Text("확인") }
@@ -166,6 +168,11 @@ fun AddReviewBlockScreen(
                             examDateMillis == null -> {
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar("시험 종료일을 선택해주세요.")
+                                }
+                            }
+                            selectedCycleOption == 1 && appliedCustomIntervalDays == null -> {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("복습간격적용을 해주세요")
                                 }
                             }
                             else -> {
@@ -362,6 +369,9 @@ fun AddReviewBlockScreen(
                                 )
                                 if (validation.isValid) {
                                     appliedCustomIntervalDays = interval
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("복습 간격이 적용되었습니다.")
+                                    }
                                 } else {
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
@@ -373,7 +383,16 @@ fun AddReviewBlockScreen(
                         },
                         enabled = !isLoading
                     ) {
-                        Text("복습 간격 적용")
+                        if (appliedCustomIntervalDays != null) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "적용됨"
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("적용됨")
+                        } else {
+                            Text("복습 간격 적용")
+                        }
                     }
                 }
             }

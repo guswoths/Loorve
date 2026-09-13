@@ -248,6 +248,10 @@ class ReviewSchedulingEngineTest {
 
         assertFalse(result.isValid)
         assertEquals(15, result.maxIntervalDays)
+        assertEquals(
+            "시험일 기준 최소 2회의 복습이 필요하므로: 현재 복습간격은 최대 15일까지 설정 가능합니다.",
+            result.message
+        )
     }
 
     @Test
