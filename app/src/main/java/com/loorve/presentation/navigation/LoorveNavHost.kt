@@ -84,7 +84,6 @@ import com.loorve.ui.theme.Primary
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import com.loorve.presentation.reviewblock.ReviewBlockDetailScreen
-import com.loorve.presentation.review.TodayReviewsScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -98,7 +97,6 @@ sealed class Screen(val route: String) {
     }
 
     object Calendar : Screen("calendar")
-    object TodayReviews : Screen("today_reviews")
     object AddReviewBlock : Screen("add_review_block")
     object NotificationTimeSetting : Screen("notification_time_setting")
     object MyPage : Screen("my_page")
@@ -394,7 +392,18 @@ fun LoorveNavHost(
 
                             NavigationBarItem(
                                 selected = isSelected,
-                                onClick = { selectedTabIndex = item.index },
+                                onClick = {
+                                    if (item.index == 1) {
+                                        selectedTabIndex = item.index
+                                        if (navController.currentDestination?.route != Screen.Calendar.route) {
+                                            navController.navigate(Screen.Calendar.route) {
+                                                launchSingleTop = true
+                                            }
+                                        }
+                                    } else {
+                                        selectedTabIndex = item.index
+                                    }
+                                },
                                 icon = {
                                     Row(
                                         modifier = Modifier
@@ -452,10 +461,6 @@ fun LoorveNavHost(
                             }
                         )
 
-                        1 -> TodayReviewsScreen(
-                            onOpenCalendar = { navController.navigate(Screen.Calendar.route) }
-                        )
-
                         2 -> {
                             MyPageScreen(
                                 onBack = {
@@ -504,12 +509,6 @@ fun LoorveNavHost(
                 onNavigateToReviewBlockDetail = { blockId ->
                     navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId))
                 }
-            )
-        }
-
-        composable(Screen.TodayReviews.route) {
-            TodayReviewsScreen(
-                onOpenCalendar = { navController.navigate(Screen.Calendar.route) }
             )
         }
 
