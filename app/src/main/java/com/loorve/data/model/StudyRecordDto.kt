@@ -2,6 +2,8 @@ package com.loorve.data.model
 
 import com.google.firebase.Timestamp
 import com.loorve.domain.model.StudyRecord
+import com.loorve.domain.review.ReviewDifficulty
+import com.loorve.domain.review.ReviewImportance
 
 data class StudyRecordDto(
     val id: String = "",
@@ -23,6 +25,11 @@ data class StudyRecordDto(
     val isAtRisk: Boolean = false,
     val createdAt: Timestamp? = null,
     val updatedAt: Timestamp? = null
+    ,val difficulty: String = "MEDIUM"
+    ,val importance: String = "NORMAL"
+    ,val initialMastery: Int? = null
+    ,val estimatedReviewMinutes: Int = 15
+    ,val optionalMinReviewCount: Int? = null
 ) {
     fun toDomain(): StudyRecord = StudyRecord(
         id = id,
@@ -43,6 +50,11 @@ data class StudyRecordDto(
         isAtRisk = isAtRisk,
         createdAt = createdAt?.toDate()?.time ?: 0L,
         updatedAt = updatedAt?.toDate()?.time ?: 0L
+        ,difficulty = runCatching { ReviewDifficulty.valueOf(difficulty) }.getOrDefault(ReviewDifficulty.MEDIUM)
+        ,importance = runCatching { ReviewImportance.valueOf(importance) }.getOrDefault(ReviewImportance.NORMAL)
+        ,initialMastery = initialMastery
+        ,estimatedReviewMinutes = estimatedReviewMinutes
+        ,optionalMinReviewCount = optionalMinReviewCount
     )
 }
 
@@ -62,6 +74,11 @@ fun StudyRecord.toDto(): StudyRecordDto = StudyRecordDto(
     stability = stability,
     plannedReviewCount = plannedReviewCount,
     completedReviewCount = completedReviewCount,
-    isAtRisk = isAtRisk
+    isAtRisk = isAtRisk,
+    difficulty = difficulty.name,
+    importance = importance.name,
+    initialMastery = initialMastery,
+    estimatedReviewMinutes = estimatedReviewMinutes,
+    optionalMinReviewCount = optionalMinReviewCount
     // createdAt/updatedAt: Firestore에서 FieldValue.serverTimestamp()
 )

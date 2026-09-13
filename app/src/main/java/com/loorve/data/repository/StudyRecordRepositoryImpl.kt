@@ -51,6 +51,11 @@ class StudyRecordRepositoryImpl @Inject constructor(
             "plannedReviewCount" to dto.plannedReviewCount,
             "completedReviewCount" to dto.completedReviewCount,
             "isAtRisk" to dto.isAtRisk,
+            "difficulty" to dto.difficulty,
+            "importance" to dto.importance,
+            "initialMastery" to dto.initialMastery,
+            "estimatedReviewMinutes" to dto.estimatedReviewMinutes,
+            "optionalMinReviewCount" to dto.optionalMinReviewCount,
             "createdAt" to if (record.id.isBlank()) FieldValue.serverTimestamp()
             else FieldValue.serverTimestamp(),
             "updatedAt" to FieldValue.serverTimestamp()
@@ -92,6 +97,11 @@ class StudyRecordRepositoryImpl @Inject constructor(
                     "stability" to record.stability,
                     "completedReviewCount" to record.completedReviewCount,
                     "isAtRisk" to record.isAtRisk,
+                    "difficulty" to record.difficulty.name,
+                    "importance" to record.importance.name,
+                    "initialMastery" to record.initialMastery,
+                    "estimatedReviewMinutes" to record.estimatedReviewMinutes,
+                    "optionalMinReviewCount" to record.optionalMinReviewCount,
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
             ).await()

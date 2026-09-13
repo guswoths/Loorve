@@ -20,6 +20,16 @@ class AddExamUseCase @Inject constructor(
                 IllegalArgumentException("학습 종료일은 시험일보다 이전이어야 합니다.")
             )
         }
+        if (exam.finalReviewBufferDays < 0) {
+            return Result.failure(
+                IllegalArgumentException("시험 전 버퍼 일수는 0 이상이어야 합니다.")
+            )
+        }
+        if (exam.maxDailyReviewMinutes != null && exam.maxDailyReviewMinutes <= 0) {
+            return Result.failure(
+                IllegalArgumentException("하루 최대 복습 시간은 양수여야 합니다.")
+            )
+        }
         return try {
             examRepository.addExam(exam)
         } catch (e: Exception) {

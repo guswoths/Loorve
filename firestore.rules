@@ -19,7 +19,10 @@ service cloud.firestore {
       let data = request.resource.data;
       return data.uid == request.auth.uid
           && data.reviewDate is number
-          && data.status in ['PENDING','COMPLETED','OVERDUE','FINAL_URGENT_REVIEW'];
+          && data.status in [
+            'PENDING','COMPLETED','OVERDUE','FINAL_URGENT_REVIEW',
+            'CRAM_MODE_REQUIRED','OVERLOADED_UNRESOLVED'
+          ];
     }
 
     // ✅ 신규 추가: progress 유효성 검사 함수
@@ -49,7 +52,9 @@ service cloud.firestore {
       // 학습기록 (기존)
       match /studyRecords/{recordId} {
         allow read: if isOwner(uid);
-        allow create: if isOwner(uid) && isValidStudyRecord();
+        allow create: if isOwner(uid)
+            && isValidStudyRecord()
+            && get(/databases/$(database)/documents/exams/$(request.resource.data.examId)).data.createdBy == uid;
         allow update: if isOwner(uid)
             && request.resource.data.uid == resource.data.uid;
         allow delete: if isOwner(uid);
@@ -58,7 +63,9 @@ service cloud.firestore {
       // 복습 일정 항목 (기존)
       match /reviewScheduleItems/{itemId} {
         allow read: if isOwner(uid);
-        allow create: if isOwner(uid) && isValidScheduleItem();
+        allow create: if isOwner(uid)
+            && isValidScheduleItem()
+            && getAfter(/databases/$(database)/documents/users/$(uid)/studyRecords/$(request.resource.data.studyRecordId)).data.uid == uid;
         allow update: if isOwner(uid)
             && request.resource.data.uid == resource.data.uid
             && (resource.data.status == 'COMPLETED'
@@ -84,6 +91,24 @@ service cloud.firestore {
             && request.resource.data.uid == resource.data.uid; // uid 변경 불가
         allow delete: if isOwner(uid);
       }
+
+      match /reviewNotificationOutbox/{eventId} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid)
+            && request.resource.data.uid == uid
+            && request.resource.data.reviewId is string
+            && request.resource.data.scheduledDate is string;
+        allow update: if isOwner(uid)
+            && request.resource.data.uid == resource.data.uid;
+      }
+    }
+
+    match /exams/{examId} {
+      allow read: if isOwner(resource.data.createdBy);
+      allow create: if isOwner(request.resource.data.createdBy);
+      allow update: if isOwner(resource.data.createdBy)
+          && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isOwner(resource.data.createdBy);
     }
   }
 }

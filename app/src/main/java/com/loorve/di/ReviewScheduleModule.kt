@@ -3,6 +3,8 @@ package com.loorve.di
 
 import com.loorve.data.repository.ReviewScheduleRepositoryImpl
 import com.loorve.domain.repository.ReviewScheduleRepository
+import com.loorve.data.notification.AlarmReviewNotificationAdapter
+import com.loorve.domain.notification.ReviewNotificationAdapter
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -18,4 +20,10 @@ abstract class ReviewScheduleModule {
     abstract fun bindReviewScheduleRepository(
         impl: ReviewScheduleRepositoryImpl
     ): ReviewScheduleRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindReviewNotificationAdapter(
+        impl: AlarmReviewNotificationAdapter
+    ): ReviewNotificationAdapter
 }

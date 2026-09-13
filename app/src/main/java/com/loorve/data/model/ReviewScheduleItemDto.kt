@@ -4,6 +4,7 @@ import com.google.firebase.Timestamp
 import com.loorve.domain.model.CompletionResult
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
+import com.loorve.domain.review.ReviewPlanStatus
 
 data class ReviewScheduleItemDto(
     val id: String = "",
@@ -25,6 +26,13 @@ data class ReviewScheduleItemDto(
     val customAlarmMinute: Int? = null,
     val createdAt: Timestamp? = null,
     val updatedAt: Timestamp? = null
+    ,val planStatus: String = "SCHEDULED"
+    ,val priorityScore: Double = 0.0
+    ,val estimatedReviewMinutes: Int = 15
+    ,val recommendedMethod: String = ""
+    ,val isFinalReview: Boolean = false
+    ,val rescheduleReason: String? = null
+    ,val outcome: String? = null
 ) {
     fun toDomain(): ReviewScheduleItem = ReviewScheduleItem(
         id = id, studyRecordId = studyRecordId, blockId = blockId,
@@ -46,5 +54,12 @@ data class ReviewScheduleItemDto(
         },
         createdAt = createdAt?.toDate()?.time ?: 0L,
         updatedAt = updatedAt?.toDate()?.time ?: 0L
+        ,planStatus = runCatching { ReviewPlanStatus.valueOf(planStatus) }.getOrDefault(ReviewPlanStatus.SCHEDULED)
+        ,priorityScore = priorityScore
+        ,estimatedReviewMinutes = estimatedReviewMinutes
+        ,recommendedMethod = recommendedMethod
+        ,isFinalReview = isFinalReview
+        ,rescheduleReason = rescheduleReason
+        ,outcome = outcome
     )
 }

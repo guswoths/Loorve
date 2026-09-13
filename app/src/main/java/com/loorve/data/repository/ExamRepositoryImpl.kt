@@ -31,7 +31,15 @@ class ExamRepositoryImpl @Inject constructor(
     override suspend fun addExam(exam: Exam): Result<Unit> = runCatching {
         val uid = requireAuthFresh()
         val examWithOwner = exam.copy(createdBy = uid)
-        examsCollection.add(examWithOwner).await()
+        if (exam.id.isBlank()) {
+            examsCollection.add(examWithOwner).await()
+        } else {
+            val ref = examsCollection.document(exam.id)
+            val existing = ref.get().await()
+            require(existing.exists()) { "시험을 찾을 수 없습니다." }
+            require(existing.getString("createdBy") == uid) { "본인의 시험만 수정할 수 있습니다." }
+            ref.set(examWithOwner.copy(id = exam.id)).await()
+        }
         Unit
     }
 
@@ -69,6 +77,10 @@ class ExamRepositoryImpl @Inject constructor(
                         close(NoSuchElementException("Exam $examId not found"))
                         return@addSnapshotListener
                     }
+                if (exam.createdBy != firebaseAuth.currentUser?.uid) {
+                    close(SecurityException("본인의 시험만 조회할 수 있습니다."))
+                    return@addSnapshotListener
+                }
                 trySend(exam)
             }
         awaitClose { listener.remove() }

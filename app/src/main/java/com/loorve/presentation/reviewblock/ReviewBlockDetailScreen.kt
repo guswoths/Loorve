@@ -649,6 +649,8 @@ fun ReviewRecordMiniCard(
                                     ReviewStatus.COMPLETED -> "완료"
                                     ReviewStatus.OVERDUE -> "지연"
                                     ReviewStatus.FINAL_URGENT_REVIEW -> "최종"
+                                    ReviewStatus.CRAM_MODE_REQUIRED -> "압축 필요"
+                                    ReviewStatus.OVERLOADED_UNRESOLVED -> "과부하"
                                 },
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 style = LoorveTypography.labelSmall,

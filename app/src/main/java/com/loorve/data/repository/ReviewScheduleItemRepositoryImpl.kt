@@ -94,6 +94,7 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
         item: ReviewScheduleItem
     ): Result<Unit> = runCatching {
         validateAuth(uid)
+        require(item.uid == uid) { "본인의 일정만 수정할 수 있습니다." }
         schedulesRef(uid).document(item.id)
             .update(buildItemMap(item) + mapOf("updatedAt" to FieldValue.serverTimestamp()))
             .await()
@@ -221,6 +222,13 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
         "completedAt" to item.completedAt,
         "customAlarmHour" to item.customAlarmTime?.first,
         "customAlarmMinute" to item.customAlarmTime?.second,
+        "planStatus" to item.planStatus.name,
+        "priorityScore" to item.priorityScore,
+        "estimatedReviewMinutes" to item.estimatedReviewMinutes,
+        "recommendedMethod" to item.recommendedMethod,
+        "isFinalReview" to item.isFinalReview,
+        "rescheduleReason" to item.rescheduleReason,
+        "outcome" to item.outcome,
         "createdAt" to FieldValue.serverTimestamp(),
         "updatedAt" to FieldValue.serverTimestamp()
     )

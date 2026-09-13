@@ -2,8 +2,9 @@ package com.loorve.presentation.exam
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.loorve.domain.model.Exam
-import com.loorve.domain.usecase.AddExamUseCase
+import com.google.firebase.auth.FirebaseAuth
+import com.loorve.domain.usecase.SaveExamRequest
+import com.loorve.domain.usecase.SaveExamWithSchedulingUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +27,11 @@ data class ExamSettingUiState(
     val dDayText: String = "",
     val studyEndDateError: String? = null, // 추가: 유효성 오류 메시지
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val canSaveExamDate: Boolean = true,
+    val helperMessages: List<String> = emptyList(),
+    val recommendedEarliestExamDate: LocalDate? = null,
+    val warnings: List<String> = emptyList()
 )
 
 sealed class ExamSettingEvent {
@@ -35,7 +40,8 @@ sealed class ExamSettingEvent {
 
 @HiltViewModel
 class ExamSettingViewModel @Inject constructor(
-    private val addExamUseCase: AddExamUseCase
+    private val firebaseAuth: FirebaseAuth,
+    private val saveExamUseCase: SaveExamWithSchedulingUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExamSettingUiState())
@@ -80,18 +86,47 @@ class ExamSettingViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val result = addExamUseCase(
-                    Exam(
-                        id           = "",
-                        subjectName  = state.subjectName,
-                        examDate     = state.examDate,
-                        studyEndDate = state.studyEndDate   // 추가
+                val uid = firebaseAuth.currentUser?.uid
+                if (uid.isNullOrBlank()) {
+                    _uiState.update {
+                        it.copy(isLoading = false, errorMessage = "로그인 정보를 찾을 수 없습니다.")
+                    }
+                    return@launch
+                }
+                val result = saveExamUseCase(
+                    uid = uid,
+                    request = SaveExamRequest(
+                        examName = state.subjectName,
+                        examDate = Instant.ofEpochMilli(state.examDate)
+                            .atZone(ZoneId.of("Asia/Seoul")).toLocalDate(),
+                        finalReviewBufferDays = 1
                     )
                 )
                 result.fold(
-                    onSuccess = {
-                        _uiState.update { it.copy(isLoading = false) }
-                        _events.emit(ExamSettingEvent.SaveSuccess)
+                    onSuccess = { saveResult ->
+                        if (!saveResult.canSaveExamDate) {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    canSaveExamDate = false,
+                                    errorMessage = saveResult.primaryMessage,
+                                    helperMessages = saveResult.helperMessages,
+                                    recommendedEarliestExamDate = saveResult.recommendedEarliestExamDate,
+                                    warnings = saveResult.warnings
+                                )
+                            }
+                        } else {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    canSaveExamDate = true,
+                                    helperMessages = saveResult.helperMessages,
+                                    recommendedEarliestExamDate = saveResult.recommendedEarliestExamDate,
+                                    warnings = saveResult.warnings
+                                )
+                            }
+                            _events.emit(ExamSettingEvent.SaveSuccess)
+                        }
                     },
                     onFailure = { throwable ->
                         _uiState.update {

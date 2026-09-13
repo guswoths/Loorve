@@ -14,8 +14,10 @@ import com.loorve.domain.review.alarmTriggerAtMillis
 import com.loorve.domain.review.toLocalDate
 import com.loorve.data.local.NotificationTimePreferences
 import com.loorve.data.notification.ReviewAlarmScheduler
-import com.loorve.domain.usecase.SaveStudyProgressRequest
-import com.loorve.domain.usecase.SaveStudyProgressUseCase
+import com.loorve.domain.usecase.CreateStudyRecordRequest
+import com.loorve.domain.usecase.CreateStudyRecordWithReviewSchedulesUseCase
+import com.loorve.domain.usecase.CompleteReviewWithReschedulingUseCase
+import com.loorve.domain.usecase.ReviewCompletionOutcome
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,7 +52,8 @@ data class ReviewBlockDetailUiState(
 
 @HiltViewModel
 class ReviewBlockDetailViewModel @Inject constructor(
-    private val saveStudyProgressUseCase: SaveStudyProgressUseCase,
+    private val createStudyRecordUseCase: CreateStudyRecordWithReviewSchedulesUseCase,
+    private val completeReviewUseCase: CompleteReviewWithReschedulingUseCase,
     private val studyRecordRepository: StudyRecordRepository,
     private val scheduleRepository: ReviewScheduleItemRepository,
     private val reviewBlockRepository: ReviewBlockRepository,
@@ -216,17 +219,15 @@ class ReviewBlockDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
-            saveStudyProgressUseCase(
-                SaveStudyProgressRequest(
-                    uid = uid,
-                    blockId = blockId,
+            createStudyRecordUseCase(
+                uid = uid,
+                request = CreateStudyRecordRequest(
                     examId = examId,
                     title = title,
                     content = content,
-                    learningDateMillis = learningDateMillis,
-                    examDateMillis = examDateMillis,
-                    prepStartDateMillis = prepStartDateMillis,
-                    dailyCap = dailyCap
+                    studiedAt = learningDateMillis.toLocalDate(),
+                    blockId = blockId,
+                    estimatedReviewMinutes = 15
                 )
             ).onSuccess {
                 loadBlockData(uid, blockId)
@@ -248,37 +249,22 @@ class ReviewBlockDetailViewModel @Inject constructor(
         examDateMillis: Long
     ) {
         viewModelScope.launch {
-            val today = LocalDate.now()
-            val examDate = examDateMillis.toLocalDate()
-
-            val completeResult = ReviewScheduler.completeReview(
-                item = item, result = result,
-                today = today, examDate = examDate
-            )
-
-            scheduleRepository.updateScheduleItem(uid, completeResult.updatedItem)
-
-            completeResult.nextReviewDate?.let { nextDate ->
-                val nextItem = item.copy(
-                    id = "${item.studyRecordId}_r${item.reviewOrder + 1}",
-                    reviewDate = nextDate.atStartOfDay(
-                        java.time.ZoneId.of("Asia/Seoul")
-                    ).toInstant().toEpochMilli(),
-                    originalReviewDate = nextDate.atStartOfDay(
-                        java.time.ZoneId.of("Asia/Seoul")
-                    ).toInstant().toEpochMilli(),
-                    reviewOrder = item.reviewOrder + 1,
-                    status = com.loorve.domain.model.ReviewStatus.PENDING,
-                    previousGapDays = completeResult.nextGapDays,
-                    overdueDays = 0L,
-                    completionResult = null,
-                    completedAt = null
+            completeReviewUseCase(
+                uid = uid,
+                reviewId = item.id,
+                outcome = if (result == CompletionResult.REMEMBERED) {
+                    ReviewCompletionOutcome.SUCCESS
+                } else {
+                    ReviewCompletionOutcome.FAILED
+                }
+            ).onSuccess {
+                loadBlockData(uid, item.blockId)
+                calendarRefreshBus.notifyRefresh()
+            }.onFailure { error ->
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = error.message ?: "복습 결과 저장에 실패했습니다."
                 )
-                scheduleRepository.saveSchedules(uid, item.studyRecordId, listOf(nextItem))
             }
-
-            loadBlockData(uid, item.blockId)
-            calendarRefreshBus.notifyRefresh()
         }
     }
 

@@ -1,5 +1,8 @@
 package com.loorve.domain.model
 
+import com.loorve.domain.review.ReviewDifficulty
+import com.loorve.domain.review.ReviewImportance
+
 data class StudyRecord(
     val id: String = "",
     val uid: String = "",
@@ -18,5 +21,10 @@ data class StudyRecord(
     val completedReviewCount: Int = 0,
     val isAtRisk: Boolean = false,
     val createdAt: Long = 0L,
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    val difficulty: ReviewDifficulty = ReviewDifficulty.MEDIUM,
+    val importance: ReviewImportance = ReviewImportance.NORMAL,
+    val initialMastery: Int? = null,
+    val estimatedReviewMinutes: Int = 15,
+    val optionalMinReviewCount: Int? = null
 )

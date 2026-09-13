@@ -1,6 +1,11 @@
 package com.loorve.domain.model
 
-enum class ReviewStatus { PENDING, COMPLETED, OVERDUE, FINAL_URGENT_REVIEW }
+import com.loorve.domain.review.ReviewPlanStatus
+
+enum class ReviewStatus {
+    PENDING, COMPLETED, OVERDUE, FINAL_URGENT_REVIEW,
+    CRAM_MODE_REQUIRED, OVERLOADED_UNRESOLVED
+}
 enum class CompletionResult { REMEMBERED, FORGOT }
 
 data class ReviewScheduleItem(
@@ -21,5 +26,12 @@ data class ReviewScheduleItem(
     val updatedAt: Long = 0L,
     val completionResult: CompletionResult? = null,
     val completedAt: Long? = null,
-    val customAlarmTime: Pair<Int, Int>? = null
+    val customAlarmTime: Pair<Int, Int>? = null,
+    val planStatus: ReviewPlanStatus = ReviewPlanStatus.SCHEDULED,
+    val priorityScore: Double = 0.0,
+    val estimatedReviewMinutes: Int = 15,
+    val recommendedMethod: String = "",
+    val isFinalReview: Boolean = false,
+    val rescheduleReason: String? = null,
+    val outcome: String? = null
 )
