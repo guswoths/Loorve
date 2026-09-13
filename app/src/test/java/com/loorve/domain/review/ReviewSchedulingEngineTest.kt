@@ -237,6 +237,48 @@ class ReviewSchedulingEngineTest {
     }
 
     @Test
+    fun `사용자 지정 간격 16일은 30일 기간에서 거부된다`() {
+        val creationDate = LocalDate.of(2026, 9, 14)
+        val examDate = creationDate.plusDays(30)
+        val result = ReviewSchedulingEngine.validateCustomReviewInterval(
+            16,
+            creationDate,
+            examDate
+        )
+
+        assertFalse(result.isValid)
+        assertEquals(15, result.maxIntervalDays)
+    }
+
+    @Test
+    fun `두 번의 복습이 불가능한 기간은 사용자 지정 간격을 거부한다`() {
+        val creationDate = LocalDate.of(2026, 9, 14)
+        val examDate = creationDate.plusDays(2)
+        val result = ReviewSchedulingEngine.validateCustomReviewInterval(
+            1,
+            creationDate,
+            examDate
+        )
+
+        assertFalse(result.isValid)
+        assertTrue(result.message!!.contains("두 번"))
+    }
+
+    @Test
+    fun `사용자 지정 일정은 생성일과 시험일을 포함하지 않는다`() {
+        val creationDate = LocalDate.of(2026, 9, 14)
+        val examDate = creationDate.plusDays(30)
+        val dates = ReviewSchedulingEngine.generateCustomReviewDates(
+            creationDate,
+            examDate,
+            15
+        )
+
+        assertTrue(dates.all { it.isAfter(creationDate) && it.isBefore(examDate) })
+        assertEquals(dates.size, dates.distinct().size)
+    }
+
+    @Test
     fun `생성일 기준 3일의 온전한 달력 날짜가 있어야 유효하다`() {
         val creationDate = LocalDate.of(2026, 9, 14)
 

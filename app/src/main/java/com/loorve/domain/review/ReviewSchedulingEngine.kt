@@ -75,6 +75,18 @@ object ReviewSchedulingEngine {
                 message = "복습 간격은 최대 ${maxInterval}일까지 설정할 수 있습니다."
             )
         }
+        val generatedDates = generateCustomReviewDatesUnchecked(
+            creationDate,
+            examDate,
+            intervalDays
+        )
+        if (generatedDates.distinct().size < 2) {
+            return CustomReviewIntervalValidation(
+                isValid = false,
+                maxIntervalDays = maxInterval,
+                message = "시험일까지 두 번의 고유한 복습 일정을 만들 수 있는 기간이 부족합니다."
+            )
+        }
         return CustomReviewIntervalValidation(true, maxInterval)
     }
 
@@ -85,6 +97,14 @@ object ReviewSchedulingEngine {
     ): List<LocalDate> {
         val validation = validateCustomReviewInterval(intervalDays, creationDate, examDate)
         require(validation.isValid) { validation.message ?: "복습 간격을 확인해주세요." }
+        return generateCustomReviewDatesUnchecked(creationDate, examDate, intervalDays)
+    }
+
+    private fun generateCustomReviewDatesUnchecked(
+        creationDate: LocalDate,
+        examDate: LocalDate,
+        intervalDays: Int
+    ): List<LocalDate> {
         val repeatedDates = generateSequence(intervalDays.toLong()) { previous ->
             (previous + intervalDays).takeIf {
                 it < ChronoUnit.DAYS.between(creationDate, examDate)
