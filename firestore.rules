@@ -13,7 +13,7 @@ service cloud.firestore {
           && data.blockId is string
           && data.learningDate is number
           && data.examDate is number
-          && data.examDate > data.learningDate;
+          && data.examDate >= data.learningDate;
     }
 
     function isValidScheduleItem() {
