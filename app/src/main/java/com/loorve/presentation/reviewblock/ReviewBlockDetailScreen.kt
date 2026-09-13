@@ -30,7 +30,6 @@ import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.model.StudyRecord
-import com.loorve.domain.review.ReviewDifficulty
 import com.loorve.domain.review.ReviewImportance
 import com.loorve.domain.review.ReviewPlanStatus
 import com.loorve.domain.usecase.CreateStudyRecordResult
@@ -285,7 +284,7 @@ fun ReviewBlockDetailScreen(
             // ── 학습 진도 입력 섹션 ──
             item {
                 StudyProgressInputSection(
-                    onSave = { learningDateMillis, title, content, difficulty, importance, estimatedReviewMinutes ->
+                    onSave = { learningDateMillis, title, content, importance ->
                         viewModel.saveProgress(
                             uid = uid,
                             blockId = blockId,
@@ -294,9 +293,7 @@ fun ReviewBlockDetailScreen(
                             content = content,
                             learningDateMillis = learningDateMillis,
                             dailyCap = dailyCap,
-                            difficulty = difficulty,
                             importance = importance,
-                            estimatedReviewMinutes = estimatedReviewMinutes
                         )
                     },
                     isLoading = uiState.isLoading,
@@ -871,9 +868,7 @@ fun StudyProgressInputSection(
         learningDateMillis: Long,
         title: String,
         content: String,
-        difficulty: ReviewDifficulty,
-        importance: ReviewImportance,
-        estimatedReviewMinutes: Int
+        importance: ReviewImportance
     ) -> Unit,
     isLoading: Boolean,
     isSaveEnabled: Boolean = true,
@@ -881,8 +876,6 @@ fun StudyProgressInputSection(
 ) {
     var titleText by remember { mutableStateOf("") }
     var contentText by remember { mutableStateOf("") }
-    var estimatedMinutesText by remember { mutableStateOf("15") }
-    var difficulty by remember { mutableStateOf(ReviewDifficulty.MEDIUM) }
     var importance by remember { mutableStateOf(ReviewImportance.NORMAL) }
 
     val kstZone = remember { ZoneId.of("Asia/Seoul") }
@@ -966,33 +959,6 @@ fun StudyProgressInputSection(
         Spacer(modifier = Modifier.height(10.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = estimatedMinutesText,
-                onValueChange = { if (it.all(Char::isDigit) && it.length <= 4) estimatedMinutesText = it },
-                label = { Text("예상 복습 시간(분)") },
-                singleLine = true,
-                enabled = !isLoading,
-                modifier = Modifier.weight(1f)
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text("난이도", style = MaterialTheme.typography.labelMedium)
-                Row {
-                    FilterChip(
-                        selected = difficulty == ReviewDifficulty.HARD,
-                        onClick = { difficulty = ReviewDifficulty.HARD },
-                        label = { Text("어려움") }
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    FilterChip(
-                        selected = difficulty != ReviewDifficulty.HARD,
-                        onClick = { difficulty = ReviewDifficulty.MEDIUM },
-                        label = { Text("보통") }
-                    )
-                }
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
                 selected = importance == ReviewImportance.HIGH,
                 onClick = { importance = ReviewImportance.HIGH },
@@ -1028,9 +994,7 @@ fun StudyProgressInputSection(
                         selectedDateMillis,
                         titleText.trim(),
                         contentText.trim(),
-                        difficulty,
-                        importance,
-                        estimatedMinutesText.toIntOrNull() ?: 15
+                        importance
                     )
                     titleText = ""
                     contentText = ""

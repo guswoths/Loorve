@@ -135,7 +135,7 @@ private fun TodayReviewCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            Text("${review.item.estimatedReviewMinutes}분 · ${review.item.recommendedMethod.ifBlank { "문제풀이·퀴즈·빈 종이 회상" }}")
+            Text(review.item.recommendedMethod.ifBlank { "문제풀이·퀴즈·빈 종이 회상" })
             review.daysUntilExam?.let { Text("시험까지 ${it}일") }
             Text("상태: ${review.item.planStatus.name}")
             if (showOutcomes) {
