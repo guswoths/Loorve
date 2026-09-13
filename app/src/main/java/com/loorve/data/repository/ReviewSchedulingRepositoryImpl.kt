@@ -2,7 +2,9 @@ package com.loorve.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.FirebaseFirestore
+import android.util.Log
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.StudyRecord
 import com.loorve.domain.notification.ReviewNotificationOutbox
@@ -16,6 +18,10 @@ class ReviewSchedulingRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth
 ) : ReviewSchedulingRepository {
+    companion object {
+        private const val TAG = "ReviewSchedulingRepo"
+    }
+
     private fun requireOwner(uid: String) {
         val currentUid = auth.currentUser?.uid
             ?: throw SecurityException("로그인이 필요합니다.")
@@ -46,8 +52,21 @@ class ReviewSchedulingRepositoryImpl @Inject constructor(
             require(schedule.uid == uid) { "복습 일정 소유자가 현재 사용자와 다릅니다." }
             batch.set(scheduleRef(uid, schedule.id), scheduleMap(schedule))
         }
-        notifications.forEach { batch.set(outboxRef(uid, it.id), outboxMap(it)) }
-        batch.commit().await()
+        notifications.forEach {
+            require(it.uid == uid) { "알림 이벤트 소유자가 현재 사용자와 다릅니다." }
+            batch.set(outboxRef(uid, it.id), outboxMap(it))
+        }
+        try {
+            batch.commit().await()
+        } catch (error: FirebaseFirestoreException) {
+            when (error.code) {
+                FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                    Log.e(TAG, "Progress batch denied: study record, schedules, or outbox rule rejected the write")
+                else ->
+                    Log.e(TAG, "Progress batch failed: ${error.code}")
+            }
+            throw error
+        }
     }
 
     override suspend fun completeReviewAndUpdateSchedules(
