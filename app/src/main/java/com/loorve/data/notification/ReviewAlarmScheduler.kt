@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import com.loorve.util.ExactAlarmPermissionHelper
@@ -27,6 +28,7 @@ import javax.inject.Singleton
 
 private const val ALARM_RECEIVER_CLASS = "com.loorve.receiver.AlarmBroadcastReceiver"
 const val EXTRA_REVIEW_SCHEDULE_ID = "extra_review_schedule_id"
+const val EXTRA_REVIEW_ALARM_TRIGGER_AT_MILLIS = "extra_review_alarm_trigger_at_millis"
 private const val TAG = "ReviewAlarmScheduler"
 
 @Singleton
@@ -48,17 +50,30 @@ class ReviewAlarmScheduler @Inject constructor(
     fun scheduleReviewAlarm(reviewScheduleId: String, triggerAtMillis: Long): ScheduleResult {
         val now = System.currentTimeMillis()
 
-        val adjustedTriggerMillis = if (triggerAtMillis <= now) {
-            Log.w(TAG, "triggerAtMillis($triggerAtMillis) is in the past. Scheduling 1s from now.")
-            now + 1_000L
-        } else {
-            triggerAtMillis
+        if (reviewScheduleId.isBlank()) {
+            Log.e(TAG, "Alarm not scheduled: blank scheduleId, triggerAt=$triggerAtMillis")
+            return ScheduleResult.FAILED
         }
 
-        val pendingIntent = buildPendingIntent(reviewScheduleId) ?: run {
+        if (triggerAtMillis <= now) {
+            Log.w(
+                TAG,
+                "Alarm not scheduled because triggerAt is not in the future: " +
+                    "id=$reviewScheduleId, triggerAt=$triggerAtMillis, now=$now"
+            )
+            return ScheduleResult.FAILED
+        }
+
+        val pendingIntent = buildPendingIntent(reviewScheduleId, triggerAtMillis) ?: run {
             Log.e(TAG, "Failed to build PendingIntent for id=$reviewScheduleId")
             return ScheduleResult.FAILED
         }
+        cancelLegacyAlarm(reviewScheduleId)
+        alarmManager.cancel(pendingIntent)
+        Log.d(
+            TAG,
+            "Replacing existing one-shot alarm: id=$reviewScheduleId, triggerAt=$triggerAtMillis"
+        )
 
         return when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
@@ -66,10 +81,10 @@ class ReviewAlarmScheduler @Inject constructor(
                     // 정확한 알람 예약 (권한 있음)
                     alarmManager.setExactAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
-                        adjustedTriggerMillis,
+                        triggerAtMillis,
                         pendingIntent
                     )
-                    Log.d(TAG, "[EXACT] Alarm scheduled: id=$reviewScheduleId, triggerAt=$adjustedTriggerMillis")
+                    Log.d(TAG, "[EXACT] Alarm scheduled: id=$reviewScheduleId, triggerAt=$triggerAtMillis")
                     ScheduleResult.EXACT
                 } else {
                     /*
@@ -90,10 +105,14 @@ class ReviewAlarmScheduler @Inject constructor(
                      */
                     alarmManager.setAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
-                        adjustedTriggerMillis,
+                        triggerAtMillis,
                         pendingIntent
                     )
-                    Log.w(TAG, "[FALLBACK/INEXACT] SCHEDULE_EXACT_ALARM not granted. id=$reviewScheduleId")
+                    Log.w(
+                        TAG,
+                        "[FALLBACK/INEXACT] Alarm scheduled: " +
+                            "id=$reviewScheduleId, triggerAt=$triggerAtMillis"
+                    )
                     ScheduleResult.FALLBACK_INEXACT
                 }
             }
@@ -101,10 +120,10 @@ class ReviewAlarmScheduler @Inject constructor(
                 // API 30 이하: setExact() 권한 불필요
                 alarmManager.setExact(
                     AlarmManager.RTC_WAKEUP,
-                    adjustedTriggerMillis,
+                    triggerAtMillis,
                     pendingIntent
                 )
-                Log.d(TAG, "[EXACT/LEGACY] Alarm scheduled: id=$reviewScheduleId, triggerAt=$adjustedTriggerMillis")
+                Log.d(TAG, "[EXACT/LEGACY] Alarm scheduled: id=$reviewScheduleId, triggerAt=$triggerAtMillis")
                 ScheduleResult.EXACT
             }
         }
@@ -120,6 +139,7 @@ class ReviewAlarmScheduler @Inject constructor(
         }
         alarmManager.cancel(pendingIntent)
         pendingIntent.cancel()
+        cancelLegacyAlarm(reviewScheduleId)
         Log.d(TAG, "[CANCEL] Alarm cancelled: id=$reviewScheduleId")
     }
 
@@ -136,11 +156,18 @@ class ReviewAlarmScheduler @Inject constructor(
         Log.d(TAG, "[CANCEL_ALL] ${reviewScheduleIds.size}개 알람 취소 완료")
     }
 
-    private fun buildPendingIntent(reviewScheduleId: String): PendingIntent? {
+    private fun buildPendingIntent(
+        reviewScheduleId: String,
+        triggerAtMillis: Long = 0L
+    ): PendingIntent? {
         val intent = try {
             Intent().apply {
                 setClassName(context, ALARM_RECEIVER_CLASS)
                 putExtra(EXTRA_REVIEW_SCHEDULE_ID, reviewScheduleId)
+                putExtra(EXTRA_REVIEW_ALARM_TRIGGER_AT_MILLIS, triggerAtMillis)
+                data = Uri.parse(
+                    "loorve://review-alarm/${Uri.encode(reviewScheduleId, "")}"
+                )
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create Intent: ${e.message}")
@@ -149,10 +176,27 @@ class ReviewAlarmScheduler @Inject constructor(
 
         return PendingIntent.getBroadcast(
             context,
-            reviewScheduleId.hashCode(),
+            0,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+    }
+
+    private fun buildLegacyPendingIntent(reviewScheduleId: String): PendingIntent =
+        PendingIntent.getBroadcast(
+            context,
+            reviewScheduleId.hashCode(),
+            Intent().apply {
+                setClassName(context, ALARM_RECEIVER_CLASS)
+                putExtra(EXTRA_REVIEW_SCHEDULE_ID, reviewScheduleId)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+    private fun cancelLegacyAlarm(reviewScheduleId: String) {
+        val legacyPendingIntent = buildLegacyPendingIntent(reviewScheduleId)
+        alarmManager.cancel(legacyPendingIntent)
+        legacyPendingIntent.cancel()
     }
 
     /**

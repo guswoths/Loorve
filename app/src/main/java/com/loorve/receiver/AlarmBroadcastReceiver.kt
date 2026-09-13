@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.loorve.data.notification.EXTRA_REVIEW_ALARM_TRIGGER_AT_MILLIS
 import com.loorve.data.notification.EXTRA_REVIEW_SCHEDULE_ID
 import com.loorve.util.showReviewNotification
 
@@ -16,7 +17,11 @@ class AlarmBroadcastReceiver : BroadcastReceiver() {
             Log.e(TAG, "EXTRA_REVIEW_SCHEDULE_ID가 없습니다.")
             return
         }
-        Log.d(TAG, "복습 알람 수신: scheduleId=$scheduleId")
+        val triggerAtMillis = intent.getLongExtra(EXTRA_REVIEW_ALARM_TRIGGER_AT_MILLIS, 0L)
+        Log.d(
+            TAG,
+            "복습 알람 수신: scheduleId=$scheduleId, triggerAt=$triggerAtMillis"
+        )
 
         showReviewNotification(
             context = context,
