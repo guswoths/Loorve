@@ -137,6 +137,12 @@ data class RebalanceResult(
     val warningMessage: String? = null
 )
 
+data class ReviewCreationWindowValidation(
+    val isValid: Boolean,
+    val availableReviewDays: Long,
+    val message: String
+)
+
 data class OutcomeRescheduleResult(
     val schedules: List<ReviewScheduleEntry>,
     val applied: Boolean,

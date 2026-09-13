@@ -3,6 +3,7 @@ package com.loorve.domain.usecase
 
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import com.loorve.domain.review.ReviewSchedulingEngine
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -36,8 +37,12 @@ class CreateReviewBlockUseCase @Inject constructor(
                 .atZone(zoneId)
                 .toLocalDate()
 
-            require(!examDate.isBefore(today)) {
-                "시험 종료일은 오늘 이후 날짜를 선택해주세요."
+            val creationWindow = ReviewSchedulingEngine.validateReviewCreationWindow(
+                today,
+                examDate
+            )
+            require(creationWindow.isValid) {
+                creationWindow.message
             }
 
             val blockId = UUID.randomUUID().toString()
@@ -138,6 +143,7 @@ class CreateReviewBlockUseCase @Inject constructor(
                 }
                 today.plusDays(scaledInterval).coerceAtMost(examDate)
             }
+            .filter { it.isAfter(today) && it.isBefore(examDate) }
             .distinct()
             .sorted()
     }

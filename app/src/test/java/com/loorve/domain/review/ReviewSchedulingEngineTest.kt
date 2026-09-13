@@ -190,6 +190,36 @@ class ReviewSchedulingEngineTest {
     }
 
     @Test
+    fun `생성일 기준 3일의 온전한 달력 날짜가 있어야 유효하다`() {
+        val creationDate = LocalDate.of(2026, 9, 14)
+
+        assertTrue(
+            ReviewSchedulingEngine.validateReviewCreationWindow(
+                creationDate,
+                creationDate.plusDays(3)
+            ).isValid
+        )
+        assertFalse(
+            ReviewSchedulingEngine.validateReviewCreationWindow(
+                creationDate,
+                creationDate.plusDays(2)
+            ).isValid
+        )
+        assertFalse(
+            ReviewSchedulingEngine.validateReviewCreationWindow(
+                creationDate,
+                creationDate
+            ).isValid
+        )
+        assertFalse(
+            ReviewSchedulingEngine.validateReviewCreationWindow(
+                creationDate,
+                creationDate.minusDays(1)
+            ).isValid
+        )
+    }
+
+    @Test
     fun `시험까지 이틀이면 가능한 하루만 부분 생성한다`() {
         val studyDate = LocalDate.of(2026, 9, 14)
         val result = ReviewSchedulingEngine.createReviewSchedules(
@@ -218,6 +248,21 @@ class ReviewSchedulingEngineTest {
         )
         assertEquals(ScheduleGenerationOutcome.FULL, result.outcome)
         assertEquals(listOf(1, 2, 3), result.schedules.map { it.reviewIndex })
+    }
+
+    @Test
+    fun `복습 생성 가능일이 3일 미만이면 일정을 만들지 않는다`() {
+        val studyDate = LocalDate.of(2026, 9, 14)
+        val result = ReviewSchedulingEngine.createReviewSchedules(
+            record = SchedulerStudyRecord("blocked", studyDate),
+            exam = SchedulerExam(examDate = studyDate.plusDays(2)),
+            today = studyDate
+        )
+
+        assertTrue(result.schedules.isEmpty())
+        assertTrue(result.warningMessage!!.startsWith("생성불가!"))
+        assertTrue(result.warningMessage!!.contains("최소 3일"))
+        assertEquals(ScheduleGenerationOutcome.NOT_GENERATED, result.outcome)
     }
 
     @Test

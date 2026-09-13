@@ -26,6 +26,27 @@ object ReviewSchedulingEngine {
     const val EXCLUDE_EXAM_DAY = true
     const val ALLOW_DUPLICATE_SAME_DAY = false
 
+    fun validateReviewCreationWindow(
+        creationDate: LocalDate,
+        examDate: LocalDate
+    ): ReviewCreationWindowValidation {
+        val daysUntilExam = ChronoUnit.DAYS.between(creationDate, examDate)
+        val availableReviewDays = (daysUntilExam - 1L).coerceAtLeast(0L)
+        val valid = daysUntilExam >= MIN_REVIEW_DAYS
+        val message = when {
+            examDate.isBefore(creationDate) ->
+                "생성불가! 시험일이 생성일보다 이전입니다. 시험일을 다시 설정해 주세요. " +
+                    "일정 생성에는 생성일과 시험일 사이에 최소 3일의 온전한 달력 날짜가 필요합니다."
+            examDate == creationDate ->
+                "생성불가! 시험일이 생성일과 같습니다. 일정 생성에는 생성일과 시험일 사이에 " +
+                    "최소 3일의 온전한 달력 날짜가 필요합니다."
+            else ->
+                "생성불가! 시험일까지 ${daysUntilExam}일 남았습니다. 일정 생성에는 생성일과 시험일 사이에 " +
+                    "최소 3일의 온전한 달력 날짜가 필요합니다."
+        }
+        return ReviewCreationWindowValidation(valid, availableReviewDays, message)
+    }
+
     fun lastReviewDate(
         examDate: LocalDate,
         finalReviewBufferDays: Int
@@ -150,6 +171,17 @@ object ReviewSchedulingEngine {
         require(config.finalReviewBufferDays >= 0) { "시험 전 버퍼 일수는 0 이상이어야 합니다." }
         require(record.initialMastery == null || record.initialMastery in 1..5) {
             "초기 숙련도는 1에서 5 사이여야 합니다."
+        }
+        val creationWindow = validateReviewCreationWindow(record.studiedAtDate, exam.examDate)
+        if (!creationWindow.isValid) {
+            return emptyResult(
+                record,
+                exam,
+                today,
+                config.finalReviewBufferDays,
+                ReviewPlanStatus.INSUFFICIENT_WINDOW,
+                creationWindow.message
+            )
         }
         if (!exam.examDate.isAfter(record.studiedAtDate)) {
             return emptyResult(

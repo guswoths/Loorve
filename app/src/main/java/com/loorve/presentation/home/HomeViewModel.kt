@@ -13,6 +13,7 @@ import com.loorve.domain.usecase.GetExamsUseCase
 import com.loorve.domain.usecase.GetProgressListUseCase
 import com.loorve.domain.usecase.SaveProgressAndScheduleUseCase
 import com.loorve.domain.repository.ReviewBlockRepository
+import com.loorve.domain.review.ReviewSchedulingEngine
 import com.loorve.domain.repository.ReviewScheduleRepository
 import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.loorve.domain.repository.StudyRecordRepository
@@ -663,6 +664,22 @@ class HomeViewModel @Inject constructor(
             val uid = getUidSafely()
             if (uid.isNullOrBlank()) {
                 _uiState.update { it.copy(saveMessage = "로그인 정보가 없습니다.") }
+                return@launch
+            }
+            val zone = ZoneId.of("Asia/Seoul")
+            val creationDate = LocalDate.now(zone)
+            val examDate = Instant.ofEpochMilli(examDateMillis).atZone(zone).toLocalDate()
+            val creationWindow = ReviewSchedulingEngine.validateReviewCreationWindow(
+                creationDate,
+                examDate
+            )
+            if (!creationWindow.isValid) {
+                _uiState.update {
+                    it.copy(
+                        saveMessage = creationWindow.message,
+                        errorMessage = creationWindow.message
+                    )
+                }
                 return@launch
             }
             _uiState.update { it.copy(isCreatingBlock = true, errorMessage = null) }
