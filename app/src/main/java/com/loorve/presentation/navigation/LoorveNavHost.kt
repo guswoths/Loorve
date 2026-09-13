@@ -443,7 +443,6 @@ fun LoorveNavHost(
                 ) {
                     when (selectedTabIndex) {
                         0 -> HomeScreen(
-                            onNavigateToMyPage = { navController.navigate(Screen.MyPage.route) },
                             onNavigateToExamSetting = { navController.navigate(Screen.ExamSetting.route) },
                             onNavigateToProgressDetail = { progressId ->
                                 navController.navigate(Screen.ProgressDetail.createRoute(progressId))
@@ -470,6 +469,14 @@ fun LoorveNavHost(
                                     selectedTabIndex = 0
                                 },
                                 onNavigateToNotificationTimeSetting = {
+                                    navController.navigate(Screen.NotificationPermission.route) {
+                                        launchSingleTop = true
+                                    }
+                                },
+                                onNavigateToBatteryOptimization = {
+                                    navController.navigate(Screen.BatteryOptimizationGuide.route)
+                                },
+                                onNavigateToNotificationPermission = {
                                     navController.navigate(Screen.NotificationPermission.route) {
                                         launchSingleTop = true
                                     }
@@ -557,6 +564,12 @@ fun LoorveNavHost(
             MyPageScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToNotificationTimeSetting = {
+                    navController.navigate(Screen.NotificationPermission.route)
+                },
+                onNavigateToBatteryOptimization = {
+                    navController.navigate(Screen.BatteryOptimizationGuide.route)
+                },
+                onNavigateToNotificationPermission = {
                     navController.navigate(Screen.NotificationPermission.route)
                 },
                 onSignOut = {

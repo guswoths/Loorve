@@ -7,8 +7,11 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
+import com.loorve.data.local.NotificationTimePreferences
 import com.loorve.util.ExactAlarmPermissionHelper
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,7 +37,9 @@ private const val TAG = "ReviewAlarmScheduler"
 @Singleton
 class ReviewAlarmScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val permissionHelper: ExactAlarmPermissionHelper
+    private val permissionHelper: ExactAlarmPermissionHelper,
+    private val notificationPreferences: NotificationTimePreferences,
+    private val firebaseAuth: FirebaseAuth
 ) {
 
     private val alarmManager: AlarmManager =
@@ -47,8 +52,14 @@ class ReviewAlarmScheduler @Inject constructor(
      * @param triggerAtMillis  알림 발생 시각 (Unix epoch milliseconds)
      * @return ScheduleResult 예약 방식 결과 (UI 레이어에서 권한 요청 흐름 판단에 활용)
      */
-    fun scheduleReviewAlarm(reviewScheduleId: String, triggerAtMillis: Long): ScheduleResult {
+    suspend fun scheduleReviewAlarm(reviewScheduleId: String, triggerAtMillis: Long): ScheduleResult {
         val now = System.currentTimeMillis()
+        val uid = firebaseAuth.currentUser?.uid
+
+        if (uid.isNullOrBlank() || !notificationPreferences.notificationEnabled(uid).first()) {
+            Log.d(TAG, "Alarm not scheduled because review notifications are disabled: id=$reviewScheduleId")
+            return ScheduleResult.DISABLED
+        }
 
         if (reviewScheduleId.isBlank()) {
             Log.e(TAG, "Alarm not scheduled: blank scheduleId, triggerAt=$triggerAtMillis")
@@ -208,6 +219,8 @@ class ReviewAlarmScheduler @Inject constructor(
         EXACT,
         /** 권한 없어 비정확 알람으로 폴백 예약 */
         FALLBACK_INEXACT,
+        /** Review notifications are disabled for the signed-in account. */
+        DISABLED,
         /** PendingIntent 생성 실패 등 예약 자체 실패 */
         FAILED
     }

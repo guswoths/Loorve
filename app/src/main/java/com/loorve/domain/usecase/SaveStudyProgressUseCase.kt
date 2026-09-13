@@ -54,7 +54,7 @@ class SaveStudyProgressUseCase @Inject constructor(
                 uid = request.uid,
                 prepStartDate = prepStart
             )
-            val defaultAlarmTime = notificationTimePreferences.notificationTime.first()
+            val defaultAlarmTime = notificationTimePreferences.notificationTime(request.uid).first()
             val schedulesWithDefaultAlarm = scheduleResult.items
 
             val record = StudyRecord(

@@ -48,7 +48,7 @@ class UpdateReviewCompletionUseCase @Inject constructor(
                 reviewScheduleId = scheduleId,
                 triggerAtMillis  = alarmTriggerAtMillis(
                     schedule.reviewDate,
-                    notificationTimePreferences.notificationTime.first()
+                    notificationTimePreferences.notificationTime(uid).first()
                 )
             )
             when (alarmResult) {
@@ -58,6 +58,7 @@ class UpdateReviewCompletionUseCase @Inject constructor(
                     Log.w(TAG, "알람 재예약 비정확 폴백 (FALLBACK_INEXACT): scheduleId=$scheduleId")
                 ReviewAlarmScheduler.ScheduleResult.EXACT ->
                     Log.d(TAG, "알람 재예약 완료: scheduleId=$scheduleId")
+                ReviewAlarmScheduler.ScheduleResult.DISABLED -> Unit
             }
         }
 

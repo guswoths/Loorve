@@ -4,6 +4,10 @@ package com.loorve.domain.repository
 import com.loorve.domain.model.ReviewScheduleItem
 import kotlinx.coroutines.flow.Flow
 
+enum class ScheduleSyncStatus {
+    SYNCING, SYNCED, OFFLINE, ERROR
+}
+
 interface ReviewScheduleItemRepository {
 
     suspend fun saveSchedules(
@@ -52,4 +56,6 @@ interface ReviewScheduleItemRepository {
     fun observeReviewScheduleItems(
         uid: String
     ): Flow<List<ReviewScheduleItem>>
+
+    fun observeSyncStatus(uid: String): Flow<ScheduleSyncStatus>
 }

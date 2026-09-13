@@ -10,7 +10,7 @@ import javax.inject.Singleton
 class AlarmReviewNotificationAdapter @Inject constructor(
     private val alarmScheduler: ReviewAlarmScheduler
 ) : ReviewNotificationAdapter {
-    override fun schedule(
+    override suspend fun schedule(
         event: ReviewNotificationOutbox,
         preferences: ReviewNotificationPreferences
     ): Result<Unit> = runCatching {

@@ -2,6 +2,7 @@ package com.loorve.presentation.reviewblock
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import com.loorve.domain.model.CompletionResult
 import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.model.ReviewScheduleItem
@@ -109,7 +110,8 @@ class ReviewBlockDetailViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            notificationTimePreferences.notificationTime.collect { time ->
+            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
+            notificationTimePreferences.notificationTime(uid).collect { time ->
                 _uiState.value = _uiState.value.copy(defaultAlarmTime = time)
             }
         }

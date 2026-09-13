@@ -7,7 +7,7 @@ import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.data.local.NotificationTimePreferences
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.repository.ReviewScheduleItemRepository
-import com.loorve.domain.review.alarmTriggerAtMillis
+import com.loorve.domain.review.nextAlarmTriggerAtMillis
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,7 +41,8 @@ class NotificationTimeSettingViewModel @Inject constructor(
     init {
         // DataStore에서 저장된 알림 시간을 수집하여 초기 상태 업데이트
         viewModelScope.launch {
-            notificationTimePreferences.notificationTime.collect { (hour, minute) ->
+            val uid = firebaseAuth.currentUser?.uid ?: return@launch
+            notificationTimePreferences.notificationTime(uid).collect { (hour, minute) ->
                 _uiState.update { current ->
                     // isSaved / errorMessage 플래그는 건드리지 않고 hour/minute만 동기화
                     current.copy(hour = hour, minute = minute)
@@ -70,24 +71,33 @@ class NotificationTimeSettingViewModel @Inject constructor(
             val state = _uiState.value
             _uiState.update { it.copy(isSaving = true, errorMessage = null) }
             runCatching {
+                val uid = firebaseAuth.currentUser?.uid
+                    ?: throw IllegalStateException("로그인된 사용자를 찾을 수 없습니다.")
                 notificationTimePreferences.setNotificationTime(
+                    uid = uid,
                     hour   = state.hour,
                     minute = state.minute
                 )
-                val uid = firebaseAuth.currentUser?.uid
-                    ?: throw IllegalStateException("로그인된 사용자를 찾을 수 없습니다.")
                 val allSchedules = scheduleRepository.getAllScheduleItems(uid)
                     .getOrThrow()
                 val now = System.currentTimeMillis()
-                allSchedules.forEach { item ->
-                    val triggerAtMillis = item.alarmTriggerAtMillis(state.hour to state.minute)
-                    if (item.status == ReviewStatus.COMPLETED || triggerAtMillis <= now) {
-                        reviewAlarmScheduler.cancelReviewAlarm(item.id)
-                    } else {
-                        reviewAlarmScheduler.scheduleReviewAlarm(
-                            reviewScheduleId = item.id,
-                            triggerAtMillis = triggerAtMillis
+                if (!notificationTimePreferences.notificationEnabled(uid).first()) {
+                    reviewAlarmScheduler.cancelAll(allSchedules.map { it.id })
+                } else {
+                    allSchedules.forEach { item ->
+                        val triggerAtMillis = nextAlarmTriggerAtMillis(
+                            item.reviewDate,
+                            state.hour to state.minute,
+                            now
                         )
+                        if (item.status == ReviewStatus.COMPLETED) {
+                            reviewAlarmScheduler.cancelReviewAlarm(item.id)
+                        } else {
+                            reviewAlarmScheduler.scheduleReviewAlarm(
+                                reviewScheduleId = item.id,
+                                triggerAtMillis = triggerAtMillis
+                            )
+                        }
                     }
                 }
             }.onSuccess {

@@ -74,7 +74,7 @@ class BootCompletedReceiver : BroadcastReceiver() {
 
                 val now = System.currentTimeMillis()
 
-                val defaultAlarmTime = notificationTimePreferences.notificationTime.first()
+                val defaultAlarmTime = notificationTimePreferences.notificationTime(uid).first()
 
                 reviewScheduleRepository.getUpcomingIncompleteSchedules(uid, now)
                     .onSuccess { schedules ->

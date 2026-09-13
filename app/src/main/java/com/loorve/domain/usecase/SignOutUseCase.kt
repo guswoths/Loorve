@@ -5,12 +5,14 @@ import com.loorve.data.local.NotificationTimePreferences
 import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.domain.repository.AuthRepository
 import com.loorve.domain.repository.ReviewScheduleRepository
+import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.google.firebase.auth.FirebaseAuth
 import javax.inject.Inject
 
 class SignOutUseCase @Inject constructor(
     private val authRepository: AuthRepository,
     private val reviewScheduleRepository: ReviewScheduleRepository,
+    private val reviewScheduleItemRepository: ReviewScheduleItemRepository,
     private val notificationTimePreferences: NotificationTimePreferences,
     private val reviewAlarmScheduler: ReviewAlarmScheduler,
     private val firebaseAuth: FirebaseAuth
@@ -31,9 +33,17 @@ class SignOutUseCase @Inject constructor(
                     .onFailure { e ->
                         Log.w(TAG, "알람 취소 스케줄 조회 실패 (계속 진행): ${e.message}")
                     }
+                reviewScheduleItemRepository.getAllScheduleItems(uid)
+                    .onSuccess { schedules ->
+                        reviewAlarmScheduler.cancelAll(schedules.map { it.id })
+                        Log.d(TAG, "ReviewScheduleItem 알람 ${schedules.size}건 취소 완료")
+                    }
+                    .onFailure { e ->
+                        Log.w(TAG, "ReviewScheduleItem 알람 취소 조회 실패 (계속 진행): ${e.message}")
+                    }
             }
 
-            notificationTimePreferences.clearAll()
+            if (uid != null) notificationTimePreferences.clearAll(uid)
             Log.d(TAG, "NotificationTimePreferences clearAll 완료")
 
             authRepository.signOut()

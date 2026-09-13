@@ -26,3 +26,20 @@ fun alarmTriggerAtMillis(
         .toInstant()
         .toEpochMilli()
 }
+
+fun nextAlarmTriggerAtMillis(
+    reviewDate: Long,
+    alarmTime: Pair<Int, Int>,
+    now: Long = System.currentTimeMillis(),
+    zoneId: ZoneId = ZoneId.systemDefault()
+): Long {
+    var date = Instant.ofEpochMilli(reviewDate).atZone(zoneId).toLocalDate()
+    var trigger = date.atTime(alarmTime.first, alarmTime.second)
+        .atZone(zoneId).toInstant().toEpochMilli()
+    while (trigger <= now) {
+        date = date.plusDays(1)
+        trigger = date.atTime(alarmTime.first, alarmTime.second)
+            .atZone(zoneId).toInstant().toEpochMilli()
+    }
+    return trigger
+}

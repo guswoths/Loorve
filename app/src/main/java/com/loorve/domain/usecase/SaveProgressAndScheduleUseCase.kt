@@ -81,7 +81,7 @@ class SaveProgressAndScheduleUseCase @Inject constructor(
             }
 
             val now = System.currentTimeMillis()
-            val defaultAlarmTime = notificationTimePreferences.notificationTime.first()
+            val defaultAlarmTime = notificationTimePreferences.notificationTime(uid).first()
             reviewDates.forEachIndexed { index, localDate ->
                 val reviewDateMs = localDate
                     .atStartOfDay(KST)
@@ -120,6 +120,7 @@ class SaveProgressAndScheduleUseCase @Inject constructor(
                     ReviewAlarmScheduler.ScheduleResult.FALLBACK_INEXACT ->
                         Log.w(TAG, "알람 비정확 폴백: id=${schedule.scheduleId}")
                     ReviewAlarmScheduler.ScheduleResult.EXACT -> Unit
+                    ReviewAlarmScheduler.ScheduleResult.DISABLED -> Unit
                 }
             }
 

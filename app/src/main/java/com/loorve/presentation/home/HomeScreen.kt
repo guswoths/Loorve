@@ -9,10 +9,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,7 +36,6 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onNavigateToMyPage: () -> Unit,
     onNavigateToExamSetting: () -> Unit,
     onNavigateToProgressDetail: (String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
@@ -82,14 +79,6 @@ fun HomeScreen(
                             style = LoorveTypography.titleLarge,
                             color = OnBackground
                         )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* 알림 */ }) {
-                        Icon(Icons.Outlined.Notifications, null, tint = OnBackground)
-                    }
-                    IconButton(onClick = onNavigateToMyPage) {
-                        Icon(Icons.Outlined.AccountCircle, null, tint = OnBackground)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)

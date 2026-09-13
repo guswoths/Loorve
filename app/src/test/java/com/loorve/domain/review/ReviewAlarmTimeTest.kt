@@ -77,4 +77,37 @@ class ReviewAlarmTimeTest {
         )
         assertEquals(false, first == second)
     }
+
+    @Test
+    fun `past selected time moves to the next local day instead of firing immediately`() {
+        val reviewDate = LocalDate.of(2026, 9, 20)
+            .atStartOfDay(zone)
+            .toInstant()
+            .toEpochMilli()
+        val now = LocalDate.of(2026, 9, 20)
+            .atTime(18, 0)
+            .atZone(zone)
+            .toInstant()
+            .toEpochMilli()
+
+        assertEquals(
+            LocalDate.of(2026, 9, 21).atTime(9, 0).atZone(zone).toInstant().toEpochMilli(),
+            nextAlarmTriggerAtMillis(reviewDate, 9 to 0, now, zone)
+        )
+    }
+
+    @Test
+    fun `next trigger is strictly in the future`() {
+        val reviewDate = LocalDate.of(2026, 9, 20)
+            .atStartOfDay(zone)
+            .toInstant()
+            .toEpochMilli()
+        val now = LocalDate.of(2026, 9, 20)
+            .atTime(9, 0)
+            .atZone(zone)
+            .toInstant()
+            .toEpochMilli()
+
+        assert(nextAlarmTriggerAtMillis(reviewDate, 9 to 0, now, zone) > now)
+    }
 }

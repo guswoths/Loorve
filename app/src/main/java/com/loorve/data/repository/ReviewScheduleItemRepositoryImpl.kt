@@ -7,6 +7,8 @@ import com.loorve.data.model.ReviewScheduleItemDto
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.repository.ReviewScheduleItemRepository
+import com.loorve.domain.repository.ScheduleSyncStatus
+import com.google.firebase.firestore.MetadataChanges
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -196,6 +198,30 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
         awaitClose {
             registration.remove()
         }
+    }
+
+    override fun observeSyncStatus(uid: String): Flow<ScheduleSyncStatus> = callbackFlow {
+        if (uid.isBlank()) {
+            trySend(ScheduleSyncStatus.ERROR)
+            close()
+            return@callbackFlow
+        }
+        trySend(ScheduleSyncStatus.SYNCING)
+        val registration = schedulesRef(uid)
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+                when {
+                    error != null -> trySend(ScheduleSyncStatus.ERROR)
+                    snapshot == null -> trySend(ScheduleSyncStatus.ERROR)
+                    snapshot.metadata.hasPendingWrites() ->
+                        trySend(ScheduleSyncStatus.SYNCING)
+                    snapshot.metadata.isFromCache ->
+                        trySend(ScheduleSyncStatus.OFFLINE)
+                    else -> {
+                        trySend(ScheduleSyncStatus.SYNCED)
+                    }
+                }
+            }
+        awaitClose { registration.remove() }
     }
 
     private fun validateAuth(uid: String) {

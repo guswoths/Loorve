@@ -136,12 +136,13 @@ class AlarmPermissionViewModel @Inject constructor(
         }
     }
 
-    private fun scheduleAlarmInternal(reviewScheduleId: String, triggerAtMillis: Long) {
+    private suspend fun scheduleAlarmInternal(reviewScheduleId: String, triggerAtMillis: Long) {
         val result = alarmScheduler.scheduleReviewAlarm(reviewScheduleId, triggerAtMillis)
         val resultState = when (result) {
             ReviewAlarmScheduler.ScheduleResult.EXACT -> ExactAlarmPermissionState.GRANTED
             ReviewAlarmScheduler.ScheduleResult.FALLBACK_INEXACT -> ExactAlarmPermissionState.FALLBACK_ACTIVE
             ReviewAlarmScheduler.ScheduleResult.FAILED -> _uiState.value.permissionState
+            ReviewAlarmScheduler.ScheduleResult.DISABLED -> _uiState.value.permissionState
         }
         _uiState.update {
             it.copy(

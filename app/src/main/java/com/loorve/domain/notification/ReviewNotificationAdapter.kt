@@ -10,7 +10,7 @@ data class ReviewNotificationPreferences(
 )
 
 interface ReviewNotificationAdapter {
-    fun schedule(
+    suspend fun schedule(
         event: ReviewNotificationOutbox,
         preferences: ReviewNotificationPreferences = ReviewNotificationPreferences()
     ): Result<Unit>
