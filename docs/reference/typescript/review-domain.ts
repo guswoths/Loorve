@@ -204,6 +204,24 @@ export interface UnresolvedOverload extends SchedulingWarning {
   status: 'OVERLOADED_UNRESOLVED';
 }
 
+export interface ExamDateValidationInput {
+  todayDate: LocalDate;
+  examDate: LocalDate;
+  finalReviewBufferDays?: number;
+  minEffectiveStudyDays?: number;
+  records?: StudyRecord[];
+  config?: Partial<SchedulerConfig>;
+}
+
+export interface ExamDateValidationViewModel {
+  canSaveExamDate: boolean;
+  primaryMessage?: string;
+  helperMessages: string[];
+  recommendedEarliestExamDate?: LocalDate;
+  blockingReason?: string;
+  warningCount: number;
+}
+
 export const DEFAULT_TIMEZONE = 'Asia/Seoul' as const;
 export const DEFAULT_MIN_EFFECTIVE_STUDY_DAYS = 3 as const;
 export const DEFAULT_FINAL_REVIEW_BUFFER_DAYS = 1 as const;
@@ -225,8 +243,8 @@ export const DEFAULT_SCHEDULER_CONFIG: SchedulerConfig = {
   examValidationPolicy: 'BLOCK_IF_ANY_RECORD_INSUFFICIENT',
   baseIntervals: DEFAULT_BASE_INTERVALS,
   preferredRescheduleRangeDays: DEFAULT_RESCHEDULE_SEARCH_RANGE_DAYS,
-  allowExamDateWithCramRequiredRecords: false,
-  strictExistingRecordValidation: true,
+  allowExamDateWithCramRequiredRecords: true,
+  strictExistingRecordValidation: false,
   rescheduleSearchRangeDays: DEFAULT_RESCHEDULE_SEARCH_RANGE_DAYS,
   reminderHour: 9,
   reminderMinute: 0,
@@ -240,6 +258,14 @@ export function createDefaultSchedulerConfig(
   return {
     ...DEFAULT_SCHEDULER_CONFIG,
     ...overrides,
+    allowExamDateWithCramRequiredRecords:
+      overrides.allowExamDateWithCramRequiredRecords ?? DEFAULT_SCHEDULER_CONFIG.allowExamDateWithCramRequiredRecords,
+    strictExistingRecordValidation:
+      overrides.strictExistingRecordValidation ?? DEFAULT_SCHEDULER_CONFIG.strictExistingRecordValidation,
+    minEffectiveStudyDays:
+      overrides.minEffectiveStudyDays ?? overrides.minimumEffectiveStudyDays ?? DEFAULT_SCHEDULER_CONFIG.minEffectiveStudyDays,
+    minimumEffectiveStudyDays:
+      overrides.minimumEffectiveStudyDays ?? overrides.minEffectiveStudyDays ?? DEFAULT_SCHEDULER_CONFIG.minimumEffectiveStudyDays,
     baseIntervals: overrides.baseIntervals ?? DEFAULT_SCHEDULER_CONFIG.baseIntervals,
   };
 }
@@ -902,100 +928,271 @@ export function getEarliestAllowedExamDate(
   );
 }
 
-/**
- * 시험일을 검증한다.
- * 정상 사용자 입력 실패는 예외 대신 ValidationResult를 반환한다.
- */
-export function validateExamDate(
-  todayDate: LocalDate,
-  examDate: LocalDate,
-  config: Partial<SchedulerConfig> = {},
+export function buildExamDateBlockingMessage(validationResult: Partial<ValidationResult>): string {
+  if (!validationResult || !validationResult.blockingReason) {
+    return '';
+  }
+  return validationResult.blockingReason;
+}
+
+export function buildExamDateWarningMessages(validationResult: Partial<ValidationResult>): string[] {
+  if (!validationResult || !Array.isArray(validationResult.warnings)) {
+    return [];
+  }
+
+  return validationResult.warnings.filter((message): message is string => typeof message === 'string' && message.trim().length > 0);
+}
+
+export function buildExamDateValidationState(validationResult: Partial<ValidationResult>): ExamDateValidationViewModel {
+  const warningCount = Array.isArray(validationResult.recordsRequiringCramMode)
+    ? validationResult.recordsRequiringCramMode.length
+    : 0;
+
+  const helperMessages = validationResult.isValid === true
+    ? buildExamDateWarningMessages(validationResult)
+    : [];
+
+  const primaryMessage = validationResult.isValid === false
+    ? buildExamDateBlockingMessage(validationResult)
+    : helperMessages[0];
+
+  return {
+    canSaveExamDate: validationResult.isValid === true,
+    primaryMessage: primaryMessage || undefined,
+    helperMessages,
+    recommendedEarliestExamDate: validationResult.recommendedEarliestExamDate ?? validationResult.earliestAllowedExamDate,
+    blockingReason: validationResult.blockingReason ?? validationResult.blockingReasons?.[0],
+    warningCount,
+  };
+}
+
+export function validateExamDateForNewLearning(
+  input: ExamDateValidationInput,
 ): ValidationResult {
-  const effectiveConfig = createDefaultSchedulerConfig(config as Partial<SchedulerConfig>);
+  const effectiveConfig = createDefaultSchedulerConfig(input.config ?? {});
+  const finalReviewBufferDays = typeof input.finalReviewBufferDays === 'number'
+    ? input.finalReviewBufferDays
+    : effectiveConfig.finalReviewBufferDays;
+  const minEffectiveStudyDays = typeof input.minEffectiveStudyDays === 'number'
+    ? input.minEffectiveStudyDays
+    : effectiveConfig.minEffectiveStudyDays;
+
   const blockingReasons: string[] = [];
   const warnings: string[] = [];
+  const recordsRequiringCramMode: string[] = [];
 
   let normalizedToday: { year: number; month: number; day: number } | null = null;
   let normalizedExam: { year: number; month: number; day: number } | null = null;
 
   try {
-    normalizedToday = parseLocalDate(todayDate);
+    normalizedToday = parseLocalDate(input.todayDate);
   } catch {
     blockingReasons.push('todayDate는 유효한 YYYY-MM-DD 형식이어야 합니다.');
   }
 
   try {
-    normalizedExam = parseLocalDate(examDate);
+    normalizedExam = parseLocalDate(input.examDate);
   } catch {
     blockingReasons.push('examDate는 유효한 YYYY-MM-DD 형식이어야 합니다.');
   }
 
-  if (normalizedToday && normalizedExam && compareLocalDates(examDate, todayDate) <= 0) {
-    blockingReasons.push('시험일은 오늘보다 늦어야 합니다.');
-  }
-
-  if (!Number.isInteger(effectiveConfig.finalReviewBufferDays) || effectiveConfig.finalReviewBufferDays < 0) {
+  if (!Number.isInteger(finalReviewBufferDays) || finalReviewBufferDays < 0) {
     blockingReasons.push('finalReviewBufferDays는 0 이상 정수여야 합니다.');
   }
-  if (!Number.isInteger(effectiveConfig.minimumEffectiveStudyDays) || effectiveConfig.minimumEffectiveStudyDays < 1) {
-    blockingReasons.push('minimumEffectiveStudyDays는 1 이상 정수여야 합니다.');
+  if (!Number.isInteger(minEffectiveStudyDays) || minEffectiveStudyDays < 1) {
+    blockingReasons.push('minEffectiveStudyDays는 1 이상 정수여야 합니다.');
   }
 
-  const lastReviewDate = (() => {
-    try {
-      return getLastReviewDate(examDate, effectiveConfig.finalReviewBufferDays);
-    } catch {
-      return examDate;
-    }
-  })();
+  let availableDaysForNewLearning = 0;
+  let recommendedEarliestExamDate: LocalDate = input.todayDate;
+  let lastReviewDate: LocalDate = input.examDate;
 
-  const availableDaysForNewLearning = (() => {
-    try {
-      return getAvailableDaysForNewLearning(todayDate, examDate, effectiveConfig.finalReviewBufferDays);
-    } catch {
-      return 0;
+  if (normalizedToday && normalizedExam) {
+    if (compareLocalDates(input.examDate, input.todayDate) <= 0) {
+      blockingReasons.push('시험일은 오늘 이후로 설정해 주세요. 현재 선택한 날짜는 학습 및 복습 일정을 만들 수 없습니다.');
     }
-  })();
 
-  const earliestAllowedExamDate = (() => {
-    try {
-      return getEarliestAllowedExamDate(
-        todayDate,
-        effectiveConfig.finalReviewBufferDays,
-        effectiveConfig.minimumEffectiveStudyDays,
-      );
-    } catch {
-      return todayDate;
+    if (Number.isInteger(finalReviewBufferDays) && finalReviewBufferDays >= 0) {
+      try {
+        availableDaysForNewLearning = getAvailableDaysForNewLearning(input.todayDate, input.examDate, finalReviewBufferDays);
+        lastReviewDate = getLastReviewDate(input.examDate, finalReviewBufferDays);
+      } catch {
+        availableDaysForNewLearning = 0;
+      }
     }
-  })();
 
-  if (
-    availableDaysForNewLearning < effectiveConfig.minimumEffectiveStudyDays
-  ) {
-    blockingReasons.push(
-      `최소 ${effectiveConfig.minimumEffectiveStudyDays}일 이상의 사용 가능한 학습일이 필요합니다. 가장 빠른 허용 시험일은 ${earliestAllowedExamDate}입니다.`,
-    );
+    if (Number.isInteger(minEffectiveStudyDays) && minEffectiveStudyDays >= 1) {
+      try {
+        recommendedEarliestExamDate = getEarliestAllowedExamDate(
+          input.todayDate,
+          finalReviewBufferDays,
+          minEffectiveStudyDays,
+        );
+      } catch {
+        recommendedEarliestExamDate = input.todayDate;
+      }
+    }
   }
 
-  if (effectiveConfig.examValidationPolicy === 'WARN_IF_ANY_RECORD_INSUFFICIENT') {
-    warnings.push(
-      '기록이 일정 부족 상태에 있어도 경고만 표시하고 저장을 막지 않습니다.',
-    );
+  const newLearningBlockingMessage = `현재 설정에서는 시험 전 정규 복습에 사용할 수 있는 기간이 ${availableDaysForNewLearning}일뿐입니다. 최소 ${minEffectiveStudyDays}일의 유효 학습기간과 시험 전 ${finalReviewBufferDays}일의 복습 버퍼가 필요합니다. 시험일을 ${recommendedEarliestExamDate} 이후로 설정해 주세요.`;
+  if (availableDaysForNewLearning < minEffectiveStudyDays) {
+    blockingReasons.push(newLearningBlockingMessage);
   }
+
+  const blockingReason = blockingReasons.find((message) => message.includes('시험 전 정규 복습'))
+    ?? blockingReasons.find((message) => message.includes('시험일은 오늘 이후로'))
+    ?? blockingReasons[0];
 
   const isValid = blockingReasons.length === 0;
-  const userMessage = isValid
-    ? `시험일 ${examDate}은 허용됩니다. 사용 가능한 학습일 수는 ${availableDaysForNewLearning}일입니다.`
-    : blockingReasons[0] ?? '시험일 검증에 실패했습니다.';
 
   return {
     isValid,
+    blockingReason,
     blockingReasons,
     warnings,
     availableDaysForNewLearning,
-    earliestAllowedExamDate,
+    recommendedEarliestExamDate,
+    recordsRequiringCramMode,
+    earliestAllowedExamDate: recommendedEarliestExamDate,
     lastReviewDate,
-    userMessage,
+    userMessage: isValid
+      ? `시험일 ${input.examDate}은 허용됩니다. 사용 가능한 학습일 수는 ${availableDaysForNewLearning}일입니다.`
+      : (blockingReason ?? '시험일 검증에 실패했습니다.'),
+  };
+}
+
+export function validateExamDateAgainstExistingRecords(
+  input: ExamDateValidationInput,
+): ValidationResult {
+  const effectiveConfig = createDefaultSchedulerConfig(input.config ?? {});
+  const finalReviewBufferDays = typeof input.finalReviewBufferDays === 'number'
+    ? input.finalReviewBufferDays
+    : effectiveConfig.finalReviewBufferDays;
+  const minEffectiveStudyDays = typeof input.minEffectiveStudyDays === 'number'
+    ? input.minEffectiveStudyDays
+    : effectiveConfig.minEffectiveStudyDays;
+
+  const blockingReasons: string[] = [];
+  const warnings: string[] = [];
+  const records = Array.isArray(input.records) ? input.records : [];
+
+  let availableDaysForNewLearning = 0;
+  let recommendedEarliestExamDate: LocalDate = input.todayDate;
+  let lastReviewDate: LocalDate = input.examDate;
+
+  try {
+    availableDaysForNewLearning = getAvailableDaysForNewLearning(input.todayDate, input.examDate, finalReviewBufferDays);
+    recommendedEarliestExamDate = getEarliestAllowedExamDate(
+      input.todayDate,
+      finalReviewBufferDays,
+      minEffectiveStudyDays,
+    );
+    lastReviewDate = getLastReviewDate(input.examDate, finalReviewBufferDays);
+  } catch {
+    availableDaysForNewLearning = 0;
+    recommendedEarliestExamDate = input.todayDate;
+    lastReviewDate = input.examDate;
+  }
+
+  const recordsRequiringCramMode = records
+    .filter((record) => record && typeof record === 'object' && typeof record.id === 'string')
+    .filter((record) => {
+      if (!isValidLocalDate(record.studiedAt)) {
+        return false;
+      }
+      return getEffectiveStudyDays(record.studiedAt, input.examDate, finalReviewBufferDays) < minEffectiveStudyDays;
+    })
+    .map((record) => record.id);
+
+  const warningMessage = `등록된 학습기록 중 ${recordsRequiringCramMode.length}개 항목은 시험일까지 정규 분산복습 기준을 충족하지 못합니다. 해당 항목은 압축 복습 또는 벼락치기 모드로 표시됩니다. 시험일을 더 늦추면 더 안정적인 복습 일정을 만들 수 있습니다.`;
+  const blockingMessage = `등록된 학습기록 중 ${recordsRequiringCramMode.length}개 항목의 복습 기간이 부족합니다. 현재 정책에서는 모든 항목이 최소 복습 기간을 확보해야 시험일을 설정할 수 있습니다.`;
+
+  if (recordsRequiringCramMode.length > 0) {
+    const shouldBlock = effectiveConfig.strictExistingRecordValidation || !effectiveConfig.allowExamDateWithCramRequiredRecords;
+    if (shouldBlock) {
+      blockingReasons.push(blockingMessage);
+    } else {
+      warnings.push(warningMessage);
+    }
+  }
+
+  const blockingReason = blockingReasons[0];
+  const isValid = blockingReasons.length === 0;
+
+  return {
+    isValid,
+    blockingReason,
+    blockingReasons,
+    warnings,
+    availableDaysForNewLearning,
+    recommendedEarliestExamDate,
+    recordsRequiringCramMode,
+    earliestAllowedExamDate: recommendedEarliestExamDate,
+    lastReviewDate,
+    userMessage: isValid
+      ? `시험일 ${input.examDate}은 허용됩니다. 사용 가능한 학습일 수는 ${availableDaysForNewLearning}일입니다.`
+      : (blockingReason ?? warnings[0] ?? '시험일 검증에 실패했습니다.'),
+  };
+}
+
+export function validateExamDate(
+  todayDate: LocalDate,
+  examDate: LocalDate,
+  config: Partial<SchedulerConfig> = {},
+): ValidationResult;
+export function validateExamDate(input: ExamDateValidationInput): ValidationResult;
+export function validateExamDate(
+  todayDateOrInput: LocalDate | ExamDateValidationInput,
+  examDate?: LocalDate,
+  config: Partial<SchedulerConfig> = {},
+): ValidationResult {
+  const input: ExamDateValidationInput = typeof todayDateOrInput === 'string'
+    ? { todayDate: todayDateOrInput, examDate: examDate ?? todayDateOrInput, config }
+    : todayDateOrInput;
+
+  const newLearningValidation = validateExamDateForNewLearning(input);
+  const existingRecordsValidation = validateExamDateAgainstExistingRecords(input);
+
+  const mergedBlockingReasons = Array.from(
+    new Set([
+      ...newLearningValidation.blockingReasons,
+      ...existingRecordsValidation.blockingReasons,
+    ]),
+  );
+
+  const mergedWarnings = Array.from(
+    new Set([
+      ...newLearningValidation.warnings,
+      ...existingRecordsValidation.warnings,
+    ]),
+  );
+
+  const mergedRecordsRequiringCramMode = Array.from(
+    new Set([
+      ...newLearningValidation.recordsRequiringCramMode,
+      ...existingRecordsValidation.recordsRequiringCramMode,
+    ]),
+  );
+
+  const blockingReason = newLearningValidation.blockingReason
+    ?? existingRecordsValidation.blockingReason
+    ?? undefined;
+
+  const isValid = mergedBlockingReasons.length === 0;
+
+  return {
+    isValid,
+    blockingReason,
+    blockingReasons: mergedBlockingReasons,
+    warnings: mergedWarnings,
+    availableDaysForNewLearning: newLearningValidation.availableDaysForNewLearning,
+    recommendedEarliestExamDate: newLearningValidation.recommendedEarliestExamDate,
+    recordsRequiringCramMode: mergedRecordsRequiringCramMode,
+    earliestAllowedExamDate: newLearningValidation.earliestAllowedExamDate,
+    lastReviewDate: newLearningValidation.lastReviewDate,
+    userMessage: isValid
+      ? `시험일 ${input.examDate}은 허용됩니다. 사용 가능한 학습일 수는 ${newLearningValidation.availableDaysForNewLearning}일입니다.`
+      : (blockingReason ?? mergedWarnings[0] ?? '시험일 검증에 실패했습니다.'),
   };
 }
 
@@ -2104,6 +2301,104 @@ export function runSelfChecks(): void {
   assert(addDays('2026-10-03' as LocalDate, -1) === '2026-10-02' as LocalDate, '음수 오프셋이 올바르게 처리되어야 합니다.');
   assert(getAvailableDaysForNewLearning('2026-10-01' as LocalDate, '2026-10-06' as LocalDate, 1) === 3, 'availableDaysForNewLearning은 3이어야 합니다.');
   assert(getEffectiveStudyDays('2026-10-01' as LocalDate, '2026-10-06' as LocalDate, 1) === 3, 'effectiveStudyDays는 3이어야 합니다.');
+
+  const todayBlocked = validateExamDateForNewLearning({
+    todayDate: '2026-10-01' as LocalDate,
+    examDate: '2026-10-01' as LocalDate,
+    finalReviewBufferDays: 1,
+    minEffectiveStudyDays: 3,
+  });
+  assert(todayBlocked.isValid === false, '오늘 시험일은 차단되어야 합니다.');
+  assert(
+    buildExamDateBlockingMessage(todayBlocked) === '시험일은 오늘 이후로 설정해 주세요. 현재 선택한 날짜는 학습 및 복습 일정을 만들 수 없습니다.',
+    '오늘/과거 시험일 메시지는 정확해야 합니다.',
+  );
+
+  const earliestBufferZero = getEarliestAllowedExamDate('2026-10-01' as LocalDate, 0, 3);
+  const earliestBufferOne = getEarliestAllowedExamDate('2026-10-01' as LocalDate, 1, 3);
+  const earliestBufferTwo = getEarliestAllowedExamDate('2026-10-01' as LocalDate, 2, 3);
+  assert(earliestBufferZero === '2026-10-05' as LocalDate, 'buffer 0일이면 가장 빠른 허용 시험일은 2026-10-05여야 합니다.');
+  assert(earliestBufferOne === '2026-10-06' as LocalDate, 'buffer 1일이면 가장 빠른 허용 시험일은 2026-10-06여야 합니다.');
+  assert(earliestBufferTwo === '2026-10-07' as LocalDate, 'buffer 2일이면 가장 빠른 허용 시험일은 2026-10-07여야 합니다.');
+
+  const cramRecordList = [{
+    id: 'rec-cram',
+    examId: 'exam-1',
+    content: '최근 기록',
+    studiedAt: '2026-10-04' as LocalDate,
+    difficulty: 'medium',
+    importance: 'normal',
+    initialMastery: 3,
+    estimatedReviewMinutes: 15,
+    isCompleted: false,
+    createdAt: '2026-10-04' as LocalDate,
+    updatedAt: '2026-10-04' as LocalDate,
+  }] as StudyRecord[];
+
+  const cramValidation = validateExamDateAgainstExistingRecords({
+    todayDate: '2026-10-01' as LocalDate,
+    examDate: '2026-10-06' as LocalDate,
+    finalReviewBufferDays: 1,
+    minEffectiveStudyDays: 3,
+    records: cramRecordList,
+    config: { ...DEFAULT_SCHEDULER_CONFIG, strictExistingRecordValidation: false, allowExamDateWithCramRequiredRecords: true },
+  });
+  assert(cramValidation.recordsRequiringCramMode.includes('rec-cram'), '최근 기록은 크램 모드 대상이어야 합니다.');
+  assert(cramValidation.isValid === true, '기본 정책은 크램 모드 기록을 경고만 남기고 저장을 허용해야 합니다.');
+  assert(cramValidation.warnings[0]?.includes('등록된 학습기록 중 1개 항목은 시험일까지 정규 분산복습 기준을 충족하지 못합니다.'), '기본 경고 메시지는 정확해야 합니다.');
+
+  const strictCramValidation = validateExamDateAgainstExistingRecords({
+    todayDate: '2026-10-01' as LocalDate,
+    examDate: '2026-10-06' as LocalDate,
+    finalReviewBufferDays: 1,
+    minEffectiveStudyDays: 3,
+    records: cramRecordList,
+    config: { ...DEFAULT_SCHEDULER_CONFIG, strictExistingRecordValidation: true, allowExamDateWithCramRequiredRecords: true },
+  });
+  assert(strictCramValidation.isValid === false, 'strictExistingRecordValidation=true면 저장이 막혀야 합니다.');
+  assert(
+    strictCramValidation.blockingReason === '등록된 학습기록 중 1개 항목의 복습 기간이 부족합니다. 현재 정책에서는 모든 항목이 최소 복습 기간을 확보해야 시험일을 설정할 수 있습니다.',
+    'strict 모드 차단 메시지는 정확해야 합니다.',
+  );
+
+  const cramDisallowedValidation = validateExamDateAgainstExistingRecords({
+    todayDate: '2026-10-01' as LocalDate,
+    examDate: '2026-10-06' as LocalDate,
+    finalReviewBufferDays: 1,
+    minEffectiveStudyDays: 3,
+    records: cramRecordList,
+    config: { ...DEFAULT_SCHEDULER_CONFIG, strictExistingRecordValidation: false, allowExamDateWithCramRequiredRecords: false },
+  });
+  assert(cramDisallowedValidation.isValid === false, 'allowExamDateWithCramRequiredRecords=false면 저장이 막혀야 합니다.');
+
+  const combinedValidation = validateExamDate({
+    todayDate: '2026-10-01' as LocalDate,
+    examDate: '2026-10-06' as LocalDate,
+    finalReviewBufferDays: 1,
+    minEffectiveStudyDays: 3,
+    records: cramRecordList,
+    config: { ...DEFAULT_SCHEDULER_CONFIG, strictExistingRecordValidation: false, allowExamDateWithCramRequiredRecords: true },
+  });
+  assert(combinedValidation.isValid === true, '새 학습기간 조건이 통과하면 기본 설정은 크램 모드 경고만 남겨야 합니다.');
+  assert(combinedValidation.recordsRequiringCramMode.length === 1, 'warningCount는 크램 모드 기록 수와 일치해야 합니다.');
+  assert(
+    buildExamDateValidationState(combinedValidation).warningCount === 1,
+    'UI 상태의 warningCount는 크램 모드 기록 수를 반영해야 합니다.',
+  );
+
+  const combinedBlockedDueToNewWindow = validateExamDate({
+    todayDate: '2026-10-01' as LocalDate,
+    examDate: '2026-10-04' as LocalDate,
+    finalReviewBufferDays: 1,
+    minEffectiveStudyDays: 3,
+    records: cramRecordList,
+    config: { ...DEFAULT_SCHEDULER_CONFIG, strictExistingRecordValidation: true, allowExamDateWithCramRequiredRecords: true },
+  });
+  assert(combinedBlockedDueToNewWindow.isValid === false, '새 학습기간 부족은 기본적으로 차단되어야 합니다.');
+  assert(
+    combinedBlockedDueToNewWindow.blockingReason?.includes('현재 설정에서는 시험 전 정규 복습에 사용할 수 있는 기간이'),
+    '새 학습기간 부족은 기본 차단 사유여야 합니다.',
+  );
 
   // 1) 시험일 검증 기본 예시
   const blockedCase = validateExamDate('2026-10-01' as LocalDate, '2026-10-04' as LocalDate, {
