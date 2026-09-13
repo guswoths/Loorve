@@ -84,6 +84,7 @@ import com.loorve.ui.theme.Primary
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import com.loorve.presentation.reviewblock.ReviewBlockDetailScreen
+import com.loorve.presentation.review.TodayReviewsScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -97,6 +98,7 @@ sealed class Screen(val route: String) {
     }
 
     object Calendar : Screen("calendar")
+    object TodayReviews : Screen("today_reviews")
     object AddReviewBlock : Screen("add_review_block")
     object NotificationTimeSetting : Screen("notification_time_setting")
     object MyPage : Screen("my_page")
@@ -450,18 +452,8 @@ fun LoorveNavHost(
                             }
                         )
 
-                        1 -> ReviewCalendarScreen(
-                            onNavigateBack = { },
-                            onNavigateToAddReviewBlock = {
-                                navController.navigate(Screen.Calendar.route)
-                                navController.navigate(Screen.AddReviewBlock.route)
-                            },
-                            onNavigateToReviewBlockDetail = { blockId ->   // ✅ 핵심 연결
-                                navController.navigate(Screen.Calendar.route) {
-                                    launchSingleTop = true
-                                }
-                                navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId))
-                            }
+                        1 -> TodayReviewsScreen(
+                            onOpenCalendar = { navController.navigate(Screen.Calendar.route) }
                         )
 
                         2 -> {
@@ -512,6 +504,12 @@ fun LoorveNavHost(
                 onNavigateToReviewBlockDetail = { blockId ->
                     navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId))
                 }
+            )
+        }
+
+        composable(Screen.TodayReviews.route) {
+            TodayReviewsScreen(
+                onOpenCalendar = { navController.navigate(Screen.Calendar.route) }
             )
         }
 

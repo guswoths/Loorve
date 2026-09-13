@@ -20,7 +20,8 @@ enum class ReviewCompletionOutcome { EASY, SUCCESS, HARD, FAILED }
 
 data class CompleteReviewResult(
     val applied: Boolean,
-    val userMessage: String
+    val userMessage: String,
+    val nextReviewDate: LocalDate? = null
 )
 
 class CompleteReviewWithReschedulingUseCase @Inject constructor(
@@ -99,7 +100,14 @@ class CompleteReviewWithReschedulingUseCase @Inject constructor(
                 notificationAdapter.schedule(it)
             }
         }
-        CompleteReviewResult(rescheduled.applied, rescheduled.reason)
+        CompleteReviewResult(
+            applied = rescheduled.applied,
+            userMessage = rescheduled.reason,
+            nextReviewDate = changed
+                .firstOrNull { it.id == oldNext?.id }
+                ?.reviewDate
+                ?.let { it.toLocalDate(zone) }
+        )
     }
 }
 

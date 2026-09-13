@@ -2,6 +2,8 @@ package com.loorve.domain.usecase
 
 import com.loorve.domain.model.Exam
 import com.loorve.domain.repository.ExamRepository
+import com.loorve.domain.repository.ReviewScheduleItemRepository
+import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.domain.review.ReviewSchedulingEngine
 import com.loorve.domain.review.SchedulingMessages
 import com.loorve.domain.review.ValidationResult
@@ -24,11 +26,14 @@ data class SaveExamResult(
     val primaryMessage: String,
     val helperMessages: List<String>,
     val recommendedEarliestExamDate: LocalDate?,
-    val warnings: List<String>
+    val warnings: List<String>,
+    val cramRequiredCount: Int = 0
 )
 
 class SaveExamWithSchedulingUseCase @Inject constructor(
-    private val examRepository: ExamRepository
+    private val examRepository: ExamRepository,
+    private val studyRecordRepository: StudyRecordRepository,
+    private val scheduleRepository: ReviewScheduleItemRepository
 ) {
     suspend operator fun invoke(
         uid: String,
@@ -71,12 +76,32 @@ class SaveExamWithSchedulingUseCase @Inject constructor(
             )
         )
         saveResult.getOrThrow()
+        val cramCount = if (request.examId.isNullOrBlank()) {
+            0
+        } else {
+            val recordIds = studyRecordRepository.getAllStudyRecords(uid).getOrDefault(emptyList())
+                .filter { it.examId == request.examId }
+                .map { it.id }
+                .toSet()
+            scheduleRepository.getAllScheduleItems(uid).getOrDefault(emptyList())
+                .filter {
+                    it.studyRecordId in recordIds &&
+                        it.planStatus == com.loorve.domain.review.ReviewPlanStatus.CRAM_MODE_REQUIRED
+                }
+                .map { it.studyRecordId }
+                .distinct()
+                .size
+        }
         SaveExamResult(
             canSaveExamDate = true,
             primaryMessage = "시험일을 저장했습니다.",
             helperMessages = emptyList(),
             recommendedEarliestExamDate = null,
-            warnings = emptyList()
+            warnings = if (cramCount > 0) listOf(
+                "등록된 학습기록 중 ${cramCount}개 항목은 시험일까지 정규 분산복습 기준을 충족하지 못합니다. 해당 항목은 압축 복습으로 표시됩니다.",
+                "시험일을 늦추면 더 안정적인 복습 일정을 만들 수 있습니다."
+            ) else emptyList(),
+            cramRequiredCount = cramCount
         )
     }
 }

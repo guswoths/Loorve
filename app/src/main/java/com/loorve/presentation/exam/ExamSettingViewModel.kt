@@ -31,7 +31,11 @@ data class ExamSettingUiState(
     val canSaveExamDate: Boolean = true,
     val helperMessages: List<String> = emptyList(),
     val recommendedEarliestExamDate: LocalDate? = null,
-    val warnings: List<String> = emptyList()
+    val warnings: List<String> = emptyList(),
+    val finalReviewBufferDaysText: String = "1",
+    val maxDailyReviewMinutesText: String = "",
+    val timezone: String = "Asia/Seoul",
+    val cramRequiredCount: Int = 0
 )
 
 sealed class ExamSettingEvent {
@@ -60,7 +64,12 @@ class ExamSettingViewModel @Inject constructor(
             current.copy(
                 examDate          = epochMillis,
                 dDayText          = calculateDDay(epochMillis),
-                studyEndDateError = newStudyEndDateError
+                studyEndDateError = newStudyEndDateError,
+                canSaveExamDate = true,
+                errorMessage = null,
+                recommendedEarliestExamDate = null,
+                cramRequiredCount = 0,
+                warnings = emptyList()
             )
         }
     }
@@ -73,6 +82,23 @@ class ExamSettingViewModel @Inject constructor(
                 studyEndDateError = error
             )
         }
+
+    }
+
+    fun onFinalReviewBufferDaysChange(value: String) {
+        if (value.all(Char::isDigit) && value.length <= 2) {
+            _uiState.update { it.copy(finalReviewBufferDaysText = value) }
+        }
+    }
+
+    fun onMaxDailyReviewMinutesChange(value: String) {
+        if (value.isEmpty() || (value.all(Char::isDigit) && value.length <= 4)) {
+            _uiState.update { it.copy(maxDailyReviewMinutesText = value) }
+        }
+    }
+
+    fun onTimezoneChange(value: String) {
+        _uiState.update { it.copy(timezone = value) }
     }
 
     fun saveExam() {
@@ -99,7 +125,9 @@ class ExamSettingViewModel @Inject constructor(
                         examName = state.subjectName,
                         examDate = Instant.ofEpochMilli(state.examDate)
                             .atZone(ZoneId.of("Asia/Seoul")).toLocalDate(),
-                        finalReviewBufferDays = 1
+                        timezone = state.timezone,
+                        finalReviewBufferDays = state.finalReviewBufferDaysText.toIntOrNull(),
+                        maxDailyReviewMinutes = state.maxDailyReviewMinutesText.toIntOrNull()
                     )
                 )
                 result.fold(
@@ -112,7 +140,8 @@ class ExamSettingViewModel @Inject constructor(
                                     errorMessage = saveResult.primaryMessage,
                                     helperMessages = saveResult.helperMessages,
                                     recommendedEarliestExamDate = saveResult.recommendedEarliestExamDate,
-                                    warnings = saveResult.warnings
+                                    warnings = saveResult.warnings,
+                                    cramRequiredCount = saveResult.cramRequiredCount
                                 )
                             }
                         } else {
@@ -122,7 +151,8 @@ class ExamSettingViewModel @Inject constructor(
                                     canSaveExamDate = true,
                                     helperMessages = saveResult.helperMessages,
                                     recommendedEarliestExamDate = saveResult.recommendedEarliestExamDate,
-                                    warnings = saveResult.warnings
+                                    warnings = saveResult.warnings,
+                                    cramRequiredCount = saveResult.cramRequiredCount
                                 )
                             }
                             _events.emit(ExamSettingEvent.SaveSuccess)

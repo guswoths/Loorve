@@ -43,7 +43,13 @@ object ReviewSchedulingEngine {
         val availableDays = ChronoUnit.DAYS.between(today, examDate) -
             finalReviewBufferDays - 1L
         val earliest = today.plusDays(3L + finalReviewBufferDays + 1L)
-        return if (examDate <= today || availableDays < 3L) {
+        return if (examDate <= today) {
+            ValidationResult.Blocked(
+                message = "시험일은 오늘 이후로 설정해 주세요. 현재 선택한 날짜는 학습 및 복습 일정을 만들 수 없습니다.",
+                availableDaysForNewLearning = availableDays,
+                recommendedEarliestExamDate = earliest
+            )
+        } else if (availableDays < 3L) {
             ValidationResult.Blocked(
                 message = SchedulingMessages.blockedExamDate(
                     availableDays = availableDays.coerceAtLeast(0L),

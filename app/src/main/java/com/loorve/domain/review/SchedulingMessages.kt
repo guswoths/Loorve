@@ -9,7 +9,7 @@ object SchedulingMessages {
         earliestExamDate: LocalDate
     ): String =
         "현재 설정에서는 시험 전 정규 복습에 사용할 수 있는 기간이 ${availableDays}일뿐입니다. " +
-            "최소 3일의 유효 학습기간과 시험 전 ${finalReviewBufferDays}일 버퍼가 필요합니다. " +
+            "최소 3일의 유효 학습기간과 시험 전 ${finalReviewBufferDays}일의 복습 버퍼가 필요합니다. " +
             "시험일을 ${earliestExamDate} 이후로 설정해 주세요."
 
     const val overloaded =

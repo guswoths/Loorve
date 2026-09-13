@@ -30,6 +30,10 @@ import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.model.StudyRecord
+import com.loorve.domain.review.ReviewDifficulty
+import com.loorve.domain.review.ReviewImportance
+import com.loorve.domain.review.ReviewPlanStatus
+import com.loorve.domain.usecase.CreateStudyRecordResult
 import com.loorve.presentation.home.HomeViewModel
 import com.loorve.ui.component.LoorveCard
 import com.loorve.ui.theme.*
@@ -281,7 +285,7 @@ fun ReviewBlockDetailScreen(
             // ── 학습 진도 입력 섹션 ──
             item {
                 StudyProgressInputSection(
-                    onSave = { learningDateMillis, title, content ->
+                    onSave = { learningDateMillis, title, content, difficulty, importance, estimatedReviewMinutes ->
                         viewModel.saveProgress(
                             uid = uid,
                             blockId = blockId,
@@ -289,12 +293,24 @@ fun ReviewBlockDetailScreen(
                             title = title,
                             content = content,
                             learningDateMillis = learningDateMillis,
-                            dailyCap = dailyCap
+                            dailyCap = dailyCap,
+                            difficulty = difficulty,
+                            importance = importance,
+                            estimatedReviewMinutes = estimatedReviewMinutes
                         )
                     },
                     isLoading = uiState.isLoading,
                     isSaveEnabled = resolvedBlock != null && resolvedBlock.examDate != 0L
                 )
+            }
+
+            uiState.lastCreationResult?.let { result ->
+                item {
+                    ScheduleSummaryCard(
+                        result = result,
+                        examDateMillis = examDateMillis
+                    )
+                }
             }
 
             // ── 학습기록 / 복습기록 탭 전환 UI ──
@@ -795,17 +811,79 @@ fun RecommendedCompletionCard(
     }
 }
 
+@Composable
+private fun ScheduleSummaryCard(
+    result: CreateStudyRecordResult,
+    examDateMillis: Long
+) {
+    val zone = ZoneId.of("Asia/Seoul")
+    val examDate = Instant.ofEpochMilli(examDateMillis).atZone(zone).toLocalDate()
+    val schedules = result.schedules.filter { it.reviewOrder > 0 }
+    val statusText = when (result.status) {
+        ReviewPlanStatus.SCHEDULED -> "정상"
+        ReviewPlanStatus.RESCHEDULED -> "일정 압축됨"
+        ReviewPlanStatus.CRAM_MODE_REQUIRED,
+        ReviewPlanStatus.INSUFFICIENT_WINDOW -> "벼락치기 모드 필요"
+        ReviewPlanStatus.OVERLOADED_UNRESOLVED -> "일일 과부하 확인 필요"
+        else -> result.status.name
+    }
+    val statusDescription = when (result.status) {
+        ReviewPlanStatus.CRAM_MODE_REQUIRED,
+        ReviewPlanStatus.INSUFFICIENT_WINDOW ->
+            "시험일까지 정규 분산복습 최소기간이 부족합니다. 가능한 복습 일정을 만들었지만, 핵심 개념을 먼저 인출하고 오답을 빠르게 보완하는 압축 학습이 필요합니다."
+        ReviewPlanStatus.RESCHEDULED ->
+            "시험일까지의 기간에 맞춰 복습 간격을 압축했습니다. 각 복습에서는 재독보다 문제풀이·퀴즈·빈 종이 회상처럼 기억을 직접 꺼내는 방식으로 점검해 보세요."
+        else -> result.userMessage
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("복습 일정 ${schedules.size}개가 생성되었습니다.",
+                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "이 학습기록에 대해 복습 일정 ${schedules.size}개를 만들었습니다. " +
+                    "첫 복습은 ${schedules.minOfOrNull { it.reviewDate }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() } ?: "-"}, " +
+                    "마지막 복습은 ${schedules.maxOfOrNull { it.reviewDate }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() } ?: result.lastReviewDate}입니다.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text("시험까지 ${java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(zone), examDate)}일 남았습니다.")
+            Text("상태: $statusText", fontWeight = FontWeight.Bold)
+            Text("일정 압축 여부: ${if (result.compressed) "압축됨" else "압축되지 않음"}")
+            Text(statusDescription, style = MaterialTheme.typography.bodySmall)
+            schedules.forEach { item ->
+                Text(
+                    "• ${Instant.ofEpochMilli(item.reviewDate).atZone(zone).toLocalDate()} · ${item.recommendedMethod.ifBlank { "인출 연습과 오답 점검" }}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
 // ── 진도 입력 섹션 ──────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudyProgressInputSection(
-    onSave: (learningDateMillis: Long, title: String, content: String) -> Unit,
+    onSave: (
+        learningDateMillis: Long,
+        title: String,
+        content: String,
+        difficulty: ReviewDifficulty,
+        importance: ReviewImportance,
+        estimatedReviewMinutes: Int
+    ) -> Unit,
     isLoading: Boolean,
     isSaveEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var titleText by remember { mutableStateOf("") }
     var contentText by remember { mutableStateOf("") }
+    var estimatedMinutesText by remember { mutableStateOf("15") }
+    var difficulty by remember { mutableStateOf(ReviewDifficulty.MEDIUM) }
+    var importance by remember { mutableStateOf(ReviewImportance.NORMAL) }
 
     val kstZone = remember { ZoneId.of("Asia/Seoul") }
     val todayMillis = remember {
@@ -887,6 +965,48 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = estimatedMinutesText,
+                onValueChange = { if (it.all(Char::isDigit) && it.length <= 4) estimatedMinutesText = it },
+                label = { Text("예상 복습 시간(분)") },
+                singleLine = true,
+                enabled = !isLoading,
+                modifier = Modifier.weight(1f)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text("난이도", style = MaterialTheme.typography.labelMedium)
+                Row {
+                    FilterChip(
+                        selected = difficulty == ReviewDifficulty.HARD,
+                        onClick = { difficulty = ReviewDifficulty.HARD },
+                        label = { Text("어려움") }
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    FilterChip(
+                        selected = difficulty != ReviewDifficulty.HARD,
+                        onClick = { difficulty = ReviewDifficulty.MEDIUM },
+                        label = { Text("보통") }
+                    )
+                }
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = importance == ReviewImportance.HIGH,
+                onClick = { importance = ReviewImportance.HIGH },
+                label = { Text("중요도 높음") }
+            )
+            FilterChip(
+                selected = importance != ReviewImportance.HIGH,
+                onClick = { importance = ReviewImportance.NORMAL },
+                label = { Text("일반") }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         OutlinedTextField(
             value = contentText,
             onValueChange = { contentText = it },
@@ -904,10 +1024,18 @@ fun StudyProgressInputSection(
         Button(
             onClick = {
                 if (canSave) {
-                    onSave(selectedDateMillis, titleText.trim(), contentText.trim())
+                    onSave(
+                        selectedDateMillis,
+                        titleText.trim(),
+                        contentText.trim(),
+                        difficulty,
+                        importance,
+                        estimatedMinutesText.toIntOrNull() ?: 15
+                    )
                     titleText = ""
                     contentText = ""
                 }
+
             },
             modifier = Modifier
                 .align(Alignment.End)

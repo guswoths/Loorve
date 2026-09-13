@@ -18,6 +18,7 @@ import com.loorve.domain.usecase.CreateStudyRecordRequest
 import com.loorve.domain.usecase.CreateStudyRecordWithReviewSchedulesUseCase
 import com.loorve.domain.usecase.CompleteReviewWithReschedulingUseCase
 import com.loorve.domain.usecase.ReviewCompletionOutcome
+import com.loorve.domain.usecase.CreateStudyRecordResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,6 +49,7 @@ data class ReviewBlockDetailUiState(
     val recordToDelete: StudyRecord? = null,
     val selectedTab: ReviewBlockTab = ReviewBlockTab.STUDY_RECORD,
     val defaultAlarmTime: Pair<Int, Int> = 9 to 0
+    ,val lastCreationResult: CreateStudyRecordResult? = null
 )
 
 @HiltViewModel
@@ -194,7 +196,13 @@ class ReviewBlockDetailViewModel @Inject constructor(
         title: String,
         content: String,
         learningDateMillis: Long,
-        dailyCap: Int = 5
+        dailyCap: Int = 5,
+        difficulty: com.loorve.domain.review.ReviewDifficulty =
+            com.loorve.domain.review.ReviewDifficulty.MEDIUM,
+        importance: com.loorve.domain.review.ReviewImportance =
+            com.loorve.domain.review.ReviewImportance.NORMAL,
+        initialMastery: Int? = null,
+        estimatedReviewMinutes: Int = 15
     ) {
         if (_uiState.value.isLoading) return
 
@@ -227,11 +235,18 @@ class ReviewBlockDetailViewModel @Inject constructor(
                     content = content,
                     studiedAt = learningDateMillis.toLocalDate(),
                     blockId = blockId,
-                    estimatedReviewMinutes = 15
+                    difficulty = difficulty,
+                    importance = importance,
+                    initialMastery = initialMastery,
+                    estimatedReviewMinutes = estimatedReviewMinutes
                 )
             ).onSuccess {
+                val result = it
                 loadBlockData(uid, blockId)
-                _uiState.value = _uiState.value.copy(savedSuccess = true)
+                _uiState.value = _uiState.value.copy(
+                    savedSuccess = true,
+                    lastCreationResult = result
+                )
                 calendarRefreshBus.notifyRefresh()
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(

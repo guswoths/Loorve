@@ -35,7 +35,8 @@ data class CreateStudyRecordResult(
     val schedules: List<ReviewScheduleItem>,
     val status: ReviewPlanStatus,
     val userMessage: String,
-    val lastReviewDate: LocalDate
+    val lastReviewDate: LocalDate,
+    val compressed: Boolean = false
 )
 
 class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
@@ -169,7 +170,16 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
         }
         val message = rebalanced.warningMessage ?: generated.warningMessage
             ?: "복습 ${generated.generatedReviewCount}회가 생성되었습니다. 첫 복습일은 ${generated.schedules.firstOrNull()?.scheduledDate ?: "-"}이고 마지막 복습일은 ${generated.schedules.lastOrNull()?.scheduledDate ?: generated.lastReviewDate}입니다."
-        CreateStudyRecordResult(recordId, newItems, resultStatus, message, generated.lastReviewDate)
+        CreateStudyRecordResult(
+            recordId,
+            newItems,
+            resultStatus,
+            message,
+            generated.lastReviewDate,
+            compressed = generated.compressed || rebalanced.schedules.any {
+                it.status == ReviewPlanStatus.RESCHEDULED
+            }
+        )
     }
 
     private suspend fun studyRecordRepositoryFor(uid: String, examId: String): Set<String> =

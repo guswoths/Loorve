@@ -23,6 +23,8 @@ import com.loorve.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 import java.util.Calendar
 
 @Composable
@@ -33,7 +35,9 @@ fun ExamSettingScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy년 MM월 dd일") }
+    val dateFormatter = remember {
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.KOREAN)
+    }
 
     var navigated by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -169,6 +173,80 @@ fun ExamSettingScreen(
                             .format(dateFormatter)
                     } else { "날짜 선택" }
                     Text(text = displayText, color = if (uiState.examDate != 0L) OnBackground else OnSurfaceVariant)
+                }
+
+                OutlinedTextField(
+                    value = uiState.finalReviewBufferDaysText,
+                    onValueChange = viewModel::onFinalReviewBufferDaysChange,
+                    label = { Text("시험 전 복습 버퍼(일)") },
+                    supportingText = { Text("시험일과 버퍼 날짜에는 일반 복습을 자동 배정하지 않습니다.") },
+                    singleLine = true,
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = uiState.maxDailyReviewMinutesText,
+                    onValueChange = viewModel::onMaxDailyReviewMinutesChange,
+                    label = { Text("하루 최대 복습 시간(분, 선택사항)") },
+                    singleLine = true,
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = uiState.timezone,
+                    onValueChange = viewModel::onTimezoneChange,
+                    label = { Text("시간대") },
+                    singleLine = true,
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (!uiState.canSaveExamDate) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = uiState.errorMessage.orEmpty(),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = LoorveTypography.bodyMedium
+                            )
+                            uiState.recommendedEarliestExamDate?.let { earliest ->
+                                Text(
+                                    text = "권장 가능한 가장 빠른 시험일: ${earliest.format(dateFormatter)}",
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    style = LoorveTypography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (uiState.cramRequiredCount > 0) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "⚠️ 압축 복습 안내",
+                                style = LoorveTypography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                            uiState.warnings.forEach { warning ->
+                                Text(
+                                    text = warning,
+                                    style = LoorveTypography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -322,6 +400,7 @@ fun ExamSettingScreen(
                 enabled = !uiState.isLoading &&
                         uiState.subjectName.isNotBlank() &&
                         uiState.examDate != 0L &&
+                        uiState.canSaveExamDate &&
                         uiState.studyEndDateError == null
             )
         }
