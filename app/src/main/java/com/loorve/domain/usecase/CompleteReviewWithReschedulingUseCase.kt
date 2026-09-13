@@ -88,7 +88,7 @@ class CompleteReviewWithReschedulingUseCase @Inject constructor(
                 kind = ReviewNotificationKind.CANCEL, scheduledDate = oldNext.date(zone),
                 triggerAtMillis = 0L
             )
-            notifications += newNext.notificationEvents(uid, zone)
+            notifications += newNext.notificationEvents(uid, zone, examDate)
         }
         schedulingRepository.completeReviewAndUpdateSchedules(
             uid, completed, changed, notifications

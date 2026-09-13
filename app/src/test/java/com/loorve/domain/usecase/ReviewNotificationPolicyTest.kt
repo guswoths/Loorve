@@ -20,7 +20,7 @@ class ReviewNotificationPolicyTest {
             reviewDate = date.atStartOfDay(zone).toInstant().toEpochMilli()
         )
 
-        val events = item.notificationEvents("user", zone)
+        val events = item.notificationEvents("user", zone, date.plusDays(1))
 
         assertEquals(2, events.size)
         assertTrue(events.all { it.scheduledDate == date })
@@ -38,6 +38,6 @@ class ReviewNotificationPolicyTest {
             planStatus = ReviewPlanStatus.CRAM_MODE_REQUIRED
         )
 
-        assertTrue(item.notificationEvents("user", zone).isEmpty())
+        assertTrue(item.notificationEvents("user", zone, LocalDate.of(2026, 10, 2)).isEmpty())
     }
 }

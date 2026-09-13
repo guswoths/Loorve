@@ -140,7 +140,7 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
         )
         val newItems = finalItems.filter { it.studyRecordId == recordId }
         val movedExistingItems = finalItems.filter { it.studyRecordId != recordId }
-        val events = newItems.flatMap { it.notificationEvents(uid, zone) }.toMutableList()
+        val events = newItems.flatMap { it.notificationEvents(uid, zone, examDate) }.toMutableList()
         movedExistingItems.forEach { moved ->
             val old = existingItems.firstOrNull { it.id == moved.id }
             if (old != null && old.reviewDate != moved.reviewDate) {
@@ -150,7 +150,7 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
                     kind = ReviewNotificationKind.CANCEL, scheduledDate = old.reviewDate.toLocalDate(zone),
                     triggerAtMillis = 0L
                 )
-                events += moved.notificationEvents(uid, zone)
+                events += moved.notificationEvents(uid, zone, examDate)
             }
         }
         val resultStatus = if (rebalanced.status == ReviewPlanStatus.OVERLOADED_UNRESOLVED) {
@@ -232,7 +232,12 @@ private fun ReviewScheduleItem.toEntry(zone: ZoneId) = ReviewScheduleEntry(
     originalScheduledDate = originalReviewDate.toLocalDate(zone)
 )
 
-fun ReviewScheduleItem.notificationEvents(uid: String, zone: ZoneId): List<ReviewNotificationOutbox> {
+fun ReviewScheduleItem.notificationEvents(
+    uid: String,
+    zone: ZoneId,
+    examDate: LocalDate
+): List<ReviewNotificationOutbox> {
+    if (reviewDate.toLocalDate(zone) >= examDate) return emptyList()
     if (planStatus == ReviewPlanStatus.CRAM_MODE_REQUIRED ||
         planStatus == ReviewPlanStatus.INSUFFICIENT_WINDOW ||
         planStatus == ReviewPlanStatus.OVERLOADED_UNRESOLVED

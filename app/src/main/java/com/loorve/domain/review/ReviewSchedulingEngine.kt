@@ -87,9 +87,10 @@ object ReviewSchedulingEngine {
             "최소 복습 횟수는 양수여야 합니다."
         }
         val systemMinimum = getMinimumReviewCount(effectiveStudyDays)
-        val preferredAdjustment =
-            (if (difficulty == ReviewDifficulty.HARD) 1 else 0) +
-                (if (initialMastery != null && initialMastery <= 2) 1 else 0)
+        val preferredAdjustment = if (
+            difficulty == ReviewDifficulty.HARD ||
+            (initialMastery != null && initialMastery <= 2)
+        ) 1 else 0
         return max(systemMinimum, optionalMinReviewCount ?: 0) + preferredAdjustment
     }
 
