@@ -79,6 +79,9 @@ fun MyPageScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
             )
         },
+        bottomBar = {
+            BannerAdView(modifier = Modifier.fillMaxWidth())
+        },
         containerColor = Background
     ) { padding ->
 

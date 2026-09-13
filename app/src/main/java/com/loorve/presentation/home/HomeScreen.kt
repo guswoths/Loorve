@@ -98,6 +98,9 @@ fun HomeScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
             )
         },
+        bottomBar = {
+            BannerAdView(modifier = Modifier.fillMaxWidth())
+        },
         containerColor = Background
     ) { paddingValues ->
         LazyColumn(
