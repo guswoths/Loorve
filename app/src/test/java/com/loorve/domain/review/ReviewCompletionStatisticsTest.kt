@@ -63,6 +63,50 @@ class ReviewCompletionStatisticsTest {
     }
 
     @Test
+    fun `삭제된 일정이 더 이상 전달되지 않으면 차트 통계에서도 사라진다`() {
+        val existing = buildRecentReviewCompletionStats(
+            schedules(today, due = 2, completed = 0),
+            today
+        )
+        val afterDeletion = buildRecentReviewCompletionStats(emptyList(), today)
+
+        assertEquals(2, existing.last().dueCount)
+        assertEquals(0, afterDeletion.last().dueCount)
+        assertEquals(0, afterDeletion.last().completedCount)
+    }
+
+    @Test
+    fun `완료 상태 변경은 완료 수와 완료율에 반영된다`() {
+        val pending = ReviewCompletionSchedule(
+            id = "schedule-1",
+            dueDate = today,
+            isCompleted = false
+        )
+        val completed = pending.copy(isCompleted = true)
+
+        val pendingStat = buildRecentReviewCompletionStats(listOf(pending), today).last()
+        val completedStat = buildRecentReviewCompletionStats(listOf(completed), today).last()
+
+        assertEquals(0, pendingStat.completedCount)
+        assertEquals(0, pendingStat.completionRatePercent)
+        assertEquals(1, completedStat.completedCount)
+        assertEquals(100, completedStat.completionRatePercent)
+    }
+
+    @Test
+    fun `표시 기간 밖의 일정은 최근 7일 통계에 포함되지 않는다`() {
+        val outside = ReviewCompletionSchedule(
+            id = "outside",
+            dueDate = today.minusDays(7),
+            isCompleted = true
+        )
+
+        val stats = buildRecentReviewCompletionStats(listOf(outside), today)
+
+        assertTrue(stats.all { it.dueCount == 0 && it.completedCount == 0 })
+    }
+
+    @Test
     fun `완료 수가 예정 수를 초과해도 완료율은 100으로 제한한다`() {
         val stat = DailyReviewCompletionStat(today, dueCount = 2, completedCount = 3)
 

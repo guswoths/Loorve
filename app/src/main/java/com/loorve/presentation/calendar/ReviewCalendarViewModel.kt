@@ -69,6 +69,8 @@ class ReviewCalendarViewModel @Inject constructor(
     private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     private val seoulZone = ZoneId.of("Asia/Seoul")
     private var loadJob: Job? = null
+    private var recentLegacyJob: Job? = null
+    private var recentItemsJob: Job? = null
     private var recentLegacySchedules: List<ReviewCompletionSchedule> = emptyList()
     private var recentScheduleItems: List<ReviewCompletionSchedule> = emptyList()
     private var recentLegacyLoaded = false
@@ -82,6 +84,20 @@ class ReviewCalendarViewModel @Inject constructor(
      */
     // ✅ AFTER — refreshUid() 내부에서 직접 스케줄 로드까지 완료
     suspend fun refreshUid() {
+        loadJob?.cancel()
+        recentLegacyJob?.cancel()
+        recentItemsJob?.cancel()
+        recentLegacySchedules = emptyList()
+        recentScheduleItems = emptyList()
+        recentLegacyLoaded = false
+        recentItemsLoaded = false
+        _uiState.update {
+            it.copy(
+                completionStats = emptyList(),
+                selectedCompletionStat = null,
+                isCompletionStatsLoading = true
+            )
+        }
         _isUidReady.value = false
         val user = FirebaseAuth.getInstance().currentUser
         val uid = runCatching {
@@ -98,6 +114,8 @@ class ReviewCalendarViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             loadSchedulesForMonth(_uiState.value.displayYearMonth)
             observeRecentCompletionSchedules(uid)
+        } else {
+            _uiState.update { it.copy(isCompletionStatsLoading = false) }
         }
     }
 
@@ -316,13 +334,15 @@ class ReviewCalendarViewModel @Inject constructor(
         val endDate = today.format(dateFormatter)
         _uiState.update { it.copy(isCompletionStatsLoading = true) }
 
-        viewModelScope.launch {
+        recentLegacyJob = viewModelScope.launch {
             reviewScheduleRepository
                 .getReviewSchedulesByDateRange(uid, startDate, endDate)
                 .catch { exception ->
+                    recentLegacySchedules = emptyList()
+                    recentLegacyLoaded = true
+                    updateCompletionStats(today)
                     _uiState.update {
                         it.copy(
-                            isCompletionStatsLoading = false,
                             errorMessage = exception.message ?: "복습 통계를 불러오지 못했습니다."
                         )
                     }
@@ -344,13 +364,15 @@ class ReviewCalendarViewModel @Inject constructor(
                 }
         }
 
-        viewModelScope.launch {
+        recentItemsJob = viewModelScope.launch {
             reviewScheduleItemRepository
                 .observeReviewScheduleItems(uid)
                 .catch { exception ->
+                    recentScheduleItems = emptyList()
+                    recentItemsLoaded = true
+                    updateCompletionStats(today)
                     _uiState.update {
                         it.copy(
-                            isCompletionStatsLoading = false,
                             errorMessage = exception.message ?: "복습 통계를 불러오지 못했습니다."
                         )
                     }
