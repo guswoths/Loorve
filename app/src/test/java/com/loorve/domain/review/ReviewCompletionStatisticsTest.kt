@@ -109,6 +109,51 @@ class ReviewCompletionStatisticsTest {
         assertEquals(100, stat.completionRatePercent)
     }
 
+    @Test
+    fun `remaining count is due count minus completed count and cannot be negative`() {
+        val normal = DailyReviewCompletionStat(today, dueCount = 5, completedCount = 3)
+        val invalid = DailyReviewCompletionStat(today, dueCount = 2, completedCount = 4)
+
+        assertEquals(2, remainingCount(normal))
+        assertEquals(0, remainingCount(invalid))
+    }
+
+    @Test
+    fun `maximum due count in the recent seven days can be used as the chart height reference`() {
+        val stats = listOf(
+            DailyReviewCompletionStat(today.minusDays(2), 3, 1),
+            DailyReviewCompletionStat(today.minusDays(1), 10, 5),
+            DailyReviewCompletionStat(today, 5, 5)
+        )
+
+        assertEquals(10, stats.maxOf { it.dueCount.coerceAtLeast(0) }.coerceAtLeast(1))
+    }
+
+    @Test
+    fun `a day with no schedule has zero remaining reviews`() {
+        val stat = DailyReviewCompletionStat(today, dueCount = 0, completedCount = 0)
+
+        assertEquals(0, remainingCount(stat))
+    }
+
+    @Test
+    fun `clamped completed count plus remaining count equals due count`() {
+        val stats = listOf(
+            DailyReviewCompletionStat(today.minusDays(1), dueCount = 5, completedCount = 3),
+            DailyReviewCompletionStat(today, dueCount = 2, completedCount = 4)
+        )
+
+        stats.forEach { stat ->
+            val completed = stat.completedCount.coerceIn(0, stat.dueCount)
+            assertEquals(stat.dueCount, completed + remainingCount(stat))
+        }
+    }
+
+    private fun remainingCount(stat: DailyReviewCompletionStat): Int {
+        val completed = stat.completedCount.coerceIn(0, stat.dueCount)
+        return (stat.dueCount - completed).coerceAtLeast(0)
+    }
+
     private fun schedules(
         date: LocalDate,
         due: Int,

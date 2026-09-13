@@ -1,7 +1,9 @@
 package com.loorve.presentation.calendar
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -41,19 +42,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.domain.model.ReviewBlock
@@ -61,13 +58,11 @@ import com.loorve.domain.model.ReviewSchedule
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.review.DailyReviewCompletionStat
-import com.loorve.domain.review.splitValidReviewCompletionStatSegments
 import com.loorve.presentation.reviewblock.ReviewRecordMiniCard
 import com.loorve.ui.component.BannerAdView
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.abs
 import androidx.compose.material3.Card
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -152,7 +147,7 @@ fun ReviewCalendarScreen(
                     // ── 섹션 1: 날짜별 복습 일정
                     item {
                         Text(
-                            text = "최근 7일 복습 완료율",
+                            text = "최근 7일 복습 현황",
                             modifier = Modifier.padding(vertical = 8.dp),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold
@@ -160,7 +155,7 @@ fun ReviewCalendarScreen(
                         )
                     }
                     item {
-                        ReviewCompletionChart(
+                        ReviewWorkloadBarChart(
                             stats = uiState.completionStats,
                             selectedStat = uiState.selectedCompletionStat,
                             isLoading = uiState.isCompletionStatsLoading,
@@ -250,7 +245,7 @@ fun ReviewCalendarScreen(
 }
 
 @Composable
-private fun ReviewCompletionChart(
+private fun ReviewWorkloadBarChart(
     stats: List<DailyReviewCompletionStat>,
     selectedStat: DailyReviewCompletionStat?,
     isLoading: Boolean,
@@ -260,7 +255,7 @@ private fun ReviewCompletionChart(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp),
+                .height(180.dp),
             contentAlignment = Alignment.Center
         ) {
             CircularProgressIndicator()
@@ -273,12 +268,21 @@ private fun ReviewCompletionChart(
     }
 
     val primary = MaterialTheme.colorScheme.primary
-    val summary = stats.joinToString(separator = ". ") { stat ->
-        val label = stat.date.format(DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN))
-        if (stat.completionRatePercent == null) {
-            "$label: 복습 일정 없음"
-        } else {
-            "$label: ${stat.completedCount}/${stat.dueCount}, ${stat.completionRatePercent}%"
+    val totalDue = stats.sumOf { it.dueCount.coerceAtLeast(0) }
+    val totalCompleted = stats.sumOf { it.completedCount.coerceIn(0, it.dueCount) }
+    val totalRemaining = (totalDue - totalCompleted).coerceAtLeast(0)
+    val latestDate = stats.lastOrNull()?.date
+    val summary = buildString {
+        append("최근 7일 복습 현황. 예정 ${totalDue}개, 완료 ${totalCompleted}개, 미완료 ${totalRemaining}개.")
+        stats.forEach { stat ->
+            append(" ")
+            append(stat.date.chartDateLabel(latestDate))
+            if (stat.dueCount <= 0) {
+                append(" 복습 일정 없음.")
+            } else {
+                val completed = stat.completedCount.coerceIn(0, stat.dueCount)
+                append(" 전체 ${stat.dueCount}개 중 완료 ${completed}개, 미완료 ${stat.dueCount - completed}개.")
+            }
         }
     }
     Column(
@@ -286,126 +290,176 @@ private fun ReviewCompletionChart(
             .fillMaxWidth()
             .semantics { contentDescription = summary }
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 220.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom
         ) {
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(stats) {
-                        detectTapGestures { tap ->
-                            val left = 44f
-                            val right = size.width - 12f
-                            val spacing = (right - left) / (stats.size - 1).coerceAtLeast(1)
-                            val index = ((tap.x - left) / spacing).toInt()
-                                .coerceIn(0, stats.lastIndex)
-                            if (abs(tap.x - (left + spacing * index)) <= spacing / 2) {
-                                onStatSelected(stats[index])
-                            }
-                        }
-                    }
-            ) {
-                val top = 16f
-                val bottom = size.height - 34f
-                val left = 44f
-                val right = size.width - 12f
-                val plotHeight = (bottom - top).coerceAtLeast(1f)
-                val spacing = (right - left) / (stats.size - 1).coerceAtLeast(1)
-                val yForRate = { rate: Int ->
-                    top + (100f - rate.coerceIn(0, 100)) / 100f * plotHeight
-                }
-
-                val labelPaint = android.graphics.Paint().apply {
-                    color = primary.toArgb()
-                    textSize = 11.dp.toPx()
-                    textAlign = android.graphics.Paint.Align.RIGHT
-                }
-                listOf(0, 25, 50, 75, 100).forEach { rate ->
-                    val y = yForRate(rate)
-                    drawLine(
-                        color = primary.copy(alpha = 0.16f),
-                        start = Offset(left, y),
-                        end = Offset(right, y),
-                        strokeWidth = 1f
-                    )
-                    drawContext.canvas.nativeCanvas.drawText(
-                        "$rate%",
-                        left - 8f,
-                        y + 4f,
-                        labelPaint
-                    )
-                }
-
-                splitValidReviewCompletionStatSegments(stats)
-                    .forEach { segment ->
-                        val points = segment.map { (index, stat) ->
-                            index to Offset(
-                                left + spacing * index,
-                                yForRate(stat.completionRatePercent ?: 0)
-                            )
-                        }
-                        val linePath = Path().apply {
-                            var previous = points.first().second
-                            moveTo(previous.x, previous.y)
-                            points.drop(1).forEach { (_, point) ->
-                                val midpoint = (previous.x + point.x) / 2f
-                                quadraticTo(midpoint, previous.y, midpoint, (previous.y + point.y) / 2f)
-                                quadraticTo(point.x, point.y, point.x, point.y)
-                                previous = point
-                            }
-                        }
-                        val fillPath = Path().apply {
-                            addPath(linePath)
-                            lineTo(points.last().second.x, bottom)
-                            lineTo(points.first().second.x, bottom)
-                            close()
-                        }
-                        drawPath(fillPath, primary.copy(alpha = 0.1f))
-                        drawPath(linePath, primary, style = Stroke(width = 3.dp.toPx()))
-                        points.forEach { (index, point) ->
-                            val isToday = index == stats.lastIndex
-                            if (isToday) {
-                                drawCircle(
-                                    color = androidx.compose.ui.graphics.Color.White,
-                                    radius = 8.dp.toPx(),
-                                    center = point
-                                )
-                            }
-                            drawCircle(
-                                color = primary,
-                                radius = if (isToday) 6.dp.toPx() else 5.dp.toPx(),
-                                center = point
-                            )
-                        }
-                    }
-            }
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             stats.forEach { stat ->
-                Text(
-                    text = stat.date.format(DateTimeFormatter.ofPattern("M/d", Locale.KOREAN)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                ReviewWorkloadBar(
+                    stat = stat,
+                    latestDate = latestDate,
+                    maxDueCount = stats.maxOfOrNull { it.dueCount.coerceAtLeast(0) }
+                        ?.coerceAtLeast(1) ?: 1,
+                    selected = selectedStat?.date == stat.date,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onStatSelected(stat) }
                 )
             }
         }
+        ChartLegend()
         selectedStat?.let { stat ->
             Text(
-                text = if (stat.completionRatePercent == null) {
-                    "${stat.date.format(DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN))}: No review scheduled"
+                text = if (stat.dueCount <= 0) {
+                    "${stat.date.format(DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN))} · 복습 일정 없음"
                 } else {
-                    "${stat.date.format(DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN))}: " +
-                        "${stat.completedCount} / ${stat.dueCount} · ${stat.completionRatePercent}%"
+                    val completed = stat.completedCount.coerceIn(0, stat.dueCount)
+                    "${stat.date.format(DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN))} · " +
+                        "완료 ${completed}개 / 전체 ${stat.dueCount}개 · " +
+                        "미완료 ${stat.dueCount - completed}개 · 완료율 ${stat.completionRatePercent ?: 0}%"
                 },
                 modifier = Modifier.padding(top = 12.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold
             )
         }
+        Text(
+            text = "최근 7일 · 예정 ${totalDue}개 · 완료 ${totalCompleted}개 · 미완료 ${totalRemaining}개",
+            modifier = Modifier.padding(top = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
+
+@Composable
+private fun ReviewWorkloadBar(
+    stat: DailyReviewCompletionStat,
+    latestDate: LocalDate?,
+    maxDueCount: Int,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val completedCount = stat.completedCount.coerceIn(0, stat.dueCount)
+    val remainingCount = (stat.dueCount - completedCount).coerceAtLeast(0)
+    val totalHeight = 126.dp
+    val totalRatio = stat.dueCount.toFloat() / maxDueCount.toFloat()
+    val totalBarHeight = totalHeight * totalRatio
+    val completedFractionOfBar = if (stat.dueCount > 0) {
+        completedCount.toFloat() / stat.dueCount.toFloat()
+    } else {
+        0f
+    }
+    val completedBarHeight = totalBarHeight * completedFractionOfBar
+    val remainingBarHeight = (totalBarHeight - completedBarHeight).coerceAtLeast(0.dp)
+    val isToday = stat.date == latestDate
+    val label = stat.date.chartDateLabel(latestDate)
+    val description = if (stat.dueCount <= 0) {
+        "$label, 복습 일정 없음"
+    } else {
+        "$label, 예정 ${stat.dueCount}개, 완료 ${completedCount}개, 미완료 ${remainingCount}개"
+    }
+    val outline = when {
+        isToday -> primary
+        selected -> primary.copy(alpha = 0.7f)
+        else -> MaterialTheme.colorScheme.outlineVariant
+    }
+    val outlineWidth = if (isToday || selected) 2.dp else 1.dp
+
+    Column(
+        modifier = modifier
+            .defaultMinSize(minWidth = 34.dp)
+            .clip(MaterialTheme.shapes.small)
+            .border(outlineWidth, outline, MaterialTheme.shapes.small)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 3.dp, vertical = 6.dp)
+            .semantics { contentDescription = description },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Bottom
+    ) {
+        if (stat.dueCount <= 0) {
+            Box(
+                modifier = Modifier
+                    .height(126.dp)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "—",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.height(126.dp),
+                verticalArrangement = Arrangement.Bottom
+            ) {
+                if (remainingCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .width(24.dp)
+                            .height(remainingBarHeight)
+                            .background(primary.copy(alpha = 0.22f))
+                    )
+                }
+                if (completedCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .width(24.dp)
+                            .height(completedBarHeight)
+                            .background(primary)
+                    )
+                }
+            }
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
+            ),
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun ChartLegend() {
+    val primary = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        LegendItem(color = primary, label = "완료")
+        Spacer(modifier = Modifier.width(16.dp))
+        LegendItem(color = primary.copy(alpha = 0.22f), label = "미완료")
+    }
+}
+
+@Composable
+private fun LegendItem(
+    color: androidx.compose.ui.graphics.Color,
+    label: String
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(color, MaterialTheme.shapes.extraSmall)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(text = label, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+private fun LocalDate.chartDateLabel(latestDate: LocalDate?): String =
+    if (this == latestDate) "오늘" else format(DateTimeFormatter.ofPattern("M/d", Locale.KOREAN))
 
 // ── Private Composables ────────────────────────────────────────────────────────
 
