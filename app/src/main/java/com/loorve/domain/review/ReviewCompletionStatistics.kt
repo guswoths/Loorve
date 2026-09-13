@@ -33,7 +33,15 @@ fun buildRecentReviewCompletionStats(
 ): List<DailyReviewCompletionStat> {
     require(dayCount > 0) { "통계 기간은 양수여야 합니다." }
     val dates = (dayCount - 1 downTo 0).map { today.minusDays(it.toLong()) }
-    val schedulesByDate = schedules.groupBy { it.dueDate }
+    val schedulesByDate = schedules
+        .distinctBy { schedule ->
+            if (schedule.id.isNotBlank()) {
+                "id:${schedule.id}"
+            } else {
+                "fallback:${schedule.dueDate}|${schedule.sourceId}|${schedule.reviewOrder}"
+            }
+        }
+        .groupBy { it.dueDate }
     return dates.map { date ->
         val dueSchedules = schedulesByDate[date].orEmpty()
         DailyReviewCompletionStat(

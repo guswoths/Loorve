@@ -149,6 +149,23 @@ class ReviewCompletionStatisticsTest {
         }
     }
 
+    @Test
+    fun `같은 영속 일정 ID가 중복으로 전달되어도 한 번만 집계한다`() {
+        val duplicate = ReviewCompletionSchedule(
+            id = "persisted-schedule",
+            dueDate = today,
+            isCompleted = true
+        )
+
+        val stat = buildRecentReviewCompletionStats(
+            schedules = listOf(duplicate, duplicate.copy(isCompleted = false)),
+            today = today
+        ).last()
+
+        assertEquals(1, stat.dueCount)
+        assertEquals(1, stat.completedCount)
+    }
+
     private fun remainingCount(stat: DailyReviewCompletionStat): Int {
         val completed = stat.completedCount.coerceIn(0, stat.dueCount)
         return (stat.dueCount - completed).coerceAtLeast(0)
