@@ -1,16 +1,12 @@
 /**
- * 이 모듈은 시험 준비형 분산 복습 앱을 위한 타입, 검증 유틸리티, LocalDate 계산 유틸리티,
- * 그리고 정규 분산 리뷰 일정 생성의 핵심 유틸리티를 정의한다.
+ * 시험 준비형 분산 복습 앱의 날짜/정책 도메인.
  *
- * 핵심 원칙:
- * - 날짜는 LocalDate 문자열(YYYY-MM-DD)만 공개 API로 사용한다.
- * - 내부 달력 연산은 UTC 기반의 안전한 Date.UTC를 사용한다.
- * - 날짜 문자열의 형식과 실제 존재 여부를 엄격하게 검증한다.
- * - 일반 사용자 검증 실패는 throw 대신 ValidationResult 구조로 반환한다.
- * - 정규 리뷰는 같은 달력 날짜를 두 번 생성하지 않으며, 시험일과 버퍼 구간은 제외한다.
+ * LocalDate 계산은 사용자 시계, UTC 변환, DST 경계값을 도메인 계약에 섞지 않고,
+ * 캘린더 날짜 기준으로만 동작하게 하여 시간대 경계 버그를 방지한다.
  */
 
-export type LocalDate = string & { readonly __localDateBrand: unique symbol };
+export type LocalDateString = string & { readonly __localDateBrand: unique symbol };
+export type LocalDate = LocalDateString;
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type Importance = 'low' | 'normal' | 'high';
@@ -36,59 +32,47 @@ export type RescheduleReason =
 export interface NotificationPlan {
   kind: 'NONE' | 'IN_APP' | 'PUSH';
   hour: number;
+  minute?: number;
   reminder: boolean;
+  timezone?: string;
 }
 
 export interface Exam {
   id: string;
   title?: string;
   examDate: LocalDate;
-  finalReviewBufferDays?: number;
+  timezone: string;
+  finalReviewBufferDays: number;
+  maxDailyReviewMinutes: number;
+  allowRegularReviewOnDayBeforeExam: boolean;
+  createdAt: LocalDate;
+  updatedAt: LocalDate;
   validationPolicy?: ExamValidationPolicy;
+}
+
+export interface StudyRecord {
+  id: string;
+  examId: string;
+  subjectId?: string;
+  title: string;
+  content: string;
+  studiedAt: LocalDate;
+  difficulty: Difficulty;
+  importance: Importance;
+  initialMastery: 1 | 2 | 3 | 4 | 5;
+  estimatedReviewMinutes: number;
+  optionalMinReviewCount?: number;
+  isCompleted: boolean;
   createdAt: LocalDate;
   updatedAt: LocalDate;
 }
 
-export type StudyRecord =
-  | {
-      id: string;
-      examId: string;
-      content: string;
-      studiedDate: LocalDate;
-      subjectId: string;
-      subjectName?: never;
-      difficulty: Difficulty;
-      importance: Importance;
-      estimatedReviewMinutes: number;
-      initialMastery: 1 | 2 | 3 | 4 | 5;
-      optionalMinReviewCount?: number;
-      createdAt: LocalDate;
-      updatedAt: LocalDate;
-    }
-  | {
-      id: string;
-      examId: string;
-      content: string;
-      studiedDate: LocalDate;
-      subjectId?: never;
-      subjectName: string;
-      difficulty: Difficulty;
-      importance: Importance;
-      estimatedReviewMinutes: number;
-      initialMastery: 1 | 2 | 3 | 4 | 5;
-      optionalMinReviewCount?: number;
-      createdAt: LocalDate;
-      updatedAt: LocalDate;
-    };
-
 export interface ReviewSchedule {
   id: string;
+  examId: string;
   studyRecordId: string;
   reviewIndex: number;
   scheduledDate: LocalDate;
-  originalScheduledDate?: LocalDate;
-  reviewStartDate?: LocalDate;
-  lastReviewDate?: LocalDate;
   status: ReviewStatus;
   priorityScore: number;
   estimatedReviewMinutes: number;
@@ -97,12 +81,13 @@ export interface ReviewSchedule {
   dueDaysBeforeExam: number;
   isFinalReview: boolean;
   rescheduleReason?: string;
-  userMessage?: string;
   createdAt: LocalDate;
   updatedAt: LocalDate;
+  originalScheduledDate?: LocalDate;
+  reviewStartDate?: LocalDate;
+  lastReviewDate?: LocalDate;
+  userMessage?: string;
 }
-
-export type ReviewOutcome = 'EASY' | 'SUCCESS' | 'HARD' | 'FAILED';
 
 export interface ReviewOutcomeEvent {
   recordId: string;
@@ -150,32 +135,27 @@ export interface RescheduleAfterOutcomeResult {
 
 export interface ValidationResult {
   isValid: boolean;
+  blockingReason?: string;
   blockingReasons: string[];
   warnings: string[];
   availableDaysForNewLearning: number;
-  earliestAllowedExamDate: LocalDate;
+  recommendedEarliestExamDate: LocalDate;
+  recordsRequiringCramMode: string[];
+  earliestAllowedExamDate?: LocalDate;
   lastReviewDate: LocalDate;
   userMessage: string;
 }
 
 export interface SchedulingResult {
-  isValid: boolean;
-  validation: ValidationResult;
   schedules: ReviewSchedule[];
-  schedule?: ReviewSchedule[];
-  warnings: SchedulingWarning[];
-  unresolvedOverloads: UnresolvedOverload[];
-  dailyLoadByDate: Map<LocalDate, number>;
-  generatedAt: LocalDate;
-  summary: {
-    totalStudyRecords: number;
-    totalSchedules: number;
-    totalReviewMinutes: number;
-    overloadedDateCount: number;
-    cramModeRecordCount: number;
-    insufficientWindowRecordCount: number;
-  };
-  notes: string[];
+  warnings: string[];
+  status: ReviewStatus;
+  effectiveStudyDays: number;
+  usableWindowDays: number;
+  targetReviewCount: number;
+  generatedReviewCount: number;
+  isValid?: boolean;
+  validation?: ValidationResult;
 }
 
 export interface PriorityScoringConfig {
@@ -189,16 +169,24 @@ export interface PriorityScoringConfig {
 }
 
 export interface SchedulerConfig {
-  timezone: 'Asia/Seoul';
+  timezone: string;
   finalReviewBufferDays: number;
-  minimumEffectiveStudyDays: number;
+  minEffectiveStudyDays: number;
+  minimumEffectiveStudyDays?: number;
   maxDailyReviewMinutes: number;
-  defaultNotificationHour: number;
-  reminderNotificationHour: number;
-  allowRegularReviewOnDayBeforeExam: boolean;
-  examValidationPolicy: ExamValidationPolicy;
   baseIntervals: readonly number[];
-  preferredRescheduleRangeDays: number;
+  allowExamDateWithCramRequiredRecords: boolean;
+  strictExistingRecordValidation: boolean;
+  rescheduleSearchRangeDays: number;
+  reminderHour: number;
+  reminderMinute: number;
+  eveningReminderHour: number;
+  eveningReminderMinute: number;
+  allowRegularReviewOnDayBeforeExam?: boolean;
+  defaultNotificationHour?: number;
+  reminderNotificationHour?: number;
+  examValidationPolicy?: ExamValidationPolicy;
+  preferredRescheduleRangeDays?: number;
   priorityScoring?: Partial<PriorityScoringConfig>;
 }
 
@@ -216,19 +204,34 @@ export interface UnresolvedOverload extends SchedulingWarning {
   status: 'OVERLOADED_UNRESOLVED';
 }
 
-export const BASE_INTERVALS = [1, 3, 7, 14, 30, 60, 120] as const;
+export const DEFAULT_TIMEZONE = 'Asia/Seoul' as const;
+export const DEFAULT_MIN_EFFECTIVE_STUDY_DAYS = 3 as const;
+export const DEFAULT_FINAL_REVIEW_BUFFER_DAYS = 1 as const;
+export const DEFAULT_BASE_INTERVALS = [1, 3, 7, 14, 30, 60, 120] as const;
+export const DEFAULT_MAX_DAILY_REVIEW_MINUTES = 120 as const;
+export const DEFAULT_RESCHEDULE_SEARCH_RANGE_DAYS = 2 as const;
+
+export const BASE_INTERVALS = DEFAULT_BASE_INTERVALS;
 
 export const DEFAULT_SCHEDULER_CONFIG: SchedulerConfig = {
-  timezone: 'Asia/Seoul',
-  finalReviewBufferDays: 1,
-  minimumEffectiveStudyDays: 3,
-  maxDailyReviewMinutes: 120,
+  timezone: DEFAULT_TIMEZONE,
+  finalReviewBufferDays: DEFAULT_FINAL_REVIEW_BUFFER_DAYS,
+  minEffectiveStudyDays: DEFAULT_MIN_EFFECTIVE_STUDY_DAYS,
+  minimumEffectiveStudyDays: DEFAULT_MIN_EFFECTIVE_STUDY_DAYS,
+  maxDailyReviewMinutes: DEFAULT_MAX_DAILY_REVIEW_MINUTES,
   defaultNotificationHour: 9,
   reminderNotificationHour: 19,
   allowRegularReviewOnDayBeforeExam: false,
   examValidationPolicy: 'BLOCK_IF_ANY_RECORD_INSUFFICIENT',
-  baseIntervals: BASE_INTERVALS,
-  preferredRescheduleRangeDays: 2,
+  baseIntervals: DEFAULT_BASE_INTERVALS,
+  preferredRescheduleRangeDays: DEFAULT_RESCHEDULE_SEARCH_RANGE_DAYS,
+  allowExamDateWithCramRequiredRecords: false,
+  strictExistingRecordValidation: true,
+  rescheduleSearchRangeDays: DEFAULT_RESCHEDULE_SEARCH_RANGE_DAYS,
+  reminderHour: 9,
+  reminderMinute: 0,
+  eveningReminderHour: 19,
+  eveningReminderMinute: 0,
 };
 
 export function createDefaultSchedulerConfig(
@@ -2092,6 +2095,16 @@ function assert(condition: unknown, message: string): void {
  * 이 함수는 LocalDate 유틸리티와 정규 리뷰 일정 생성 규칙을 함께 검증한다.
  */
 export function runSelfChecks(): void {
+  // LocalDate는 UTC/DST 경계 문제를 피하고 달력 일 단위로만 계산한다.
+  assert(getEarliestAllowedExamDate('2026-10-01' as LocalDate, 1, 3) === '2026-10-06' as LocalDate, '가장 빠른 허용 시험일은 2026-10-06이어야 합니다.');
+  assert(getLastReviewDate('2026-10-06' as LocalDate, 1) === '2026-10-04' as LocalDate, '마지막 정규 리뷰일은 시험일 1일 전 버퍼 직전이어야 합니다.');
+  assert(!isValidLocalDate('2026-02-30'), '존재하지 않는 날짜는 무효해야 합니다.');
+  assert(isValidLocalDate('2024-02-29'), '윤년 2월 29일은 유효해야 합니다.');
+  assert(addDays('2026-02-28' as LocalDate, 1) === '2026-03-01' as LocalDate, '월 경계를 넘는 더하기가 정확해야 합니다.');
+  assert(addDays('2026-10-03' as LocalDate, -1) === '2026-10-02' as LocalDate, '음수 오프셋이 올바르게 처리되어야 합니다.');
+  assert(getAvailableDaysForNewLearning('2026-10-01' as LocalDate, '2026-10-06' as LocalDate, 1) === 3, 'availableDaysForNewLearning은 3이어야 합니다.');
+  assert(getEffectiveStudyDays('2026-10-01' as LocalDate, '2026-10-06' as LocalDate, 1) === 3, 'effectiveStudyDays는 3이어야 합니다.');
+
   // 1) 시험일 검증 기본 예시
   const blockedCase = validateExamDate('2026-10-01' as LocalDate, '2026-10-04' as LocalDate, {
     ...DEFAULT_SCHEDULER_CONFIG,
