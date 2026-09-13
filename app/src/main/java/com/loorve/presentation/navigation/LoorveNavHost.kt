@@ -392,18 +392,7 @@ fun LoorveNavHost(
 
                             NavigationBarItem(
                                 selected = isSelected,
-                                onClick = {
-                                    if (item.index == 1) {
-                                        selectedTabIndex = item.index
-                                        if (navController.currentDestination?.route != Screen.Calendar.route) {
-                                            navController.navigate(Screen.Calendar.route) {
-                                                launchSingleTop = true
-                                            }
-                                        }
-                                    } else {
-                                        selectedTabIndex = item.index
-                                    }
-                                },
+                                onClick = { selectedTabIndex = item.index },
                                 icon = {
                                     Row(
                                         modifier = Modifier
@@ -461,14 +450,29 @@ fun LoorveNavHost(
                             }
                         )
 
+                        1 -> ReviewCalendarScreen(
+                            onNavigateBack = { selectedTabIndex = 0 },
+                            onNavigateToAddReviewBlock = {
+                                navController.navigate(Screen.AddReviewBlock.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                            onNavigateToReviewBlockDetail = { blockId ->
+                                navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId)) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        )
+
                         2 -> {
                             MyPageScreen(
                                 onBack = {
                                     selectedTabIndex = 0
                                 },
                                 onNavigateToNotificationTimeSetting = {
-                                    navController.navigate(Screen.MyPage.route)
-                                    navController.navigate(Screen.NotificationTimeSetting.route)
+                                    navController.navigate(Screen.NotificationTimeSetting.route) {
+                                        launchSingleTop = true
+                                    }
                                 },
                                 onSignOut = {
                                     navController.navigate(Screen.Login.route) {
