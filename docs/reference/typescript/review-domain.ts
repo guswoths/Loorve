@@ -208,6 +208,64 @@ export interface UnresolvedOverload extends SchedulingWarning {
   status: 'OVERLOADED_UNRESOLVED';
 }
 
+export interface PriorityScoreBreakdown {
+  importance: number;
+  difficulty: number;
+  initialMastery: number;
+  examProximity: number;
+  finalReview: number;
+  reviewPosition: number;
+  dueDaysBeforeExam: number;
+  proximityCap: number;
+}
+
+export interface PriorityScoreResult {
+  score: number;
+  breakdown: PriorityScoreBreakdown;
+}
+
+export interface DailyReviewLoad {
+  scheduledDate: LocalDate;
+  scheduleCount: number;
+  totalEstimatedReviewMinutes: number;
+  maxDailyReviewMinutes: number;
+  isOverloaded: boolean;
+  overloadMinutes: number;
+  scheduleIds: string[];
+}
+
+export interface StudyRecordScheduleBundle {
+  record: StudyRecord;
+  schedules: ReviewSchedule[];
+  generation?: GenerateReviewDatesResult;
+}
+
+export interface RebalanceMove {
+  scheduleId: string;
+  originalDate: LocalDate;
+  newDate: LocalDate;
+  originalLoad: number;
+  priority: PriorityScoreResult;
+  reason: string;
+}
+
+export interface RebalanceDailyLoadInput {
+  schedules?: ReviewSchedule[];
+  bundles?: StudyRecordScheduleBundle[];
+  exam: Exam;
+  finalReviewBufferDays?: number;
+  maxDailyReviewMinutes?: number;
+}
+
+export interface RebalanceDailyLoadResult {
+  schedules: ReviewSchedule[];
+  dailyLoads: DailyReviewLoad[];
+  warnings: string[];
+  unresolvedOverloadDates: LocalDate[];
+  moves: RebalanceMove[];
+  unresolvedOverloads: UnresolvedOverload[];
+}
+
 export interface ExamDateValidationInput {
   todayDate: LocalDate;
   examDate: LocalDate;
@@ -851,6 +909,8 @@ export function createReviewSchedulesForStudyRecord(input: {
       isFinalReview,
       createdAt: input.record.createdAt ?? input.record.studiedAt,
       updatedAt: input.record.updatedAt ?? input.record.studiedAt,
+      reviewStartDate: generation.reviewStartDate,
+      lastReviewDate: generation.lastReviewDate,
     };
   });
 
@@ -1448,29 +1508,82 @@ export function getDefaultPriorityScoringConfig(
   };
 }
 
+export function calculatePriorityScore(input: {
+  importance: Importance;
+  difficulty: Difficulty;
+  initialMastery: 1 | 2 | 3 | 4 | 5;
+  dueDaysBeforeExam: number;
+  isFinalReview: boolean;
+  reviewIndex: number;
+  totalReviewCount: number;
+}): PriorityScoreResult;
 export function calculatePriorityScore(
   schedule: ReviewSchedule,
   record: StudyRecord,
   exam: Exam,
+  config?: Partial<SchedulerConfig>,
+): number;
+export function calculatePriorityScore(
+  inputOrSchedule: {
+    importance: Importance;
+    difficulty: Difficulty;
+    initialMastery: 1 | 2 | 3 | 4 | 5;
+    dueDaysBeforeExam: number;
+    isFinalReview: boolean;
+    reviewIndex: number;
+    totalReviewCount: number;
+  } | ReviewSchedule,
+  record?: StudyRecord,
+  exam?: Exam,
   config: Partial<SchedulerConfig> = {},
-): number {
-  const effective = createDefaultSchedulerConfig(config);
-  const scoring = getDefaultPriorityScoringConfig(effective);
-  const dueDaysBeforeExam = Math.max(0, schedule.dueDaysBeforeExam);
-  const urgency = Math.max(0, scoring.urgencyBase - dueDaysBeforeExam);
-  const importance = scoring.importance[record.importance] ?? scoring.importance.normal;
-  const difficulty = scoring.difficulty[record.difficulty] ?? scoring.difficulty.medium;
-  const masteryScore = scoring.mastery[record.initialMastery] ?? scoring.mastery[3];
-
-  let total = urgency + importance + difficulty + masteryScore + scoring.overdueBonus;
-  if (schedule.isFinalReview) {
-    total += scoring.finalReviewBonus;
+): PriorityScoreResult | number {
+  if (record && exam && 'id' in inputOrSchedule) {
+    const schedule = inputOrSchedule as ReviewSchedule;
+    const effective = createDefaultSchedulerConfig(config);
+    const scoring = getDefaultPriorityScoringConfig(effective);
+    const dueDaysBeforeExam = Math.max(0, schedule.dueDaysBeforeExam);
+    const importance = scoring.importance[record.importance] ?? scoring.importance.normal;
+    const difficulty = scoring.difficulty[record.difficulty] ?? scoring.difficulty.medium;
+    const masteryScore = scoring.mastery[record.initialMastery] ?? scoring.mastery[3];
+    return Math.max(0, scoring.urgencyBase - dueDaysBeforeExam)
+      + importance
+      + difficulty
+      + masteryScore
+      + (schedule.isFinalReview ? scoring.finalReviewBonus : 0)
+      + (schedule.reviewIndex === 0 ? scoring.firstReviewBonus : 0)
+      + scoring.overdueBonus;
   }
-  if (schedule.reviewIndex === 0) {
-    total += scoring.firstReviewBonus;
-  }
 
-  return total;
+  const input = inputOrSchedule as {
+    importance: Importance;
+    difficulty: Difficulty;
+    initialMastery: 1 | 2 | 3 | 4 | 5;
+    dueDaysBeforeExam: number;
+    isFinalReview: boolean;
+    reviewIndex: number;
+    totalReviewCount: number;
+  };
+  const proximityCap = 30;
+  const dueDaysBeforeExam = Math.max(0, Math.floor(input.dueDaysBeforeExam));
+  const breakdown: PriorityScoreBreakdown = {
+    importance: { high: 40, normal: 20, low: 0 }[input.importance],
+    difficulty: { hard: 25, medium: 10, easy: 0 }[input.difficulty],
+    initialMastery: { 1: 25, 2: 18, 3: 10, 4: 4, 5: 0 }[input.initialMastery],
+    examProximity: Math.max(0, Math.min(proximityCap, 30 - dueDaysBeforeExam)),
+    finalReview: input.isFinalReview ? 30 : 0,
+    reviewPosition: input.totalReviewCount > 0 && input.reviewIndex === input.totalReviewCount - 1 ? 2 : 0,
+    dueDaysBeforeExam,
+    proximityCap,
+  };
+  return {
+    score: breakdown.importance
+      + breakdown.difficulty
+      + breakdown.initialMastery
+      + breakdown.examProximity
+      + breakdown.finalReview
+      + breakdown.reviewPosition,
+    breakdown,
+  };
 }
 
 export function createReviewSchedules(
@@ -1583,7 +1696,10 @@ export function groupSchedulesByDate(
   schedules: ReviewSchedule[],
 ): Map<LocalDate, ReviewSchedule[]> {
   const grouped = new Map<LocalDate, ReviewSchedule[]>();
-  const ordered = [...schedules].sort((a, b) => compareLocalDates(a.scheduledDate, b.scheduledDate));
+  const ordered = [...schedules].sort((a, b) => {
+    const dateOrder = compareLocalDates(a.scheduledDate, b.scheduledDate);
+    return dateOrder !== 0 ? dateOrder : a.id.localeCompare(b.id);
+  });
 
   for (const schedule of ordered) {
     const bucket = grouped.get(schedule.scheduledDate) ?? [];
@@ -1592,6 +1708,36 @@ export function groupSchedulesByDate(
   }
 
   return grouped;
+}
+
+export function calculateDailyReviewLoad(
+  schedules: ReviewSchedule[],
+  maxDailyReviewMinutes: number,
+): DailyReviewLoad[] {
+  if (!Number.isFinite(maxDailyReviewMinutes) || maxDailyReviewMinutes < 0) {
+    throw new RangeError('maxDailyReviewMinutes는 0 이상 유한수여야 합니다.');
+  }
+
+  return Array.from(groupSchedulesByDate(schedules).entries()).map(([scheduledDate, grouped]) => {
+    const totalEstimatedReviewMinutes = grouped.reduce(
+      (total, schedule) => {
+        if (!Number.isFinite(schedule.estimatedReviewMinutes) || schedule.estimatedReviewMinutes < 0) {
+          throw new RangeError(`estimatedReviewMinutes는 유한하고 0 이상이어야 합니다: ${schedule.id}`);
+        }
+        return total + schedule.estimatedReviewMinutes;
+      },
+      0,
+    );
+    return {
+      scheduledDate,
+      scheduleCount: grouped.length,
+      totalEstimatedReviewMinutes,
+      maxDailyReviewMinutes,
+      isOverloaded: totalEstimatedReviewMinutes > maxDailyReviewMinutes,
+      overloadMinutes: Math.max(0, totalEstimatedReviewMinutes - maxDailyReviewMinutes),
+      scheduleIds: grouped.map((schedule) => schedule.id),
+    };
+  });
 }
 
 export function calculateDailyLoad(
@@ -1611,6 +1757,19 @@ export function calculateDailyLoad(
   return dailyLoad;
 }
 
+export function validateRecordSpacingAfterMove(
+  schedule: ReviewSchedule,
+  candidateDate: LocalDate,
+  schedules: ReviewSchedule[],
+): boolean {
+  const sameRecordDates = schedules
+    .filter((item) => item.id !== schedule.id && item.studyRecordId === schedule.studyRecordId)
+    .map((item) => item.scheduledDate)
+    .sort(compareLocalDates);
+
+  return sameRecordDates.every((date) => Math.abs(daysBetween(date, candidateDate)) >= 2);
+}
+
 export function findRescheduleCandidateDate(
   schedule: ReviewSchedule,
   schedules: ReviewSchedule[],
@@ -1618,19 +1777,45 @@ export function findRescheduleCandidateDate(
   config: Partial<SchedulerConfig> = {},
 ): LocalDate | null {
   const effectiveConfig = createDefaultSchedulerConfig(config);
-  if (schedule.isFinalReview) {
-    return null;
-  }
-
   const offsets = [-1, 1, -2, 2] as const;
   for (const offset of offsets) {
     const candidateDate = addDays(schedule.scheduledDate, offset);
-    if (canMoveScheduleToDate(schedule, candidateDate, schedules, exam, effectiveConfig)) {
+    const currentLoad = calculateDailyLoad(schedules);
+    const sourceLoad = currentLoad.get(schedule.scheduledDate) ?? 0;
+    const candidateLoad = currentLoad.get(candidateDate) ?? 0;
+    const finalBufferDays = Number.isInteger(exam.finalReviewBufferDays)
+      ? exam.finalReviewBufferDays
+      : effectiveConfig.finalReviewBufferDays;
+    const lastReviewDate = schedule.lastReviewDate ?? getLastReviewDate(exam.examDate, finalBufferDays);
+    const reviewStartDate = schedule.reviewStartDate ?? getReviewStartDate(schedule.scheduledDate);
+    const candidateInWindow = candidateDate >= reviewStartDate && candidateDate <= lastReviewDate;
+    const inBuffer = candidateDate >= addDays(exam.examDate, -finalBufferDays)
+      && candidateDate < exam.examDate;
+    const preservesFinal = !schedule.isFinalReview
+      || candidateDate < lastReviewDate;
+
+    if (
+      candidateInWindow
+      && candidateDate !== exam.examDate
+      && !inBuffer
+      && preservesFinal
+      && sourceLoad > effectiveConfig.maxDailyReviewMinutes
+      && candidateLoad + schedule.estimatedReviewMinutes <= effectiveConfig.maxDailyReviewMinutes
+      && validateRecordSpacingAfterMove(schedule, candidateDate, schedules)
+    ) {
       return candidateDate;
     }
   }
 
   return null;
+}
+
+export function buildOverloadWarningMessage(
+  date: LocalDate,
+  totalMinutes: number,
+  maxDailyReviewMinutes: number,
+): string {
+  return `${date}의 예상 복습량이 ${totalMinutes}분으로 설정 한도 ${maxDailyReviewMinutes}분을 초과합니다. 하루 복습 한도를 늘리거나 시험일을 조정해 주세요.`;
 }
 
 export function canMoveScheduleToDate(
@@ -2372,92 +2557,261 @@ export function sortSchedulesForDailyView(
 }
 
 export function rebalanceDailyLoad(
+  input: RebalanceDailyLoadInput,
+): RebalanceDailyLoadResult;
+export function rebalanceDailyLoad(
   schedules: ReviewSchedule[],
   exam: Exam,
-  config: Partial<SchedulerConfig> = {},
+  config?: Partial<SchedulerConfig>,
 ): {
   schedules: ReviewSchedule[];
   warnings: SchedulingWarning[];
   unresolvedOverloads: UnresolvedOverload[];
+};
+export function rebalanceDailyLoad(
+  inputOrSchedules: RebalanceDailyLoadInput | ReviewSchedule[],
+  examArgument?: Exam,
+  config: Partial<SchedulerConfig> = {},
+): RebalanceDailyLoadResult | {
+  schedules: ReviewSchedule[];
+  warnings: SchedulingWarning[];
+  unresolvedOverloads: UnresolvedOverload[];
 } {
-  const effectiveConfig = createDefaultSchedulerConfig(config);
-  const working = schedules.map((schedule) => ({
-    ...schedule,
-    originalScheduledDate: schedule.originalScheduledDate ?? schedule.scheduledDate,
-  }));
-  const warnings: SchedulingWarning[] = [];
-  const unresolvedOverloads: UnresolvedOverload[] = [];
+  const legacyCall = Array.isArray(inputOrSchedules);
+  const input: RebalanceDailyLoadInput = legacyCall
+    ? { schedules: inputOrSchedules, exam: examArgument as Exam, ...config }
+    : inputOrSchedules;
+  const effectiveConfig = createDefaultSchedulerConfig({
+    ...config,
+    finalReviewBufferDays: input.finalReviewBufferDays ?? config.finalReviewBufferDays,
+    maxDailyReviewMinutes: input.maxDailyReviewMinutes ?? config.maxDailyReviewMinutes,
+  });
+  const sourceSchedules = input.schedules
+    ?? input.bundles?.flatMap((bundle) => bundle.schedules)
+    ?? [];
+  const working = sourceSchedules
+    .map((schedule) => cloneSchedule(schedule))
+    .sort((a, b) => a.id.localeCompare(b.id));
   const movedScheduleIds = new Set<string>();
+  const moves: RebalanceMove[] = [];
 
-  for (let pass = 0; pass < working.length + 1; pass += 1) {
-    const dailyLoad = calculateDailyLoad(working);
-    const overloadedDates = Array.from(dailyLoad.entries())
-      .filter(([, total]) => total > effectiveConfig.maxDailyReviewMinutes)
-      .map(([date]) => date)
-      .sort((a, b) => compareLocalDates(a, b));
+  const scoreForSchedule = (schedule: ReviewSchedule): PriorityScoreResult => {
+    const record = input.bundles?.find((bundle) => bundle.schedules.some((item) => item.id === schedule.id))?.record;
+    return calculatePriorityScore({
+      importance: record?.importance ?? 'normal',
+      difficulty: record?.difficulty ?? 'medium',
+      initialMastery: record?.initialMastery ?? 3,
+      dueDaysBeforeExam: schedule.dueDaysBeforeExam,
+      isFinalReview: schedule.isFinalReview,
+      reviewIndex: schedule.reviewIndex,
+      totalReviewCount: input.bundles?.find((bundle) => bundle.record.id === schedule.studyRecordId)?.schedules.length ?? 1,
+    });
+  };
 
-    if (overloadedDates.length === 0) {
-      break;
-    }
+  // 이동 우선순위: 낮은 점수, 비최종 복습, 시험에서 먼 날짜, 이른 reviewIndex, ID 순이다.
+  const compareForMove = (a: ReviewSchedule, b: ReviewSchedule): number => {
+    const aScore = scoreForSchedule(a);
+    const bScore = scoreForSchedule(b);
+    if (aScore.score !== bScore.score) return aScore.score - bScore.score;
+    if (a.isFinalReview !== b.isFinalReview) return Number(a.isFinalReview) - Number(b.isFinalReview);
+    if (a.dueDaysBeforeExam !== b.dueDaysBeforeExam) return b.dueDaysBeforeExam - a.dueDaysBeforeExam;
+    if (a.reviewIndex !== b.reviewIndex) return a.reviewIndex - b.reviewIndex;
+    return a.id.localeCompare(b.id);
+  };
 
-    let movedThisPass = false;
+  const maxPasses = Math.max(1, working.length * 2);
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const overloadedLoads = calculateDailyReviewLoad(working, effectiveConfig.maxDailyReviewMinutes)
+      .filter((load) => load.isOverloaded)
+      .sort((a, b) => compareLocalDates(a.scheduledDate, b.scheduledDate));
+    if (overloadedLoads.length === 0) break;
 
-    for (const date of overloadedDates) {
-      const daySchedules = working
-        .filter((schedule) => schedule.scheduledDate === date)
-        .sort((a, b) => compareSchedulePriority(a, b));
+    let moved = false;
+    for (const load of overloadedLoads) {
+      const candidates = working
+        .filter((schedule) => schedule.scheduledDate === load.scheduledDate)
+        .filter((schedule) => !movedScheduleIds.has(schedule.id))
+        .sort(compareForMove);
 
-      for (const schedule of daySchedules) {
-        if (movedScheduleIds.has(schedule.id)) {
-          continue;
-        }
-
-        const candidateDate = findRescheduleCandidateDate(schedule, working, exam, effectiveConfig);
-        if (!candidateDate) {
-          continue;
-        }
+      for (const schedule of candidates) {
+        const candidateDate = findRescheduleCandidateDate(
+          schedule,
+          working,
+          input.exam,
+          effectiveConfig,
+        );
+        if (!candidateDate) continue;
 
         const originalDate = schedule.scheduledDate;
-        schedule.originalScheduledDate = schedule.originalScheduledDate ?? originalDate;
-        schedule.scheduledDate = candidateDate;
-        schedule.status = 'RESCHEDULED';
-        schedule.rescheduleReason = `Rescheduled due to daily review limit: ${originalDate} → ${candidateDate}`;
-        schedule.userMessage = `일일 제한을 맞추기 위해 ${originalDate}에서 ${candidateDate}로 이동했습니다.`;
-        schedule.updatedAt = originalDate;
+        const originalLoad = load.totalEstimatedReviewMinutes;
+        const newDueDaysBeforeExam = daysBetween(candidateDate, input.exam.examDate);
+        const nextPriority = calculatePriorityScore({
+          importance: input.bundles?.find((bundle) => bundle.record.id === schedule.studyRecordId)?.record.importance ?? 'normal',
+          difficulty: input.bundles?.find((bundle) => bundle.record.id === schedule.studyRecordId)?.record.difficulty ?? 'medium',
+          initialMastery: input.bundles?.find((bundle) => bundle.record.id === schedule.studyRecordId)?.record.initialMastery ?? 3,
+          dueDaysBeforeExam: newDueDaysBeforeExam,
+          isFinalReview: schedule.isFinalReview,
+          reviewIndex: schedule.reviewIndex,
+          totalReviewCount: input.bundles?.find((bundle) => bundle.record.id === schedule.studyRecordId)?.schedules.length ?? 1,
+        });
+        const reason = `일일 복습량 ${originalLoad}분이 설정 한도 ${effectiveConfig.maxDailyReviewMinutes}분을 초과하여 ${originalDate}에서 ${candidateDate}로 자동 조정됨`;
+        const index = working.findIndex((item) => item.id === schedule.id);
+        working[index] = {
+          ...working[index],
+          scheduledDate: candidateDate,
+          status: 'RESCHEDULED',
+          rescheduleReason: reason,
+          dueDaysBeforeExam: newDueDaysBeforeExam,
+          priorityScore: nextPriority.score,
+        };
         movedScheduleIds.add(schedule.id);
-        movedThisPass = true;
+        moves.push({
+          scheduleId: schedule.id,
+          originalDate,
+          newDate: candidateDate,
+          originalLoad,
+          priority: nextPriority,
+          reason,
+        });
+        moved = true;
         break;
       }
+      if (moved) break;
     }
-
-    if (!movedThisPass) {
-      for (const date of overloadedDates) {
-        const affectedSchedules = working.filter((schedule) => schedule.scheduledDate === date);
-        const warning = buildOverloadWarning(date, affectedSchedules, 'DAILY_REVIEW_LIMIT_EXCEEDED', effectiveConfig);
-        warnings.push(warning);
-
-        const unresolved: UnresolvedOverload = {
-          ...warning,
-          status: 'OVERLOADED_UNRESOLVED',
-        };
-        unresolvedOverloads.push(unresolved);
-
-        for (const schedule of affectedSchedules) {
-          schedule.status = 'OVERLOADED_UNRESOLVED';
-          schedule.userMessage = `일일 학습량 제한을 해결할 수 없어 ${date} 일정이 유지되었습니다. 시험일 조정, 제한 확대, 또는 수동 조정이 필요합니다.`;
-          if (schedule.isFinalReview) {
-            schedule.rescheduleReason = `Final review fixed at ${schedule.lastReviewDate ?? schedule.scheduledDate} and remains overloaded`;
-          }
-        }
-      }
-      break;
-    }
+    if (!moved) break;
   }
 
-  return {
+  const finalLoads = calculateDailyReviewLoad(working, effectiveConfig.maxDailyReviewMinutes);
+  const unresolvedOverloadDates = finalLoads
+    .filter((load) => load.isOverloaded)
+    .map((load) => load.scheduledDate);
+  const warnings = unresolvedOverloadDates.map((date) => {
+    const load = finalLoads.find((item) => item.scheduledDate === date);
+    return buildOverloadWarningMessage(
+      date,
+      load?.totalEstimatedReviewMinutes ?? 0,
+      effectiveConfig.maxDailyReviewMinutes,
+    );
+  });
+  const unresolvedOverloads: UnresolvedOverload[] = unresolvedOverloadDates.map((date) => {
+    const affected = working.filter((schedule) => schedule.scheduledDate === date);
+    const total = affected.reduce((sum, schedule) => sum + schedule.estimatedReviewMinutes, 0);
+    const warning = buildOverloadWarning(date, affected, 'DAILY_REVIEW_LIMIT_EXCEEDED', effectiveConfig);
+    for (const schedule of affected) {
+      schedule.status = 'OVERLOADED_UNRESOLVED';
+    }
+    return {
+      ...warning,
+      excessMinutes: Math.max(0, total - effectiveConfig.maxDailyReviewMinutes),
+      message: buildOverloadWarningMessage(date, total, effectiveConfig.maxDailyReviewMinutes),
+      status: 'OVERLOADED_UNRESOLVED',
+    };
+  });
+  const result: RebalanceDailyLoadResult = {
     schedules: working,
+    dailyLoads: finalLoads,
     warnings,
+    unresolvedOverloadDates,
+    moves,
     unresolvedOverloads,
+  };
+
+  if (legacyCall) {
+    return {
+      schedules: result.schedules,
+      warnings: result.unresolvedOverloads,
+      unresolvedOverloads: result.unresolvedOverloads,
+    };
+  }
+  return result;
+}
+
+export function buildDistributedRebalanceExample(): {
+  exam: Exam;
+  bundles: StudyRecordScheduleBundle[];
+  originalSchedules: ReviewSchedule[];
+  originalDailyLoads: DailyReviewLoad[];
+  result: RebalanceDailyLoadResult;
+} {
+  const exam: Exam = {
+    id: 'exam-example',
+    examDate: '2026-11-15' as LocalDate,
+    timezone: DEFAULT_TIMEZONE,
+    finalReviewBufferDays: 1,
+    maxDailyReviewMinutes: 30,
+    allowRegularReviewOnDayBeforeExam: false,
+    createdAt: '2026-10-01' as LocalDate,
+    updatedAt: '2026-10-01' as LocalDate,
+  };
+  const records: StudyRecord[] = [
+    {
+      id: 'A',
+      examId: exam.id,
+      title: '기록 A',
+      content: '기록 A',
+      studiedAt: '2026-10-01' as LocalDate,
+      difficulty: 'medium',
+      importance: 'normal',
+      initialMastery: 3,
+      estimatedReviewMinutes: 15,
+      isCompleted: false,
+      createdAt: '2026-10-01' as LocalDate,
+      updatedAt: '2026-10-01' as LocalDate,
+    },
+    {
+      id: 'B',
+      examId: exam.id,
+      title: '기록 B',
+      content: '기록 B',
+      studiedAt: '2026-10-08' as LocalDate,
+      difficulty: 'hard',
+      importance: 'high',
+      initialMastery: 2,
+      estimatedReviewMinutes: 20,
+      isCompleted: false,
+      createdAt: '2026-10-08' as LocalDate,
+      updatedAt: '2026-10-08' as LocalDate,
+    },
+    {
+      id: 'C',
+      examId: exam.id,
+      title: '기록 C',
+      content: '기록 C',
+      studiedAt: '2026-10-25' as LocalDate,
+      difficulty: 'easy',
+      importance: 'normal',
+      initialMastery: 4,
+      estimatedReviewMinutes: 15,
+      isCompleted: false,
+      createdAt: '2026-10-25' as LocalDate,
+      updatedAt: '2026-10-25' as LocalDate,
+    },
+  ];
+  const bundles = records.map((record) => ({
+    record,
+    ...createReviewSchedulesForStudyRecord({
+      record,
+      examDate: exam.examDate,
+      finalReviewBufferDays: exam.finalReviewBufferDays,
+      config: {
+        ...DEFAULT_SCHEDULER_CONFIG,
+        maxDailyReviewMinutes: exam.maxDailyReviewMinutes,
+      },
+    }),
+  }));
+  const originalSchedules = bundles.flatMap((bundle) => bundle.schedules);
+  const result = rebalanceDailyLoad({
+    bundles,
+    exam,
+    finalReviewBufferDays: exam.finalReviewBufferDays,
+    maxDailyReviewMinutes: exam.maxDailyReviewMinutes,
+  });
+  return {
+    exam,
+    bundles,
+    originalSchedules,
+    originalDailyLoads: calculateDailyReviewLoad(originalSchedules, exam.maxDailyReviewMinutes),
+    result,
   };
 }
 
@@ -2470,11 +2824,113 @@ function assert(condition: unknown, message: string): void {
   }
 }
 
+export function runDailyLoadRebalancingSelfChecks(): void {
+  const exam = {
+    id: 'rebalance-check',
+    examDate: '2026-11-15' as LocalDate,
+    timezone: DEFAULT_TIMEZONE,
+    finalReviewBufferDays: 1,
+    maxDailyReviewMinutes: 30,
+    allowRegularReviewOnDayBeforeExam: false,
+    createdAt: '2026-10-01' as LocalDate,
+    updatedAt: '2026-10-01' as LocalDate,
+  };
+  const createRecord = (
+    id: string,
+    importance: Importance,
+    difficulty: Difficulty,
+    initialMastery: 1 | 2 | 3 | 4 | 5,
+  ): StudyRecord => ({
+    id,
+    examId: exam.id,
+    title: id,
+    content: id,
+    studiedAt: '2026-10-01' as LocalDate,
+    importance,
+    difficulty,
+    initialMastery,
+    estimatedReviewMinutes: 15,
+    isCompleted: false,
+    createdAt: '2026-10-01' as LocalDate,
+    updatedAt: '2026-10-01' as LocalDate,
+  });
+  const createSchedule = (
+    id: string,
+    record: StudyRecord,
+    date: LocalDate,
+    minutes: number,
+    isFinalReview = false,
+  ): ReviewSchedule => ({
+    id,
+    examId: exam.id,
+    studyRecordId: record.id,
+    reviewIndex: 0,
+    scheduledDate: date,
+    originalScheduledDate: date,
+    reviewStartDate: '2026-10-01' as LocalDate,
+    lastReviewDate: '2026-11-13' as LocalDate,
+    status: 'SCHEDULED',
+    priorityScore: 0,
+    estimatedReviewMinutes: minutes,
+    recommendedMethod: '회상',
+    notificationPlan: { kind: 'IN_APP', hour: 9, reminder: false },
+    dueDaysBeforeExam: daysBetween(date, exam.examDate),
+    isFinalReview,
+    createdAt: '2026-10-01' as LocalDate,
+    updatedAt: '2026-10-01' as LocalDate,
+  });
+
+  const highRecord = createRecord('high', 'high', 'hard', 1);
+  const lowRecord = createRecord('low', 'low', 'easy', 5);
+  const highSchedule = createSchedule('high-schedule', highRecord, '2026-10-10' as LocalDate, 20);
+  const lowSchedule = createSchedule('low-schedule', lowRecord, '2026-10-10' as LocalDate, 15);
+  const bundles: StudyRecordScheduleBundle[] = [
+    { record: highRecord, schedules: [highSchedule] },
+    { record: lowRecord, schedules: [lowSchedule] },
+  ];
+  const inputSnapshot = JSON.stringify(bundles);
+  const rebalanced = rebalanceDailyLoad({
+    bundles,
+    exam,
+    maxDailyReviewMinutes: 30,
+  });
+  assert(JSON.stringify(bundles) === inputSnapshot, '재배치는 입력 스케줄을 변경하면 안 됩니다.');
+  assert(rebalanced.moves[0]?.scheduleId === 'low-schedule', '낮은 우선순위 일정이 먼저 이동해야 합니다.');
+  assert(rebalanced.unresolvedOverloadDates.length === 0, '이동 가능한 과부하는 해결되어야 합니다.');
+
+  const noOverload = rebalanceDailyLoad({
+    schedules: [createSchedule('no-overload', highRecord, '2026-10-10' as LocalDate, 10)],
+    exam,
+    maxDailyReviewMinutes: 30,
+  });
+  assert(noOverload.moves.length === 0 && noOverload.warnings.length === 0, '과부하가 없으면 이동하지 않아야 합니다.');
+
+  const unresolved = rebalanceDailyLoad({
+    schedules: [
+      { ...createSchedule('unresolved-a', highRecord, '2026-10-10' as LocalDate, 20), reviewStartDate: '2026-10-10' as LocalDate, lastReviewDate: '2026-10-10' as LocalDate },
+      { ...createSchedule('unresolved-b', lowRecord, '2026-10-10' as LocalDate, 20), reviewStartDate: '2026-10-10' as LocalDate, lastReviewDate: '2026-10-10' as LocalDate },
+    ],
+    exam,
+    maxDailyReviewMinutes: 30,
+  });
+  assert(unresolved.unresolvedOverloadDates[0] === '2026-10-10' as LocalDate, '해결할 수 없는 날짜를 기록해야 합니다.');
+  assert(unresolved.schedules.every((schedule) => schedule.status === 'OVERLOADED_UNRESOLVED'), '미해결 일정은 명시적 상태를 가져야 합니다.');
+  assert(
+    unresolved.warnings[0] === '2026-10-10의 예상 복습량이 40분으로 설정 한도 30분을 초과합니다. 하루 복습 한도를 늘리거나 시험일을 조정해 주세요.',
+    '미해결 과부하 경고 문구가 정확해야 합니다.',
+  );
+
+  const example = buildDistributedRebalanceExample();
+  assert(example.originalSchedules.length === example.result.schedules.length, '통합 예시는 일정을 삭제하면 안 됩니다.');
+  assert(example.result.warnings.length === 0, '통합 예시는 현재 한도에서 과부하를 해결해야 합니다.');
+}
+
 /**
  * 실행 시점에 검증 예시를 바로 확인할 수 있도록 하는 경량 self-check.
  * 이 함수는 LocalDate 유틸리티와 정규 리뷰 일정 생성 규칙을 함께 검증한다.
  */
 export function runSelfChecks(): void {
+  runDailyLoadRebalancingSelfChecks();
   // LocalDate는 UTC/DST 경계 문제를 피하고 달력 일 단위로만 계산한다.
   assert(getEarliestAllowedExamDate('2026-10-01' as LocalDate, 1, 3) === '2026-10-06' as LocalDate, '가장 빠른 허용 시험일은 2026-10-06이어야 합니다.');
   assert(getLastReviewDate('2026-10-06' as LocalDate, 1) === '2026-10-04' as LocalDate, '마지막 정규 리뷰일은 시험일 1일 전 버퍼 직전이어야 합니다.');
