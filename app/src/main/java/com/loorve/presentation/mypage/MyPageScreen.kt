@@ -1,8 +1,5 @@
 package com.loorve.presentation.mypage
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,7 +29,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -57,14 +53,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.loorve.BuildConfig
 import com.loorve.R
 import com.loorve.domain.repository.ScheduleSyncStatus
+import com.loorve.presentation.notification.NotificationPermissionViewModel
 import com.loorve.ui.component.BannerAdView
 import com.loorve.ui.component.LoorveCard
 import com.loorve.ui.theme.Background
@@ -92,11 +87,8 @@ fun MyPageScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    val notificationAllowed = lifecycleState.let { Build.VERSION.SDK_INT < 33 ||
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED
+    val notificationAllowed = lifecycleState.let {
+        NotificationPermissionViewModel.hasNotificationPermission(context)
     }
 
     LaunchedEffect(Unit) {
@@ -194,28 +186,15 @@ fun MyPageScreen(
                             onCheckedChange = viewModel::setNotificationsEnabled
                         )
                         HorizontalDivider(color = SurfaceVariant, thickness = 0.5.dp)
-                        SettingsRow(
-                            icon = Icons.Default.Schedule,
-                            title = stringResource(R.string.settings_notification_time),
-                            subtitle = stringResource(
+                        NotificationSettingRow(
+                            notificationTime = stringResource(
                                 R.string.settings_time_format,
                                 uiState.notificationTime.first,
                                 uiState.notificationTime.second
                             ),
-                            actionLabel = stringResource(R.string.settings_chevron),
-                            onAction = onNavigateToNotificationTimeSetting
-                        )
-                        HorizontalDivider(color = SurfaceVariant, thickness = 0.5.dp)
-                        SettingsRow(
-                            icon = Icons.Default.Notifications,
-                            title = stringResource(R.string.settings_notification_permission),
-                            subtitle = stringResource(
-                                if (notificationAllowed) R.string.settings_permission_allowed
-                                else R.string.settings_permission_not_allowed
-                            ),
-                            actionLabel = if (notificationAllowed) null
-                            else stringResource(R.string.settings_request_permission),
-                            onAction = onNavigateToNotificationPermission
+                            notificationAllowed = notificationAllowed,
+                            onChangeTime = onNavigateToNotificationTimeSetting,
+                            onRequestPermission = onNavigateToNotificationPermission
                         )
                         HorizontalDivider(color = SurfaceVariant, thickness = 0.5.dp)
                         SettingsRow(
@@ -353,6 +332,59 @@ private fun SettingsSwitchRow(
         Spacer(Modifier.width(14.dp))
         Text(title, Modifier.weight(1f), style = LoorveTypography.bodyLarge, color = OnBackground)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun NotificationSettingRow(
+    notificationTime: String,
+    notificationAllowed: Boolean,
+    onChangeTime: () -> Unit,
+    onRequestPermission: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 14.dp, horizontal = 4.dp)
+    ) {
+        SettingsRow(
+            icon = Icons.Default.Schedule,
+            title = stringResource(R.string.settings_notification_time),
+            subtitle = notificationTime,
+            actionLabel = stringResource(R.string.settings_change_notification_time),
+            onAction = onChangeTime
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 36.dp, top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_notification_permission),
+                    style = LoorveTypography.bodyMedium,
+                    color = OnBackground
+                )
+                Text(
+                    text = stringResource(
+                        if (notificationAllowed) {
+                            R.string.settings_notifications_enabled
+                        } else {
+                            R.string.settings_notification_permission_required
+                        }
+                    ),
+                    style = LoorveTypography.bodySmall,
+                    color = OnSurfaceVariant
+                )
+            }
+            if (!notificationAllowed) {
+                TextButton(onClick = onRequestPermission) {
+                    Text(
+                        text = stringResource(R.string.settings_allow_notifications),
+                        color = Primary
+                    )
+                }
+            }
+        }
     }
 }
 
