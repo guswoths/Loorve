@@ -35,6 +35,10 @@ export interface NotificationPlan {
   minute?: number;
   reminder: boolean;
   timezone?: string;
+  reminderTimes?: Array<{ hour: number; minute: number }>;
+  secondaryReminderHour?: number;
+  secondaryReminderMinute?: number;
+  requiresFollowUpReminder?: boolean;
 }
 
 export interface Exam {
@@ -373,6 +377,8 @@ export interface GenerateReviewDatesResult {
   effectiveStudyDays: number;
   usableWindowDays: number;
   status: ScheduleGenerationStatus[];
+  scheduleStatus?: ReviewStatus;
+  wasCompressed: boolean;
   warnings: ScheduleGenerationWarning[];
 }
 
@@ -395,37 +401,53 @@ export function getMinimumReviewCount(effectiveStudyDays: number): number {
 }
 
 export function getTargetReviewCount(
-  record: StudyRecord,
+  record: Pick<StudyRecord, 'difficulty' | 'initialMastery' | 'optionalMinReviewCount'>,
   effectiveStudyDays: number,
-): TargetReviewCountResult {
-  const systemMinimumReviewCount = getMinimumReviewCount(effectiveStudyDays);
-  const optionalMinimumContribution = record.optionalMinReviewCount ?? 0;
+  config?: Partial<SchedulerConfig>,
+): TargetReviewCountResult & {
+  systemMinimum: number;
+  adjustedTarget: number;
+  adjustmentReasons: string[];
+} {
+  const systemMinimum = getMinimumReviewCount(effectiveStudyDays);
+  const optionalMinimumContribution =
+    config?.optionalMinReviewCount ?? record.optionalMinReviewCount ?? 0;
 
-  let difficultyAdjustment = 0;
+  const adjustmentReasons: string[] = [];
+  let extraAdjustment = 0;
+
   if (record.difficulty === 'hard') {
-    difficultyAdjustment = 1;
+    extraAdjustment += 1;
+    adjustmentReasons.push('난이도 hard → +1 회 복습 보정');
   }
 
-  let masteryAdjustment = 0;
   if (record.initialMastery === 1 || record.initialMastery === 2) {
-    masteryAdjustment = 1;
+    if (extraAdjustment === 0) {
+      extraAdjustment += 1;
+      adjustmentReasons.push('초기 숙련도 1~2 → +1 회 복습 보정');
+    } else {
+      adjustmentReasons.push('난이도/숙련도 보정은 한 번만 적용');
+    }
   }
 
-  const extraAdjustmentCap = Math.min(2, difficultyAdjustment + masteryAdjustment);
-  const requestedTargetCount = Math.max(systemMinimumReviewCount, optionalMinimumContribution) + extraAdjustmentCap;
+  const baseFloor = Math.max(systemMinimum, optionalMinimumContribution);
+  const adjustedTarget = baseFloor + extraAdjustment;
 
   return {
-    systemMinimumReviewCount,
+    systemMinimum,
+    adjustedTarget,
+    adjustmentReasons,
+    systemMinimumReviewCount: systemMinimum,
     optionalMinimumContribution,
-    difficultyAdjustment,
-    masteryAdjustment,
-    extraAdjustmentCap,
-    requestedTargetCount,
+    difficultyAdjustment: record.difficulty === 'hard' ? 1 : 0,
+    masteryAdjustment: record.initialMastery === 1 || record.initialMastery === 2 ? 1 : 0,
+    extraAdjustmentCap: Math.min(1, extraAdjustment),
+    requestedTargetCount: adjustedTarget,
     notes: [
-      `system minimum=${systemMinimumReviewCount}`,
+      `system minimum=${systemMinimum}`,
       `optional minimum=${optionalMinimumContribution}`,
-      `difficulty adjustment=${difficultyAdjustment}`,
-      `mastery adjustment=${masteryAdjustment}`,
+      `adjusted target=${adjustedTarget}`,
+      ...adjustmentReasons,
     ],
   };
 }
@@ -468,21 +490,32 @@ export function ensureStrictlyIncreasingUniqueDates(
   return corrected;
 }
 
-export function createRecommendedMethod(
+export function getRecommendedMethod(
   reviewIndex: number,
   totalReviewCount: number,
   isFinalReview: boolean,
 ): string {
   if (isFinalReview) {
-    return '최종 점검: 오답 재검토, 약점 영역 우선 복습, 시험형 회상';
+    return '새 내용을 넓히기보다 핵심 구조·자주 틀리는 포인트·대표 문제를 인출 점검하세요.';
   }
-  if (reviewIndex === 0) {
-    return '짧은 회상 + 핵심 개념 재확인';
+
+  const normalizedIndex = reviewIndex >= 1 ? reviewIndex : 1;
+  if (normalizedIndex === 1) {
+    return '노트를 보지 말고 핵심 개념 3~5개를 먼저 떠올린 뒤, 기억나지 않는 부분만 확인하세요.';
   }
-  if (reviewIndex >= totalReviewCount - 1) {
-    return '퀴즈 + 카드 복습 + 약점 정리';
+  if (normalizedIndex === 2) {
+    return '플래시카드, 빈칸 채우기 또는 짧은 퀴즈로 능동회상을 해보세요.';
   }
-  return '짧은 퀴즈 + 오답 설명 + 핵심 단어 재호출';
+
+  return '문제풀이, 서술형 회상, 개념 간 연결 설명 중 하나를 수행하고 오답 이유를 기록하세요.';
+}
+
+export function createRecommendedMethod(
+  reviewIndex: number,
+  totalReviewCount: number,
+  isFinalReview: boolean,
+): string {
+  return getRecommendedMethod(reviewIndex, totalReviewCount, isFinalReview);
 }
 
 export function createNotificationPlan(
@@ -540,49 +573,78 @@ export function generateScaledReviewDates(
 ): GenerateReviewDatesResult {
   const record = input.record;
   const config = createDefaultSchedulerConfig(input.config ?? {});
+  const studyDate = record.studiedAt ?? record.studiedDate ?? record.createdAt;
   const finalReviewBufferDays =
     typeof input.finalReviewBufferDays === 'number'
       ? input.finalReviewBufferDays
       : config.finalReviewBufferDays;
 
-  const reviewStartDate = getReviewStartDate(record.studiedDate);
-  const lastReviewDate = getLastReviewDate(input.examDate, finalReviewBufferDays);
-  const effectiveStudyDays = getEffectiveStudyDays(record.studiedDate, input.examDate, finalReviewBufferDays);
-  const usableWindowDays = Math.max(
-    0,
-    daysBetween(reviewStartDate, lastReviewDate) + 1,
-  );
+  if (!isValidLocalDate(studyDate) || !isValidLocalDate(input.examDate)) {
+    throw new RangeError('studyDate와 examDate는 모두 유효한 YYYY-MM-DD LocalDate여야 합니다.');
+  }
 
-  const targetResult = getTargetReviewCount(record, effectiveStudyDays);
-  const requestedTargetCount = targetResult.requestedTargetCount;
+  const reviewStartDate = getReviewStartDate(studyDate);
+  const lastReviewDate = getLastReviewDate(input.examDate, finalReviewBufferDays);
+  const effectiveStudyDays = getEffectiveStudyDays(studyDate, input.examDate, finalReviewBufferDays);
+  const usableWindowDays = Math.max(0, daysBetween(reviewStartDate, lastReviewDate) + 1);
 
   const warnings: ScheduleGenerationWarning[] = [];
-  let status: ScheduleGenerationStatus[] = [];
-
-  let effectiveRequestedCount = Math.max(0, Math.min(requestedTargetCount, usableWindowDays));
+  let scheduleStatus: ReviewStatus = 'SCHEDULED';
+  let wasCompressed = false;
 
   if (effectiveStudyDays < 3) {
-    effectiveRequestedCount = Math.min(1, usableWindowDays);
-    status = ['CRAM_MODE_REQUIRED', 'INSUFFICIENT_WINDOW'];
-    if (effectiveRequestedCount > 0) {
-      warnings.push({
-        code: 'CRAM_MODE_REQUIRED',
-        message: '정상적인 분산 복습은 불가하며, 짧은 회상/퀴즈 중심으로 점검이 필요합니다.',
-      });
-    } else {
-      warnings.push({
-        code: 'INSUFFICIENT_WINDOW',
-        message: '학습 창이 너무 짧아 자동 복습을 생성하지 않았습니다.',
-      });
-    }
-  } else if (requestedTargetCount > usableWindowDays) {
+    scheduleStatus = 'CRAM_MODE_REQUIRED';
+    warnings.push({
+      code: 'CRAM_MODE_REQUIRED',
+      message: '정규 분산 복습은 불가능합니다. 짧은 회상·퀴즈 중심으로 압축 복습을 검토하세요.',
+    });
+    return {
+      generatedDates: [],
+      requestedTargetCount: 0,
+      actualGeneratedCount: 0,
+      reviewStartDate,
+      lastReviewDate,
+      effectiveStudyDays,
+      usableWindowDays,
+      status: ['CRAM_MODE_REQUIRED', 'INSUFFICIENT_WINDOW'],
+      scheduleStatus,
+      wasCompressed: true,
+      warnings,
+    };
+  }
+
+  if (usableWindowDays < 1) {
+    scheduleStatus = 'INSUFFICIENT_WINDOW';
     warnings.push({
       code: 'INSUFFICIENT_WINDOW',
-      message: '요청된 복습 수가 사용 가능한 날짜를 초과해 가능한 최대 일수만 생성했습니다.',
+      message: '복습 가능한 날짜 창이 없어 자동 복습 일정을 만들 수 없습니다.',
     });
-    status = ['SCHEDULED', 'INSUFFICIENT_WINDOW'];
-  } else {
-    status = ['SCHEDULED'];
+    return {
+      generatedDates: [],
+      requestedTargetCount: 0,
+      actualGeneratedCount: 0,
+      reviewStartDate,
+      lastReviewDate,
+      effectiveStudyDays,
+      usableWindowDays,
+      status: ['INSUFFICIENT_WINDOW'],
+      scheduleStatus,
+      wasCompressed: true,
+      warnings,
+    };
+  }
+
+  const targetResult = getTargetReviewCount(record, effectiveStudyDays, config);
+  const requestedTargetCount = Math.max(0, targetResult.adjustedTarget ?? 0);
+  const maxFeasibleCount = Math.min(requestedTargetCount, usableWindowDays);
+
+  if (requestedTargetCount > usableWindowDays) {
+    wasCompressed = true;
+    scheduleStatus = 'INSUFFICIENT_WINDOW';
+    warnings.push({
+      code: 'INSUFFICIENT_WINDOW',
+      message: `요청된 복습 수 ${requestedTargetCount}개가 사용 가능한 날짜 ${usableWindowDays}개를 초과해 가능한 최대 개수만 생성했습니다.`,
+    });
   }
 
   const dateSpan: LocalDate[] = [];
@@ -592,90 +654,211 @@ export function generateScaledReviewDates(
     cursor = addDays(cursor, 1);
   }
 
-  let generatedDates: LocalDate[] = [];
+  const actualTargetCount = Math.max(0, Math.min(requestedTargetCount, dateSpan.length));
+  const generatedDates: LocalDate[] = [];
 
-  if (effectiveStudyDays < 3) {
-    if (dateSpan.length > 0) {
-      generatedDates = [dateSpan[0]];
-    }
-  } else if (effectiveRequestedCount === 1) {
-    generatedDates = [reviewStartDate];
-  } else if (effectiveRequestedCount >= 2) {
-    const indices = new Set<number>();
-    indices.add(0);
-    indices.add(dateSpan.length - 1);
-    for (let i = 1; i < effectiveRequestedCount - 1; i += 1) {
-      const relative = i / (effectiveRequestedCount - 1);
-      const index = Math.round(relative * (dateSpan.length - 1));
-      if (index > 0 && index < dateSpan.length - 1) {
-        indices.add(index);
+  if (actualTargetCount === 0) {
+    return {
+      generatedDates: [],
+      requestedTargetCount,
+      actualGeneratedCount: 0,
+      reviewStartDate,
+      lastReviewDate,
+      effectiveStudyDays,
+      usableWindowDays,
+      status: ['INSUFFICIENT_WINDOW'],
+      scheduleStatus: 'INSUFFICIENT_WINDOW',
+      wasCompressed: true,
+      warnings,
+    };
+  }
+
+  if (actualTargetCount === 1) {
+    generatedDates.push(reviewStartDate);
+  } else {
+    const desiredIndices = new Set<number>();
+    const totalSpan = Math.max(1, dateSpan.length - 1);
+
+    for (let i = 0; i < actualTargetCount; i += 1) {
+      if (i === 0) {
+        desiredIndices.add(0);
+        continue;
       }
+      if (i === actualTargetCount - 1) {
+        desiredIndices.add(dateSpan.length - 1);
+        continue;
+      }
+
+      const ratio = i / Math.max(1, actualTargetCount - 1);
+      const rawIndex = Math.round(ratio * totalSpan);
+      const candidateIndex = Math.max(1, Math.min(dateSpan.length - 2, rawIndex));
+      desiredIndices.add(candidateIndex);
     }
 
-    const candidateDates = Array.from(indices)
+    const anchoredDates = Array.from(desiredIndices)
+      .sort((a, b) => a - b)
       .map((index) => dateSpan[index])
-      .filter(Boolean);
+      .filter((date): date is LocalDate => typeof date === 'string');
 
-    generatedDates = ensureStrictlyIncreasingUniqueDates(
-      candidateDates,
+    const repaired = ensureStrictlyIncreasingUniqueDates(
+      anchoredDates,
       reviewStartDate,
       lastReviewDate,
     );
 
-    if (generatedDates.length < effectiveRequestedCount) {
+    if (repaired.length < actualTargetCount) {
       for (const date of dateSpan) {
-        if (generatedDates.length >= effectiveRequestedCount) break;
-        if (!generatedDates.includes(date)) {
-          generatedDates.push(date);
+        if (repaired.length >= actualTargetCount) break;
+        if (!repaired.includes(date)) {
+          repaired.push(date);
         }
       }
-      generatedDates = ensureStrictlyIncreasingUniqueDates(
-        generatedDates,
-        reviewStartDate,
-        lastReviewDate,
-      );
     }
 
-    if (generatedDates.length > effectiveRequestedCount) {
-      generatedDates = generatedDates.slice(0, effectiveRequestedCount);
+    const trimmed = ensureStrictlyIncreasingUniqueDates(
+      repaired,
+      reviewStartDate,
+      lastReviewDate,
+    );
+
+    if (trimmed.length > actualTargetCount) {
+      const kept: LocalDate[] = [trimmed[0]];
+      for (let i = 1; i < trimmed.length - 1; i += 1) {
+        if (kept.length >= actualTargetCount - 1) break;
+        kept.push(trimmed[i]);
+      }
+      kept.push(trimmed[trimmed.length - 1]);
+      trimmed.splice(0, trimmed.length, ...kept);
     }
+
+    trimmed.forEach((date) => generatedDates.push(date));
   }
 
-  if (generatedDates.length === 0 && dateSpan.length > 0) {
-    generatedDates = [dateSpan[0]];
+  const uniqueDates = ensureStrictlyIncreasingUniqueDates(generatedDates, reviewStartDate, lastReviewDate);
+  const finalDates = uniqueDates.filter((date) => date >= reviewStartDate && date <= lastReviewDate);
+
+  if (finalDates.length === 0) {
+    scheduleStatus = 'INSUFFICIENT_WINDOW';
     warnings.push({
       code: 'INSUFFICIENT_WINDOW',
-      message: '법적으로 유효한 날짜가 없어 최소한의 대체 날짜만 생성했습니다.',
+      message: '사용 가능한 리뷰 창이 없어 고유한 정규 리뷰 날짜를 만들지 못했습니다.',
     });
+    return {
+      generatedDates: [],
+      requestedTargetCount,
+      actualGeneratedCount: 0,
+      reviewStartDate,
+      lastReviewDate,
+      effectiveStudyDays,
+      usableWindowDays,
+      status: ['INSUFFICIENT_WINDOW'],
+      scheduleStatus,
+      wasCompressed: true,
+      warnings,
+    };
   }
 
-  const finalStatus = getScheduleStatus({
-    effectiveStudyDays,
-    requestedTargetCount,
-    actualGeneratedCount: generatedDates.length,
-    generatedDates,
-    reviewStartDate,
-    lastReviewDate,
-  });
+  if (requestedTargetCount > usableWindowDays || finalDates.length < requestedTargetCount) {
+    wasCompressed = true;
+    scheduleStatus = 'INSUFFICIENT_WINDOW';
+  }
+
+  if (!wasCompressed && usableWindowDays < 14 && requestedTargetCount > 1) {
+    wasCompressed = true;
+  }
+
+  if (finalDates.length === 1) {
+    scheduleStatus = 'CRAM_MODE_REQUIRED';
+  }
+
+  if (finalDates.length > 0 && finalDates.length >= 2 && scheduleStatus !== 'INSUFFICIENT_WINDOW') {
+    scheduleStatus = 'SCHEDULED';
+  }
 
   return {
-    generatedDates: ensureStrictlyIncreasingUniqueDates(
-      generatedDates,
-      reviewStartDate,
-      lastReviewDate,
-    ),
+    generatedDates: finalDates,
     requestedTargetCount,
-    actualGeneratedCount: ensureStrictlyIncreasingUniqueDates(
-      generatedDates,
-      reviewStartDate,
-      lastReviewDate,
-    ).length,
+    actualGeneratedCount: finalDates.length,
     reviewStartDate,
     lastReviewDate,
     effectiveStudyDays,
     usableWindowDays,
-    status: finalStatus,
+    status: [
+      ...(scheduleStatus === 'SCHEDULED' ? ['SCHEDULED'] : []),
+      ...(scheduleStatus === 'INSUFFICIENT_WINDOW' ? ['INSUFFICIENT_WINDOW'] : []),
+      ...(scheduleStatus === 'CRAM_MODE_REQUIRED' ? ['CRAM_MODE_REQUIRED', 'INSUFFICIENT_WINDOW'] : []),
+    ],
+    scheduleStatus,
+    wasCompressed,
     warnings,
+  };
+}
+
+export function createReviewSchedulesForStudyRecord(input: {
+  record: StudyRecord;
+  examDate: LocalDate;
+  finalReviewBufferDays?: number;
+  config?: Partial<SchedulerConfig>;
+}): {
+  schedules: ReviewSchedule[];
+  generation: GenerateReviewDatesResult;
+  warnings: string[];
+  scheduleStatus: ReviewStatus;
+} {
+  const config = createDefaultSchedulerConfig(input.config ?? {});
+  const finalReviewBufferDays =
+    typeof input.finalReviewBufferDays === 'number'
+      ? input.finalReviewBufferDays
+      : config.finalReviewBufferDays;
+  const generation = generateScaledReviewDates({
+    record: input.record,
+    examDate: input.examDate,
+    finalReviewBufferDays,
+    config,
+  });
+
+  const schedules: ReviewSchedule[] = generation.generatedDates.map((scheduledDate, index) => {
+    const isFinalReview = scheduledDate === generation.lastReviewDate;
+    const dueDaysBeforeExam = daysBetween(scheduledDate, input.examDate);
+    const reminderHour = isFinalReview ? 9 : 9;
+    const followUpHour = isFinalReview ? 18 : 19;
+
+    return {
+      id: `${input.record.id}-review-${index + 1}`,
+      examId: input.record.examId,
+      studyRecordId: input.record.id,
+      reviewIndex: index,
+      scheduledDate,
+      status: generation.scheduleStatus ?? 'SCHEDULED',
+      priorityScore: Math.max(1, 100 - dueDaysBeforeExam),
+      estimatedReviewMinutes: input.record.estimatedReviewMinutes,
+      recommendedMethod: getRecommendedMethod(index + 1, generation.generatedDates.length || 1, isFinalReview),
+      notificationPlan: {
+        kind: 'PUSH',
+        hour: reminderHour,
+        minute: 0,
+        reminder: true,
+        timezone: config.timezone,
+        reminderTimes: [
+          { hour: 9, minute: 0 },
+          ...(isFinalReview ? [{ hour: 18, minute: 0 }] : [{ hour: 19, minute: 0 }]),
+        ],
+        secondaryReminderHour: followUpHour,
+        secondaryReminderMinute: 0,
+        requiresFollowUpReminder: !isFinalReview,
+      },
+      dueDaysBeforeExam,
+      isFinalReview,
+      createdAt: input.record.createdAt ?? input.record.studiedAt,
+      updatedAt: input.record.updatedAt ?? input.record.studiedAt,
+    };
+  });
+
+  return {
+    schedules,
+    generation,
+    warnings: generation.warnings.map((warning) => warning.message),
+    scheduleStatus: generation.scheduleStatus ?? 'SCHEDULED',
   };
 }
 
@@ -2461,18 +2644,20 @@ export function runSelfChecks(): void {
       id: 'r1',
       examId: 'e1',
       content: '약점 정리',
-      studiedDate: '2026-10-01' as LocalDate,
-      subjectName: '수학',
+      studiedAt: '2026-10-01' as LocalDate,
+      title: '약점 정리',
       difficulty: 'medium',
       importance: 'normal',
       estimatedReviewMinutes: 20,
       initialMastery: 3,
+      isCompleted: true,
       createdAt: '2026-10-01' as LocalDate,
       updatedAt: '2026-10-01' as LocalDate,
     },
     examDate: '2026-11-15' as LocalDate,
     finalReviewBufferDays: 1,
   });
+  assert(JSON.stringify(sufficient.generatedDates) === JSON.stringify(['2026-10-02','2026-10-13','2026-10-23','2026-11-03','2026-11-13']), '충분한 창의 생성 일자는 정책에 맞게 결정되어야 합니다.');
   assert(sufficient.generatedDates[0] === '2026-10-02' as LocalDate, '첫 날짜는 reviewStartDate여야 합니다.');
   assert(sufficient.generatedDates[sufficient.generatedDates.length - 1] === '2026-11-13' as LocalDate, '마지막 날짜는 lastReviewDate여야 합니다.');
   assert(sufficient.generatedDates.length === 5, '충분한 창은 5개 일정을 생성해야 합니다.');
@@ -2485,22 +2670,25 @@ export function runSelfChecks(): void {
       id: 'r2',
       examId: 'e2',
       content: '압축 일정 사례',
-      studiedDate: '2026-10-01' as LocalDate,
-      subjectName: '생물',
+      studiedAt: '2026-10-01' as LocalDate,
+      title: '압축 일정 사례',
       difficulty: 'hard',
       importance: 'high',
       estimatedReviewMinutes: 15,
       initialMastery: 2,
+      isCompleted: true,
       createdAt: '2026-10-01' as LocalDate,
       updatedAt: '2026-10-01' as LocalDate,
     },
     examDate: '2026-10-12' as LocalDate,
     finalReviewBufferDays: 1,
   });
-  assert(compressed.generatedDates.length === 5, '압축 창은 5개의 유효한 날짜만 생성해야 합니다.');
+  assert(JSON.stringify(compressed.generatedDates) === JSON.stringify(['2026-10-02','2026-10-05','2026-10-07','2026-10-10']), '압축 창의 생성 일자는 정책에 맞게 결정되어야 합니다.');
+  assert(compressed.generatedDates.length === 4, '압축 창은 4개의 유효한 날짜만 생성해야 합니다.');
   assert(compressed.generatedDates[0] === '2026-10-02' as LocalDate, '압축 일정의 시작은 reviewStartDate여야 합니다.');
   assert(compressed.generatedDates[compressed.generatedDates.length - 1] === '2026-10-10' as LocalDate, '압축 일정의 마지막은 lastReviewDate여야 합니다.');
-  assert(compressed.status.includes('INSUFFICIENT_WINDOW') || compressed.status.includes('SCHEDULED'), '압축 일정은 상태를 포함해야 합니다.');
+  assert(compressed.wasCompressed === true, '짧은 압축 창은 wasCompressed=true여야 합니다.');
+  assert(compressed.status.includes('SCHEDULED') || compressed.status.includes('INSUFFICIENT_WINDOW'), '압축 일정은 상태를 포함해야 합니다.');
 
   // 5) 너무 짧은 창
   const tooShort = generateScaledReviewDates({
