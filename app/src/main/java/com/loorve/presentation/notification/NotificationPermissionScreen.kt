@@ -47,6 +47,7 @@ private fun openAppNotificationSettings(context: Context) {
 @Composable
 fun NotificationPermissionRoute(
     onNavigateBack: () -> Unit,
+    onPermissionGranted: () -> Unit = {},
     viewModel: NotificationPermissionViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -69,6 +70,9 @@ fun NotificationPermissionRoute(
             shouldShowRationale = shouldShowRationale,
             hasRequestedBefore = true
         )
+        if (isGranted) {
+            onPermissionGranted()
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -84,6 +88,9 @@ fun NotificationPermissionRoute(
             shouldShowRationale = shouldShowRationale,
             hasRequestedBefore = false
         )
+        if (NotificationPermissionViewModel.hasNotificationPermission(context)) {
+            onPermissionGranted()
+        }
     }
 
     NotificationPermissionScreen(

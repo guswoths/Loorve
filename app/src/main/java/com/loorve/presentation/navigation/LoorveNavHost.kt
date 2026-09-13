@@ -470,7 +470,7 @@ fun LoorveNavHost(
                                     selectedTabIndex = 0
                                 },
                                 onNavigateToNotificationTimeSetting = {
-                                    navController.navigate(Screen.NotificationTimeSetting.route) {
+                                    navController.navigate(Screen.NotificationPermission.route) {
                                         launchSingleTop = true
                                     }
                                 },
@@ -542,6 +542,13 @@ fun LoorveNavHost(
             NotificationPermissionRoute(
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onPermissionGranted = {
+                    navController.navigate(Screen.NotificationTimeSetting.route) {
+                        popUpTo(Screen.NotificationPermission.route) {
+                            inclusive = true
+                        }
+                    }
                 }
             )
         }
@@ -550,7 +557,7 @@ fun LoorveNavHost(
             MyPageScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToNotificationTimeSetting = {
-                    navController.navigate(Screen.NotificationTimeSetting.route)
+                    navController.navigate(Screen.NotificationPermission.route)
                 },
                 onSignOut = {
                     navController.navigate(Screen.Login.route) {
