@@ -69,10 +69,13 @@ class ReviewCalendarViewModel @Inject constructor(
     private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     private val seoulZone = ZoneId.of("Asia/Seoul")
     private var loadJob: Job? = null
+    private var recentBlocksJob: Job? = null
     private var recentLegacyJob: Job? = null
     private var recentItemsJob: Job? = null
     private var recentLegacySchedules: List<ReviewCompletionSchedule> = emptyList()
     private var recentScheduleItems: List<ReviewCompletionSchedule> = emptyList()
+    private var recentActiveBlockIds: Set<String> = emptySet()
+    private var recentBlocksLoaded = false
     private var recentLegacyLoaded = false
     private var recentItemsLoaded = false
 
@@ -85,10 +88,13 @@ class ReviewCalendarViewModel @Inject constructor(
     // ✅ AFTER — refreshUid() 내부에서 직접 스케줄 로드까지 완료
     suspend fun refreshUid() {
         loadJob?.cancel()
+        recentBlocksJob?.cancel()
         recentLegacyJob?.cancel()
         recentItemsJob?.cancel()
         recentLegacySchedules = emptyList()
         recentScheduleItems = emptyList()
+        recentActiveBlockIds = emptySet()
+        recentBlocksLoaded = false
         recentLegacyLoaded = false
         recentItemsLoaded = false
         _uiState.update {
@@ -334,6 +340,27 @@ class ReviewCalendarViewModel @Inject constructor(
         val endDate = today.format(dateFormatter)
         _uiState.update { it.copy(isCompletionStatsLoading = true) }
 
+        recentBlocksJob = viewModelScope.launch {
+            reviewBlockRepository
+                .observeReviewBlocks(uid)
+                .catch { exception ->
+                    recentBlocksLoaded = true
+                    recentActiveBlockIds = emptySet()
+                    updateCompletionStats(today)
+                    _uiState.update {
+                        it.copy(errorMessage = exception.message ?: "복습 블록을 불러오지 못했습니다.")
+                    }
+                }
+                .collectLatest { blocks ->
+                    recentBlocksLoaded = true
+                    recentActiveBlockIds = blocks
+                        .map { it.blockId }
+                        .filter { it.isNotBlank() }
+                        .toSet()
+                    updateCompletionStats(today)
+                }
+        }
+
         recentLegacyJob = viewModelScope.launch {
             reviewScheduleRepository
                 .getReviewSchedulesByDateRange(uid, startDate, endDate)
@@ -357,7 +384,8 @@ class ReviewCalendarViewModel @Inject constructor(
                                 .toLocalDate(),
                             isCompleted = schedule.isCompleted,
                             sourceId = schedule.originProgressId.ifBlank { schedule.blockId },
-                            reviewOrder = schedule.reviewOrder
+                            reviewOrder = schedule.reviewOrder,
+                            blockId = schedule.blockId
                         )
                     }
                     updateCompletionStats(today)
@@ -391,7 +419,8 @@ class ReviewCalendarViewModel @Inject constructor(
                             dueDate = dueDate,
                             isCompleted = item.status == com.loorve.domain.model.ReviewStatus.COMPLETED,
                             sourceId = item.studyRecordId.ifBlank { item.blockId },
-                            reviewOrder = item.reviewOrder
+                            reviewOrder = item.reviewOrder,
+                            blockId = item.blockId
                         )
                     }
                     updateCompletionStats(today)
@@ -400,7 +429,21 @@ class ReviewCalendarViewModel @Inject constructor(
     }
 
     private fun updateCompletionStats(today: LocalDate) {
-        val schedules = (recentLegacySchedules + recentScheduleItems)
+        val activeLegacySchedules = if (!recentBlocksLoaded) {
+            recentLegacySchedules
+        } else {
+            recentLegacySchedules.filter { schedule ->
+                schedule.blockId.isBlank() || schedule.blockId in recentActiveBlockIds
+            }
+        }
+        val activeScheduleItems = if (!recentBlocksLoaded) {
+            recentScheduleItems
+        } else {
+            recentScheduleItems.filter { schedule ->
+                schedule.blockId.isBlank() || schedule.blockId in recentActiveBlockIds
+            }
+        }
+        val schedules = (activeLegacySchedules + activeScheduleItems)
             .distinctBy { Triple(it.dueDate, it.sourceId, it.reviewOrder) }
         val stats = buildRecentReviewCompletionStats(schedules, today)
         val selectedDate = _uiState.value.selectedCompletionStat?.date ?: today

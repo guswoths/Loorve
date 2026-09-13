@@ -8,7 +8,8 @@ data class ReviewCompletionSchedule(
     val dueDate: LocalDate,
     val isCompleted: Boolean,
     val sourceId: String = "",
-    val reviewOrder: Int = 0
+    val reviewOrder: Int = 0,
+    val blockId: String = ""
 )
 
 data class DailyReviewCompletionStat(

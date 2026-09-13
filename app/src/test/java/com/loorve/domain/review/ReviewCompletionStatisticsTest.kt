@@ -107,6 +107,29 @@ class ReviewCompletionStatisticsTest {
     }
 
     @Test
+    fun `생성 완료 삭제를 순차 반영하면 이전 통계를 유지하지 않는다`() {
+        val schedule = ReviewCompletionSchedule(
+            id = "schedule-1",
+            dueDate = today,
+            isCompleted = false
+        )
+
+        val afterCreate = buildRecentReviewCompletionStats(listOf(schedule), today).last()
+        val afterComplete = buildRecentReviewCompletionStats(
+            listOf(schedule.copy(isCompleted = true)),
+            today
+        ).last()
+        val afterDelete = buildRecentReviewCompletionStats(emptyList(), today).last()
+
+        assertEquals(1, afterCreate.dueCount)
+        assertEquals(0, afterCreate.completedCount)
+        assertEquals(1, afterComplete.dueCount)
+        assertEquals(1, afterComplete.completedCount)
+        assertEquals(0, afterDelete.dueCount)
+        assertEquals(0, afterDelete.completedCount)
+    }
+
+    @Test
     fun `완료 수가 예정 수를 초과해도 완료율은 100으로 제한한다`() {
         val stat = DailyReviewCompletionStat(today, dueCount = 2, completedCount = 3)
 
