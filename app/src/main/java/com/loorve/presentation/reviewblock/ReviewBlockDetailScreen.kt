@@ -30,7 +30,6 @@ import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.model.StudyRecord
-import com.loorve.domain.review.ReviewImportance
 import com.loorve.domain.review.ReviewPlanStatus
 import com.loorve.domain.usecase.CreateStudyRecordResult
 import com.loorve.presentation.home.HomeViewModel
@@ -284,7 +283,7 @@ fun ReviewBlockDetailScreen(
             // ── 학습 진도 입력 섹션 ──
             item {
                 StudyProgressInputSection(
-                    onSave = { learningDateMillis, title, content, importance ->
+                    onSave = { learningDateMillis, title, content ->
                         viewModel.saveProgress(
                             uid = uid,
                             blockId = blockId,
@@ -293,7 +292,6 @@ fun ReviewBlockDetailScreen(
                             content = content,
                             learningDateMillis = learningDateMillis,
                             dailyCap = dailyCap,
-                            importance = importance,
                         )
                     },
                     isLoading = uiState.isLoading,
@@ -867,8 +865,7 @@ fun StudyProgressInputSection(
     onSave: (
         learningDateMillis: Long,
         title: String,
-        content: String,
-        importance: ReviewImportance
+        content: String
     ) -> Unit,
     isLoading: Boolean,
     isSaveEnabled: Boolean = true,
@@ -876,7 +873,6 @@ fun StudyProgressInputSection(
 ) {
     var titleText by remember { mutableStateOf("") }
     var contentText by remember { mutableStateOf("") }
-    var importance by remember { mutableStateOf(ReviewImportance.NORMAL) }
 
     val kstZone = remember { ZoneId.of("Asia/Seoul") }
     val todayMillis = remember {
@@ -958,19 +954,6 @@ fun StudyProgressInputSection(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = importance == ReviewImportance.HIGH,
-                onClick = { importance = ReviewImportance.HIGH },
-                label = { Text("중요도 높음") }
-            )
-            FilterChip(
-                selected = importance != ReviewImportance.HIGH,
-                onClick = { importance = ReviewImportance.NORMAL },
-                label = { Text("일반") }
-            )
-        }
-
         Spacer(modifier = Modifier.height(10.dp))
 
         OutlinedTextField(
@@ -993,8 +976,7 @@ fun StudyProgressInputSection(
                     onSave(
                         selectedDateMillis,
                         titleText.trim(),
-                        contentText.trim(),
-                        importance
+                        contentText.trim()
                     )
                     titleText = ""
                     contentText = ""

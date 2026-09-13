@@ -6,8 +6,8 @@ import com.loorve.domain.model.StudyRecord
 import com.loorve.domain.notification.ReviewNotificationKind
 import com.loorve.domain.notification.ReviewNotificationOutbox
 import com.loorve.domain.notification.ReviewNotificationAdapter
-import com.loorve.domain.repository.ExamRepository
 import com.loorve.domain.repository.ReviewScheduleItemRepository
+import com.loorve.domain.repository.ReviewBlockRepository
 import com.loorve.domain.repository.ReviewSchedulingRepository
 import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.domain.review.*
@@ -15,7 +15,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
-import kotlinx.coroutines.flow.first
 
 data class CreateStudyRecordRequest(
     val examId: String,
@@ -40,7 +39,7 @@ data class CreateStudyRecordResult(
 )
 
 class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
-    private val examRepository: ExamRepository,
+    private val reviewBlockRepository: ReviewBlockRepository,
     private val scheduleRepository: ReviewScheduleItemRepository,
     private val studyRecordRepository: StudyRecordRepository,
     private val schedulingRepository: ReviewSchedulingRepository,
@@ -55,18 +54,20 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
         require(request.content.isNotBlank()) { "학습 내용은 비어 있을 수 없습니다." }
         require(request.content.length <= 20_000) { "학습 내용은 20,000자 이내여야 합니다." }
         require(request.estimatedReviewMinutes > 0) { "예상 복습 시간은 양수여야 합니다." }
-        val exam = examRepository.getExamById(request.examId).first()
-        require(exam.createdBy == uid) { "본인의 시험에만 학습기록을 추가할 수 있습니다." }
-        val zone = ZoneId.of(exam.timezone.ifBlank { "Asia/Seoul" })
-        val examDate = java.time.Instant.ofEpochMilli(exam.examDate).atZone(zone).toLocalDate()
+        val block = reviewBlockRepository.getReviewBlock(uid, request.blockId).getOrThrow()
+            ?: error("복습 블록을 찾을 수 없습니다.")
+        require(block.uid == uid) { "본인의 복습 블록에만 학습기록을 추가할 수 있습니다." }
+        require(block.examDate > 0L) { "시험 날짜가 설정되지 않은 블록입니다." }
+        val zone = ZoneId.of("Asia/Seoul")
+        val examDate = java.time.Instant.ofEpochMilli(block.examDate).atZone(zone).toLocalDate()
         val recordId = UUID.randomUUID().toString()
         val schedulerExam = SchedulerExam(
-            examId = exam.id,
-            examName = exam.subjectName,
+            examId = request.examId,
+            examName = block.examName.ifBlank { block.title },
             examDate = examDate,
             timezone = zone,
-            maxDailyReviewMinutes = exam.maxDailyReviewMinutes,
-            finalReviewBufferDays = exam.finalReviewBufferDays
+            maxDailyReviewMinutes = null,
+            finalReviewBufferDays = 1
         )
         val record = SchedulerStudyRecord(
             studyRecordId = recordId,
@@ -81,7 +82,7 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
         )
         val generated = ReviewSchedulingEngine.createReviewSchedules(
             record, schedulerExam, today,
-            SchedulerConfig(finalReviewBufferDays = exam.finalReviewBufferDays),
+            SchedulerConfig(finalReviewBufferDays = 1),
             ReviewNotificationPlan(timezone = zone)
         )
         val generatedEntries = if (generated.schedules.isEmpty()) {
@@ -116,7 +117,7 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
             schedules = existingEntries + generatedEntries.map { it.toEntry(zone) },
             exam = schedulerExam,
             reviewStartDate = today.plusDays(1),
-            config = SchedulerConfig(finalReviewBufferDays = exam.finalReviewBufferDays)
+            config = SchedulerConfig(finalReviewBufferDays = 1)
         )
         val finalItems = rebalanced.schedules.mapNotNull { entry ->
             existingItems.firstOrNull { it.id == entry.reviewId }?.let { old ->
@@ -130,7 +131,7 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
             title = request.title.trim().ifBlank { request.content.take(20) },
             content = request.content,
             learningDate = request.studiedAt.atStartOfDay(zone).toInstant().toEpochMilli(),
-            examDate = exam.examDate, plannedReviewCount = generated.generatedReviewCount,
+            examDate = block.examDate, plannedReviewCount = generated.generatedReviewCount,
             recommendedCompletionDate = generated.lastReviewDate.atStartOfDay(zone).toInstant().toEpochMilli(),
             difficulty = request.difficulty, importance = request.importance,
             initialMastery = request.initialMastery,
