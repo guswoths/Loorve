@@ -57,18 +57,23 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
         val block = reviewBlockRepository.getReviewBlock(uid, request.blockId).getOrThrow()
             ?: error("복습 블록을 찾을 수 없습니다.")
         require(block.uid == uid) { "본인의 복습 블록에만 학습기록을 추가할 수 있습니다." }
-        require(block.examDate > 0L) { "시험 날짜가 설정되지 않은 블록입니다." }
         val zone = ZoneId.of("Asia/Seoul")
-        val examDate = java.time.Instant.ofEpochMilli(block.examDate).atZone(zone).toLocalDate()
-        val recordId = UUID.randomUUID().toString()
+        val examDate = if (block.examDate > 0L) {
+            java.time.Instant.ofEpochMilli(block.examDate).atZone(zone).toLocalDate()
+        } else {
+            request.studiedAt
+        }
+        val hasLinkedExam = request.examId.isNotBlank()
+        val hasExamDate = block.examDate > 0L
         val schedulerExam = SchedulerExam(
             examId = request.examId,
             examName = block.examName.ifBlank { block.title },
             examDate = examDate,
             timezone = zone,
             maxDailyReviewMinutes = null,
-            finalReviewBufferDays = 1
+            finalReviewBufferDays = 0
         )
+        val recordId = UUID.randomUUID().toString()
         val record = SchedulerStudyRecord(
             studyRecordId = recordId,
             studiedAtDate = request.studiedAt,
@@ -80,34 +85,39 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
             initialMastery = request.initialMastery,
             optionalMinReviewCount = request.optionalMinReviewCount
         )
-        val generated = ReviewSchedulingEngine.createReviewSchedules(
-            record, schedulerExam, today,
-            SchedulerConfig(finalReviewBufferDays = 1),
-            ReviewNotificationPlan(timezone = zone)
-        )
-        val generatedEntries = if (generated.schedules.isEmpty()) {
-            listOf(
-                ReviewScheduleItem(
-                    id = "${recordId}_status",
-                    studyRecordId = recordId,
-                    blockId = request.blockId,
-                    uid = uid,
-                    title = request.title.ifBlank { request.content.take(20) },
-                    reviewDate = generated.lastReviewDate.atStartOfDay(zone).toInstant().toEpochMilli(),
-                    originalReviewDate = generated.lastReviewDate.atStartOfDay(zone).toInstant().toEpochMilli(),
-                    reviewOrder = 0,
-                    status = if (generated.status == ReviewPlanStatus.CRAM_MODE_REQUIRED)
-                        ReviewStatus.CRAM_MODE_REQUIRED else ReviewStatus.OVERLOADED_UNRESOLVED,
-                    planStatus = generated.status,
-                    compressedReview = true,
-                    estimatedReviewMinutes = request.estimatedReviewMinutes,
-                    createdAt = System.currentTimeMillis()
-                )
+        val generated = if (!hasLinkedExam) {
+            SchedulingResult(
+                schedules = emptyList(),
+                status = ReviewPlanStatus.INSUFFICIENT_WINDOW,
+                warningMessage = "복습 일정이 생성되지 않았습니다. 이 학습기록에 연결된 시험이 없습니다.",
+                lastReviewDate = request.studiedAt,
+                effectiveStudyDays = 0,
+                targetReviewCount = 0,
+                generatedReviewCount = 0,
+                compressed = false,
+                availableDaysForNewLearning = 0
+            )
+        } else if (!hasExamDate) {
+            SchedulingResult(
+                schedules = emptyList(),
+                status = ReviewPlanStatus.INSUFFICIENT_WINDOW,
+                warningMessage = "복습 일정이 생성되지 않았습니다. 연결된 시험일이 설정되지 않았습니다.",
+                lastReviewDate = request.studiedAt,
+                effectiveStudyDays = 0,
+                targetReviewCount = 0,
+                generatedReviewCount = 0,
+                compressed = false,
+                availableDaysForNewLearning = 0
             )
         } else {
-            generated.schedules.map {
-                it.toScheduleItem(uid, request.blockId, zone, request.title.ifBlank { request.content.take(20) })
-            }
+            ReviewSchedulingEngine.createReviewSchedules(
+                record, schedulerExam, today,
+                SchedulerConfig(finalReviewBufferDays = 0),
+                ReviewNotificationPlan(timezone = zone)
+            )
+        }
+        val generatedEntries = generated.schedules.map {
+            it.toScheduleItem(uid, request.blockId, zone, request.title.ifBlank { request.content.take(20) })
         }
         val existingRecordIds = studyRecordRepositoryFor(uid, request.examId)
         val existingItems = scheduleRepository.getAllScheduleItems(uid).getOrThrow()
@@ -117,13 +127,17 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
             schedules = existingEntries + generatedEntries.map { it.toEntry(zone) },
             exam = schedulerExam,
             reviewStartDate = today.plusDays(1),
-            config = SchedulerConfig(finalReviewBufferDays = 1)
+            config = SchedulerConfig(finalReviewBufferDays = 0)
         )
-        val finalItems = rebalanced.schedules.mapNotNull { entry ->
-            existingItems.firstOrNull { it.id == entry.reviewId }?.let { old ->
-                entry.toScheduleItem(old, uid, zone)
-            } ?: generatedEntries.firstOrNull { it.id == entry.reviewId }?.let { generated ->
-                entry.toScheduleItem(generated, uid, zone)
+        val finalItems = if (generatedEntries.isEmpty()) {
+            existingItems
+        } else {
+            rebalanced.schedules.mapNotNull { entry ->
+                existingItems.firstOrNull { it.id == entry.reviewId }?.let { old ->
+                    entry.toScheduleItem(old, uid, zone)
+                } ?: generatedEntries.firstOrNull { it.id == entry.reviewId }?.let { generated ->
+                    entry.toScheduleItem(generated, uid, zone)
+                }
             }
         }
         val studyRecord = StudyRecord(

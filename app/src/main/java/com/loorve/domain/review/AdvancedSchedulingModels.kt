@@ -55,7 +55,7 @@ data class SchedulerStudyRecord(
 )
 
 data class SchedulerConfig(
-    val baseIntervals: List<Int> = listOf(1, 3, 7, 14, 30, 60, 120),
+    val baseIntervals: List<Int> = listOf(1, 3, 7, 14, 30),
     val finalReviewBufferDays: Int = 1,
     val existingRecordInsufficiencyPolicy: ExistingRecordInsufficiencyPolicy =
         ExistingRecordInsufficiencyPolicy.ALLOW_WITH_CRAM_WARNING,

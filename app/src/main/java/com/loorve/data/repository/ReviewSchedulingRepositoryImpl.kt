@@ -45,6 +45,9 @@ class ReviewSchedulingRepositoryImpl @Inject constructor(
     ): Result<Unit> = runCatching {
         requireOwner(uid)
         require(record.uid == uid) { "학습기록 소유자가 현재 사용자와 다릅니다." }
+        require(
+            schedules.map { it.studyRecordId to it.reviewDate }.distinct().size == schedules.size
+        ) { "동일 학습기록에 중복된 복습 날짜가 있습니다." }
         val ref = recordRef(uid, record.id)
         val batch = firestore.batch()
         batch.set(ref, recordMap(record))

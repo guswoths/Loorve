@@ -84,6 +84,96 @@ class ReviewSchedulingEngineTest {
     }
 
     @Test
+    fun `시험까지 5일이면 시험 전 가능한 날짜를 모두 압축한다`() {
+        val studyDate = LocalDate.of(2026, 9, 14)
+        val examDate = LocalDate.of(2026, 9, 19)
+
+        assertEquals(
+            listOf(
+                LocalDate.of(2026, 9, 15),
+                LocalDate.of(2026, 9, 16),
+                LocalDate.of(2026, 9, 17),
+                LocalDate.of(2026, 9, 18)
+            ),
+            ReviewSchedulingEngine.generateScaledReviewDates(
+                studyDate = studyDate,
+                examDate = examDate,
+                finalReviewBufferDays = 0,
+                targetReviewCount = 2
+            )
+        )
+    }
+
+    @Test
+    fun `시험까지 21일이면 기본 간격과 시험 전 마지막 복습을 생성한다`() {
+        val studyDate = LocalDate.of(2026, 9, 14)
+        val examDate = LocalDate.of(2026, 10, 5)
+
+        assertEquals(
+            listOf(
+                LocalDate.of(2026, 9, 15),
+                LocalDate.of(2026, 9, 17),
+                LocalDate.of(2026, 9, 21),
+                LocalDate.of(2026, 9, 28),
+                LocalDate.of(2026, 10, 4)
+            ),
+            ReviewSchedulingEngine.generateScaledReviewDates(
+                studyDate = studyDate,
+                examDate = examDate,
+                finalReviewBufferDays = 0,
+                targetReviewCount = 4
+            )
+        )
+    }
+
+    @Test
+    fun `시험까지 90일이면 기본 간격과 중복 없는 마지막 복습을 생성한다`() {
+        val studyDate = LocalDate.of(2026, 9, 14)
+        val examDate = LocalDate.of(2026, 12, 13)
+        val dates = ReviewSchedulingEngine.generateScaledReviewDates(
+            studyDate = studyDate,
+            examDate = examDate,
+            finalReviewBufferDays = 0,
+            targetReviewCount = 6
+        )
+
+        assertEquals(
+            listOf(
+                LocalDate.of(2026, 9, 15),
+                LocalDate.of(2026, 9, 17),
+                LocalDate.of(2026, 9, 21),
+                LocalDate.of(2026, 9, 28),
+                LocalDate.of(2026, 10, 14),
+                LocalDate.of(2026, 12, 12)
+            ),
+            dates
+        )
+        assertEquals(dates.size, dates.distinct().size)
+        assertTrue(dates.all { it.isAfter(studyDate) && it.isBefore(examDate) })
+    }
+
+    @Test
+    fun `시험일이 학습일과 같거나 이전이면 명시적 사유로 일정을 만들지 않는다`() {
+        val studyDate = LocalDate.of(2026, 9, 14)
+
+        val sameDay = ReviewSchedulingEngine.createReviewSchedules(
+            record = SchedulerStudyRecord("same", studyDate),
+            exam = SchedulerExam(examDate = studyDate),
+            today = studyDate
+        )
+        val before = ReviewSchedulingEngine.createReviewSchedules(
+            record = SchedulerStudyRecord("before", studyDate),
+            exam = SchedulerExam(examDate = studyDate.minusDays(1)),
+            today = studyDate
+        )
+
+        assertTrue(sameDay.schedules.isEmpty())
+        assertTrue(sameDay.warningMessage!!.contains("시험일은 학습일보다 늦어야"))
+        assertTrue(before.schedules.isEmpty())
+        assertTrue(before.warningMessage!!.contains("시험일이 학습일보다 빠릅니다"))
+    }
+
+    @Test
     fun `기존 기록의 기간 부족은 기본 정책에서 압축 모드로 표시된다`() {
         val result = ReviewSchedulingEngine.createReviewSchedules(
             record = SchedulerStudyRecord("short", today),

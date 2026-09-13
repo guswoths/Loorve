@@ -5,7 +5,6 @@ import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
@@ -99,7 +98,7 @@ object ReviewSchedulingEngine {
         examDate: LocalDate,
         finalReviewBufferDays: Int,
         targetReviewCount: Int,
-        baseIntervals: List<Int> = listOf(1, 3, 7, 14, 30, 60, 120)
+        baseIntervals: List<Int> = listOf(1, 3, 7, 14, 30)
     ): List<LocalDate> {
         require(targetReviewCount >= 0) { "목표 복습 횟수는 0 이상이어야 합니다." }
         require(baseIntervals.isNotEmpty() && baseIntervals.first() == 1) {
@@ -112,29 +111,19 @@ object ReviewSchedulingEngine {
         val last = lastReviewDate(examDate, finalReviewBufferDays)
         if (targetReviewCount == 0 || first.isAfter(last)) return emptyList()
 
-        val usableDays = ChronoUnit.DAYS.between(first, last).toInt() + 1
-        val count = min(targetReviewCount, usableDays)
-        val selectedIntervals = (0 until count).map { index ->
-            if (index < baseIntervals.size) {
-                baseIntervals[index].toDouble()
-            } else {
-                baseIntervals.last().toDouble() *
-                    (2.0.pow(index - baseIntervals.lastIndex))
-            }
-        }
-        val baseLast = selectedIntervals.last()
-        val span = ChronoUnit.DAYS.between(first, last).toInt()
-        val rawOffsets = if (count == 1) {
-            listOf(0)
-        } else {
-            (0 until count).map { index ->
-                if (index == 0) 0
-                else if (index == count - 1) span
-                else (selectedIntervals[index] / baseLast * span).roundToInt()
-            }
-        }
-        val offsets = enforceStrictOffsets(rawOffsets, span, count)
-        return offsets.map { first.plusDays(it.toLong()) }.distinct()
+        val availableDates = generateSequence(first) { date ->
+            date.plusDays(1).takeUnless { it.isAfter(last) }
+        }.toList()
+        if (availableDates.size <= baseIntervals.size) return availableDates
+
+        val baseDates = baseIntervals
+            .map { studyDate.plusDays(it.toLong()) }
+            .filter { !it.isAfter(last) }
+            .distinct()
+        return (baseDates + last)
+            .filter { it.isAfter(studyDate) && it.isBefore(examDate) }
+            .distinct()
+            .sorted()
     }
 
     fun createReviewSchedules(
@@ -148,6 +137,20 @@ object ReviewSchedulingEngine {
         require(config.finalReviewBufferDays >= 0) { "시험 전 버퍼 일수는 0 이상이어야 합니다." }
         require(record.initialMastery == null || record.initialMastery in 1..5) {
             "초기 숙련도는 1에서 5 사이여야 합니다."
+        }
+        if (!exam.examDate.isAfter(record.studiedAtDate)) {
+            return emptyResult(
+                record,
+                exam,
+                today,
+                config.finalReviewBufferDays,
+                ReviewPlanStatus.INSUFFICIENT_WINDOW,
+                if (exam.examDate == record.studiedAtDate) {
+                    "복습 일정이 생성되지 않았습니다. 시험일은 학습일보다 늦어야 합니다."
+                } else {
+                    "복습 일정이 생성되지 않았습니다. 시험일이 학습일보다 빠릅니다."
+                }
+            )
         }
         if (!record.isCompleted) {
             return emptyResult(
@@ -168,7 +171,7 @@ object ReviewSchedulingEngine {
             record.initialMastery,
             record.optionalMinReviewCount
         )
-        if (effectiveDays < 3L) {
+        if (effectiveDays < 1L) {
             val status = if (config.existingRecordInsufficiencyPolicy ==
                 ExistingRecordInsufficiencyPolicy.BLOCK
             ) ReviewPlanStatus.INSUFFICIENT_WINDOW else ReviewPlanStatus.CRAM_MODE_REQUIRED
@@ -178,7 +181,7 @@ object ReviewSchedulingEngine {
                 today,
                 config.finalReviewBufferDays,
                 status,
-                SchedulingMessages.cramMode(record.studyRecordId)
+                "복습 일정이 생성되지 않았습니다. 시험일까지 유효한 복습 날짜가 없습니다."
             )
                 .copy(targetReviewCount = target, effectiveStudyDays = effectiveDays)
         }

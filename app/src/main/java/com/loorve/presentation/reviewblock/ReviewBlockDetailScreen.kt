@@ -64,7 +64,9 @@ fun ReviewBlockDetailScreen(
     // 저장 성공 스낵바
     LaunchedEffect(uiState.savedSuccess) {
         if (uiState.savedSuccess) {
-            snackbarHostState.showSnackbar("복습 일정이 생성되었습니다.")
+            snackbarHostState.showSnackbar(
+                uiState.lastCreationResult?.userMessage ?: "학습기록이 저장되었습니다."
+            )
             viewModel.resetSavedSuccess()
         }
     }
@@ -822,7 +824,9 @@ private fun ScheduleSummaryCard(
         ReviewPlanStatus.OVERLOADED_UNRESOLVED -> "일일 과부하 확인 필요"
         else -> result.status.name
     }
-    val statusDescription = when (result.status) {
+    val statusDescription = if (schedules.isEmpty()) {
+        result.userMessage
+    } else when (result.status) {
         ReviewPlanStatus.CRAM_MODE_REQUIRED,
         ReviewPlanStatus.INSUFFICIENT_WINDOW ->
             "시험일까지 정규 분산복습 최소기간이 부족합니다. 가능한 복습 일정을 만들었지만, 핵심 개념을 먼저 인출하고 오답을 빠르게 보완하는 압축 학습이 필요합니다."
@@ -836,7 +840,9 @@ private fun ScheduleSummaryCard(
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("복습 일정 ${schedules.size}개가 생성되었습니다.",
+            Text(
+                if (schedules.isEmpty()) "학습기록이 저장되었습니다."
+                else "복습 일정 ${schedules.size}개가 생성되었습니다.",
                 style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
                 "이 학습기록에 대해 복습 일정 ${schedules.size}개를 만들었습니다. " +
