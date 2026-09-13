@@ -2,6 +2,7 @@ package com.loorve
 
 import android.app.Application
 import com.google.firebase.auth.FirebaseAuth
+import com.loorve.util.ensureReviewNotificationChannel
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -9,6 +10,7 @@ class LoorveApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        ensureReviewNotificationChannel(this)
         // ✅ 앱 시작 시 Firebase 토큰 자동 갱신 설정
         // 장시간 백그라운드 후 포그라운드 복귀 시 토큰 만료 방지
         FirebaseAuth.getInstance().addAuthStateListener { auth ->

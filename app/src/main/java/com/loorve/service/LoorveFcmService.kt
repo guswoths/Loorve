@@ -2,6 +2,7 @@ package com.loorve.service
 
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.loorve.util.showReviewNotification
 
 class LoorveFcmService : FirebaseMessagingService() {
 
@@ -12,6 +13,20 @@ class LoorveFcmService : FirebaseMessagingService() {
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
-        // TODO: 푸시 알림 수신 처리 로직 구현
+
+        val title = remoteMessage.notification?.title
+            ?: remoteMessage.data["title"]
+            ?: getString(com.loorve.R.string.app_name)
+        val body = remoteMessage.notification?.body
+            ?: remoteMessage.data["body"]
+            ?: remoteMessage.data["message"]
+            ?: return
+
+        showReviewNotification(
+            context = this,
+            notificationId = remoteMessage.messageId ?: "fcm_${System.currentTimeMillis()}",
+            title = title,
+            text = body
+        )
     }
 }

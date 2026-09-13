@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Loorve</string>
+    <string name="review_notification_channel_id">review_alarm_channel</string>
 </resources>
