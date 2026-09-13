@@ -21,6 +21,12 @@ enum class ExistingRecordInsufficiencyPolicy {
     BLOCK
 }
 
+enum class ScheduleGenerationOutcome {
+    FULL,
+    PARTIAL,
+    NOT_GENERATED
+}
+
 enum class ReviewOutcome {
     SUCCESS,
     EASY,
@@ -116,6 +122,7 @@ data class SchedulingResult(
     val schedules: List<ReviewScheduleEntry>,
     val status: ReviewPlanStatus,
     val warningMessage: String? = null,
+    val outcome: ScheduleGenerationOutcome = ScheduleGenerationOutcome.FULL,
     val lastReviewDate: LocalDate,
     val effectiveStudyDays: Long,
     val targetReviewCount: Int,

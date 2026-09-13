@@ -31,6 +31,7 @@ import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.model.StudyRecord
 import com.loorve.domain.review.ReviewPlanStatus
+import com.loorve.domain.review.ScheduleGenerationOutcome
 import com.loorve.domain.usecase.CreateStudyRecordResult
 import com.loorve.presentation.home.HomeViewModel
 import com.loorve.ui.component.LoorveCard
@@ -824,7 +825,7 @@ private fun ScheduleSummaryCard(
         ReviewPlanStatus.OVERLOADED_UNRESOLVED -> "일일 과부하 확인 필요"
         else -> result.status.name
     }
-    val statusDescription = if (schedules.isEmpty()) {
+    val statusDescription = if (result.generationOutcome != ScheduleGenerationOutcome.FULL) {
         result.userMessage
     } else when (result.status) {
         ReviewPlanStatus.CRAM_MODE_REQUIRED,
@@ -841,7 +842,7 @@ private fun ScheduleSummaryCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                if (schedules.isEmpty()) "학습기록이 저장되었습니다."
+                if (result.generationOutcome != ScheduleGenerationOutcome.FULL) "학습기록이 저장되었습니다."
                 else "복습 일정 ${schedules.size}개가 생성되었습니다.",
                 style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(

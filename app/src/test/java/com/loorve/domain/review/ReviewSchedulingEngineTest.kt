@@ -168,20 +168,95 @@ class ReviewSchedulingEngineTest {
         )
 
         assertTrue(sameDay.schedules.isEmpty())
-        assertTrue(sameDay.warningMessage!!.contains("시험일은 학습일보다 늦어야"))
+        assertTrue(sameDay.warningMessage!!.startsWith("생성불가! 시험일이 오늘이어서"))
+        assertEquals(ScheduleGenerationOutcome.NOT_GENERATED, sameDay.outcome)
         assertTrue(before.schedules.isEmpty())
-        assertTrue(before.warningMessage!!.contains("시험일이 학습일보다 빠릅니다"))
+        assertTrue(before.warningMessage!!.startsWith("생성불가! 시험일이 학습일보다 이전입니다."))
+        assertEquals(ScheduleGenerationOutcome.NOT_GENERATED, before.outcome)
     }
 
     @Test
-    fun `기존 기록의 기간 부족은 기본 정책에서 압축 모드로 표시된다`() {
+    fun `시험일이 내일이면 일정 없이 명시적 사유를 반환한다`() {
+        val studyDate = LocalDate.of(2026, 9, 14)
+        val result = ReviewSchedulingEngine.createReviewSchedules(
+            record = SchedulerStudyRecord("tomorrow", studyDate),
+            exam = SchedulerExam(examDate = studyDate.plusDays(1)),
+            today = studyDate
+        )
+
+        assertTrue(result.schedules.isEmpty())
+        assertTrue(result.warningMessage!!.startsWith("생성불가! 시험일이 내일이어서"))
+        assertEquals(ScheduleGenerationOutcome.NOT_GENERATED, result.outcome)
+    }
+
+    @Test
+    fun `시험까지 이틀이면 가능한 하루만 부분 생성한다`() {
+        val studyDate = LocalDate.of(2026, 9, 14)
+        val result = ReviewSchedulingEngine.createReviewSchedules(
+            record = SchedulerStudyRecord("two-days", studyDate),
+            exam = SchedulerExam(examDate = studyDate.plusDays(2)),
+            today = studyDate
+        )
+
+        assertEquals(listOf(studyDate.plusDays(1)), result.schedules.map { it.scheduledDate })
+        assertEquals(ScheduleGenerationOutcome.PARTIAL, result.outcome)
+        assertEquals(1, result.schedules.single().reviewIndex)
+    }
+
+    @Test
+    fun `시험까지 나흘이면 세 날짜를 모두 생성한다`() {
+        val studyDate = LocalDate.of(2026, 9, 14)
+        val result = ReviewSchedulingEngine.createReviewSchedules(
+            record = SchedulerStudyRecord("four-days", studyDate),
+            exam = SchedulerExam(examDate = studyDate.plusDays(4)),
+            today = studyDate
+        )
+
+        assertEquals(
+            listOf(15, 16, 17).map { LocalDate.of(2026, 9, it) },
+            result.schedules.map { it.scheduledDate }
+        )
+        assertEquals(ScheduleGenerationOutcome.FULL, result.outcome)
+        assertEquals(listOf(1, 2, 3), result.schedules.map { it.reviewIndex })
+    }
+
+    @Test
+    fun `시험까지 8일이면 최소 세 회차를 고유한 날짜와 순서로 생성한다`() {
+        val studyDate = LocalDate.of(2026, 9, 14)
+        val examDate = studyDate.plusDays(8)
+        val result = ReviewSchedulingEngine.createReviewSchedules(
+            record = SchedulerStudyRecord("eight-days", studyDate),
+            exam = SchedulerExam(examDate = examDate),
+            today = studyDate
+        )
+
+        assertTrue(result.schedules.size >= ReviewSchedulingEngine.MIN_REVIEW_COUNT)
+        assertEquals(
+            result.schedules.size,
+            result.schedules.map { it.scheduledDate }.distinct().size
+        )
+        assertEquals(
+            (1..result.schedules.size).toList(),
+            result.schedules.map { it.reviewIndex }
+        )
+        assertTrue(result.schedules.all {
+            it.studyRecordId == "eight-days" &&
+                it.scheduledDate.isAfter(studyDate) &&
+                it.scheduledDate.isBefore(examDate)
+        })
+    }
+
+    @Test
+    fun `시험일까지 3일이면 가능한 두 날짜만 부분 생성한다`() {
         val result = ReviewSchedulingEngine.createReviewSchedules(
             record = SchedulerStudyRecord("short", today),
             exam = SchedulerExam(examDate = today.plusDays(3)),
             today = today
         )
-        assertEquals(ReviewPlanStatus.CRAM_MODE_REQUIRED, result.status)
-        assertTrue(result.schedules.isEmpty())
+        assertEquals(2, result.schedules.size)
+        assertEquals(ScheduleGenerationOutcome.PARTIAL, result.outcome)
+        assertTrue(result.schedules.all { it.scheduledDate.isAfter(today) })
+        assertTrue(result.schedules.all { it.scheduledDate.isBefore(today.plusDays(3)) })
     }
 
     @Test

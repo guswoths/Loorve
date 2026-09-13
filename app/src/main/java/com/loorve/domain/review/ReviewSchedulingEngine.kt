@@ -17,13 +17,14 @@ import kotlin.math.roundToInt
  * 향후 조정할 수 있도록 입력과 결과에 명시합니다.
  *
  * 일정 계산은 LocalDate만 사용하여 시간대와 서머타임에 따른 날짜 오차를 피합니다.
- * 기본 간격의 비율을 보존하면서 첫 복습을 +1일에 두고 마지막 복습을 버퍼 직전 날짜에
- * 고정하는 하이브리드 방식입니다. 단순 비율 스케일링은 짧은 기간에 초기 간격을
- * 과도하게 뭉칠 수 있고, 정규화 백분위 보간은 원래 간격의 의미를 약화할 수 있으므로
- * 두 방법을 절충해 중간 날짜에 기본 간격의 상대 구조를 사용합니다. 날짜 보정은
- * 일정 개수에 대해 선형으로 수행됩니다.
+ * 기본 간격을 우선 사용하되, 시험 전 유효 날짜가 부족하면 가능한 날짜를 순서대로
+ * 채워 최소 복습 보장을 명시적으로 드러냅니다.
  */
 object ReviewSchedulingEngine {
+    const val MIN_REVIEW_COUNT = 3
+    const val MIN_REVIEW_DAYS = 3
+    const val EXCLUDE_EXAM_DAY = true
+    const val ALLOW_DUPLICATE_SAME_DAY = false
 
     fun lastReviewDate(
         examDate: LocalDate,
@@ -108,22 +109,34 @@ object ReviewSchedulingEngine {
             "기본 간격은 오름차순이어야 합니다."
         }
         val first = studyDate.plusDays(1L)
-        val last = lastReviewDate(examDate, finalReviewBufferDays)
-        if (targetReviewCount == 0 || first.isAfter(last)) return emptyList()
+        val last = if (EXCLUDE_EXAM_DAY) {
+            lastReviewDate(examDate, finalReviewBufferDays)
+        } else {
+            examDate.minusDays(finalReviewBufferDays.toLong())
+        }
+        if (first.isAfter(last)) return emptyList()
 
         val availableDates = generateSequence(first) { date ->
             date.plusDays(1).takeUnless { it.isAfter(last) }
         }.toList()
-        if (availableDates.size <= baseIntervals.size) return availableDates
+        if (availableDates.size <= MIN_REVIEW_DAYS) return availableDates
 
         val baseDates = baseIntervals
             .map { studyDate.plusDays(it.toLong()) }
             .filter { !it.isAfter(last) }
             .distinct()
-        return (baseDates + last)
+        val desiredCount = maxOf(MIN_REVIEW_COUNT, targetReviewCount)
+        val selected = (baseDates + last)
             .filter { it.isAfter(studyDate) && it.isBefore(examDate) }
             .distinct()
             .sorted()
+            .take(desiredCount)
+            .toMutableList()
+        availableDates.forEach { date ->
+            if (selected.size >= desiredCount) return@forEach
+            if (date !in selected) selected += date
+        }
+        return selected.sorted()
     }
 
     fun createReviewSchedules(
@@ -145,10 +158,10 @@ object ReviewSchedulingEngine {
                 today,
                 config.finalReviewBufferDays,
                 ReviewPlanStatus.INSUFFICIENT_WINDOW,
-                if (exam.examDate == record.studiedAtDate) {
-                    "복습 일정이 생성되지 않았습니다. 시험일은 학습일보다 늦어야 합니다."
+                if (exam.examDate.isBefore(record.studiedAtDate)) {
+                    "생성불가! 시험일이 학습일보다 이전입니다. 시험일을 다시 설정해 주세요."
                 } else {
-                    "복습 일정이 생성되지 않았습니다. 시험일이 학습일보다 빠릅니다."
+                    "생성불가! 시험일이 오늘이어서 시험 전 자동 복습 일정을 만들 수 없습니다.\n오늘 학습한 내용을 직접 한 번 더 확인해 보세요."
                 }
             )
         }
@@ -181,7 +194,10 @@ object ReviewSchedulingEngine {
                 today,
                 config.finalReviewBufferDays,
                 status,
-                "복습 일정이 생성되지 않았습니다. 시험일까지 유효한 복습 날짜가 없습니다."
+                when (ChronoUnit.DAYS.between(record.studiedAtDate, exam.examDate)) {
+                    1L -> "생성불가! 시험일이 내일이어서 시험 전 자동 복습 일정을 만들 수 없습니다.\n오늘 학습한 내용을 직접 한 번 더 확인해 보세요."
+                    else -> "생성불가! 시험 전 복습 가능일이 없습니다."
+                }
             )
                 .copy(targetReviewCount = target, effectiveStudyDays = effectiveDays)
         }
@@ -195,10 +211,20 @@ object ReviewSchedulingEngine {
         )
         val compressed = dates.lastOrNull() != null &&
             dates.last() != record.studiedAtDate.plusDays(config.baseIntervals.last().toLong())
-        val status = if (dates.size < target) ReviewPlanStatus.INSUFFICIENT_WINDOW
+        val availableReviewDays = ChronoUnit.DAYS.between(
+            record.studiedAtDate,
+            exam.examDate
+        ) - 1L
+        val outcome = if (availableReviewDays < MIN_REVIEW_DAYS) {
+            ScheduleGenerationOutcome.PARTIAL
+        } else {
+            ScheduleGenerationOutcome.FULL
+        }
+        val status = if (outcome == ScheduleGenerationOutcome.PARTIAL)
+            ReviewPlanStatus.INSUFFICIENT_WINDOW
         else ReviewPlanStatus.SCHEDULED
-        val warning = if (status == ReviewPlanStatus.INSUFFICIENT_WINDOW) {
-            SchedulingMessages.insufficientWindow(dates.size, target)
+        val warning = if (outcome == ScheduleGenerationOutcome.PARTIAL) {
+            "생성불가! 시험 전 복습 가능일이 ${dates.size}일이라 최소 3회 중 ${dates.size}회의 복습 일정만 생성했어요."
         } else null
         val schedules = dates.mapIndexed { index, date ->
             createEntry(record, exam, notificationPlan, date, index, dates.last(), status)
@@ -207,6 +233,7 @@ object ReviewSchedulingEngine {
             schedules = schedules,
             status = status,
             warningMessage = warning,
+            outcome = outcome,
             lastReviewDate = last,
             effectiveStudyDays = effectiveDays,
             targetReviewCount = target,
@@ -389,6 +416,7 @@ object ReviewSchedulingEngine {
         schedules = emptyList(),
         status = status,
         warningMessage = warning,
+        outcome = ScheduleGenerationOutcome.NOT_GENERATED,
         lastReviewDate = lastReviewDate(exam.examDate, finalReviewBufferDays),
         effectiveStudyDays = ChronoUnit.DAYS.between(
             record.studiedAtDate,

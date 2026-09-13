@@ -35,7 +35,8 @@ data class CreateStudyRecordResult(
     val status: ReviewPlanStatus,
     val userMessage: String,
     val lastReviewDate: LocalDate,
-    val compressed: Boolean = false
+    val compressed: Boolean = false,
+    val generationOutcome: ScheduleGenerationOutcome = ScheduleGenerationOutcome.FULL
 )
 
 class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
@@ -89,7 +90,8 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
             SchedulingResult(
                 schedules = emptyList(),
                 status = ReviewPlanStatus.INSUFFICIENT_WINDOW,
-                warningMessage = "복습 일정이 생성되지 않았습니다. 이 학습기록에 연결된 시험이 없습니다.",
+                warningMessage = "생성불가! 이 학습기록에 연결된 시험이 없습니다.",
+                outcome = ScheduleGenerationOutcome.NOT_GENERATED,
                 lastReviewDate = request.studiedAt,
                 effectiveStudyDays = 0,
                 targetReviewCount = 0,
@@ -101,7 +103,8 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
             SchedulingResult(
                 schedules = emptyList(),
                 status = ReviewPlanStatus.INSUFFICIENT_WINDOW,
-                warningMessage = "복습 일정이 생성되지 않았습니다. 연결된 시험일이 설정되지 않았습니다.",
+                warningMessage = "생성불가! 연결된 시험일이 설정되지 않았습니다.",
+                outcome = ScheduleGenerationOutcome.NOT_GENERATED,
                 lastReviewDate = request.studiedAt,
                 effectiveStudyDays = 0,
                 targetReviewCount = 0,
@@ -193,7 +196,8 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
             generated.lastReviewDate,
             compressed = generated.compressed || rebalanced.schedules.any {
                 it.status == ReviewPlanStatus.RESCHEDULED
-            }
+            },
+            generationOutcome = generated.outcome
         )
     }
 
