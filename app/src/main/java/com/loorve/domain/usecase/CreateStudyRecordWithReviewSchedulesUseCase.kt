@@ -116,7 +116,8 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
             ReviewSchedulingEngine.createReviewSchedules(
                 record, schedulerExam, today,
                 SchedulerConfig(finalReviewBufferDays = 0),
-                ReviewNotificationPlan(timezone = zone)
+                ReviewNotificationPlan(timezone = zone),
+                customIntervalDays = block.customIntervalDays
             )
         }
         val generatedEntries = generated.schedules.map {

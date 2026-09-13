@@ -80,13 +80,15 @@ object ReviewScheduler {
         exam: SchedulerExam,
         today: LocalDate,
         config: SchedulerConfig = SchedulerConfig(),
-        notificationPlan: ReviewNotificationPlan = ReviewNotificationPlan()
+        notificationPlan: ReviewNotificationPlan = ReviewNotificationPlan(),
+        customIntervalDays: Int? = null
     ): SchedulingResult = ReviewSchedulingEngine.createReviewSchedules(
         record,
         exam,
         today,
         config,
-        notificationPlan
+        notificationPlan,
+        customIntervalDays
     )
 
     fun rebalanceDailyLoad(

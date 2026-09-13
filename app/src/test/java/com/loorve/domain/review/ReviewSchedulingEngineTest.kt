@@ -283,6 +283,57 @@ class ReviewSchedulingEngineTest {
     }
 
     @Test
+    fun `적용된 사용자 지정 간격 7일은 에빙하우스 대신 7일 간격 일정을 생성한다`() {
+        val studyDate = LocalDate.of(2026, 9, 14)
+        val examDate = studyDate.plusDays(30)
+        val result = ReviewSchedulingEngine.createReviewSchedules(
+            record = SchedulerStudyRecord(
+                studyRecordId = "custom-record",
+                studiedAtDate = studyDate
+            ),
+            exam = SchedulerExam(examDate = examDate, finalReviewBufferDays = 0),
+            today = studyDate,
+            config = SchedulerConfig(finalReviewBufferDays = 0),
+            customIntervalDays = 7
+        )
+
+        assertEquals(
+            listOf(
+                studyDate.plusDays(7),
+                studyDate.plusDays(14),
+                studyDate.plusDays(21),
+                studyDate.plusDays(28),
+                examDate.minusDays(1)
+            ),
+            result.schedules.map { it.scheduledDate }
+        )
+        assertTrue(result.schedules.all { it.scheduledDate.isAfter(studyDate) })
+        assertTrue(result.schedules.all { it.scheduledDate.isBefore(examDate) })
+    }
+
+    @Test
+    fun `사용자 지정 간격이 없으면 기존 에빙하우스 일정이 유지된다`() {
+        val studyDate = LocalDate.of(2026, 9, 14)
+        val examDate = studyDate.plusDays(30)
+        val result = ReviewSchedulingEngine.createReviewSchedules(
+            record = SchedulerStudyRecord(
+                studyRecordId = "default-record",
+                studiedAtDate = studyDate
+            ),
+            exam = SchedulerExam(examDate = examDate, finalReviewBufferDays = 0),
+            today = studyDate,
+            config = SchedulerConfig(finalReviewBufferDays = 0)
+        )
+
+        assertEquals(
+            listOf(1L, 3L, 7L, 14L, 29L),
+            result.schedules.map {
+                java.time.temporal.ChronoUnit.DAYS.between(studyDate, it.scheduledDate)
+            }
+        )
+    }
+
+    @Test
     fun `생성일 기준 3일의 온전한 달력 날짜가 있어야 유효하다`() {
         val creationDate = LocalDate.of(2026, 9, 14)
 

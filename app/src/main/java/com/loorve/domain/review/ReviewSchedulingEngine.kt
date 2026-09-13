@@ -235,7 +235,8 @@ object ReviewSchedulingEngine {
         exam: SchedulerExam,
         today: LocalDate,
         config: SchedulerConfig = SchedulerConfig(),
-        notificationPlan: ReviewNotificationPlan = ReviewNotificationPlan()
+        notificationPlan: ReviewNotificationPlan = ReviewNotificationPlan(),
+        customIntervalDays: Int? = null
     ): SchedulingResult {
         require(record.estimatedReviewMinutes > 0) { "예상 복습 시간은 양수여야 합니다." }
         require(config.finalReviewBufferDays >= 0) { "시험 전 버퍼 일수는 0 이상이어야 합니다." }
@@ -302,6 +303,54 @@ object ReviewSchedulingEngine {
                 }
             )
                 .copy(targetReviewCount = target, effectiveStudyDays = effectiveDays)
+        }
+
+        if (customIntervalDays != null) {
+            val customValidation = validateCustomReviewInterval(
+                customIntervalDays,
+                record.studiedAtDate,
+                exam.examDate
+            )
+            if (!customValidation.isValid) {
+                return emptyResult(
+                    record,
+                    exam,
+                    today,
+                    config.finalReviewBufferDays,
+                    ReviewPlanStatus.INSUFFICIENT_WINDOW,
+                    customValidation.message ?: "복습 간격을 확인해주세요."
+                )
+            }
+
+            val customDates = generateCustomReviewDates(
+                creationDate = record.studiedAtDate,
+                examDate = exam.examDate,
+                intervalDays = customIntervalDays
+            )
+            val customSchedules = customDates.mapIndexed { index, date ->
+                createEntry(
+                    record = record,
+                    exam = exam,
+                    plan = notificationPlan,
+                    date = date,
+                    index = index,
+                    lastDate = customDates.last(),
+                    status = ReviewPlanStatus.SCHEDULED
+                )
+            }
+            return SchedulingResult(
+                schedules = customSchedules,
+                status = ReviewPlanStatus.SCHEDULED,
+                lastReviewDate = customDates.last(),
+                effectiveStudyDays = effectiveDays,
+                targetReviewCount = customSchedules.size,
+                generatedReviewCount = customSchedules.size,
+                compressed = false,
+                availableDaysForNewLearning = ChronoUnit.DAYS.between(
+                    today,
+                    exam.examDate
+                ) - config.finalReviewBufferDays - 1L
+            )
         }
 
         val dates = generateScaledReviewDates(
