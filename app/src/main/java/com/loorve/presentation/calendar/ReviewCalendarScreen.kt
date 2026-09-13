@@ -60,6 +60,9 @@ import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.review.DailyReviewCompletionStat
 import com.loorve.presentation.reviewblock.ReviewRecordMiniCard
 import com.loorve.ui.component.BannerAdView
+import com.loorve.ui.theme.LoorveTypography
+import com.loorve.ui.theme.OnBackground
+import com.loorve.ui.theme.Primary
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -96,7 +99,21 @@ fun ReviewCalendarScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("복습 캘린더") },
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "REVIEW",
+                            style = LoorveTypography.labelSmall,
+                            color = Primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "복습",
+                            style = LoorveTypography.titleLarge,
+                            color = OnBackground
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(

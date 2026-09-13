@@ -72,17 +72,14 @@ fun HomeScreen(
                 title = {
                     Column {
                         Text(
-                            text = LocalDate.now().format(
-                                DateTimeFormatter.ofPattern("yyyy년 M월 d일 · EEEE",
-                                    java.util.Locale.KOREAN)
-                            ),
-                            style = LoorveTypography.labelMedium,
-                            color = OnSurfaceVariant
+                            text = "HOME",
+                            style = LoorveTypography.labelSmall,
+                            color = Primary,
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "HOME",
-                            style = LoorveTypography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            text = "홈",
+                            style = LoorveTypography.titleLarge,
                             color = OnBackground
                         )
                     }
