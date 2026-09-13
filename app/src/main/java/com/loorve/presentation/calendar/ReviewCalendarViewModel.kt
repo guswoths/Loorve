@@ -8,6 +8,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.loorve.domain.model.ReviewSchedule
 import com.loorve.domain.repository.ReviewScheduleRepository
 import com.loorve.domain.repository.ReviewScheduleItemRepository
+import com.loorve.domain.review.DailyReviewCompletionStat
+import com.loorve.domain.review.ReviewCompletionSchedule
+import com.loorve.domain.review.buildRecentReviewCompletionStats
 import com.loorve.domain.usecase.UpdateReviewCompletionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -21,6 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import com.loorve.domain.model.ReviewBlock
@@ -38,7 +42,10 @@ data class ReviewCalendarUiState(
     val isBlocksLoading: Boolean = false,
     val selectedBlock: ReviewBlock? = null,   // 클릭된 블록 (바텀시트용)
     val showBlockDetail: Boolean = false,      // 바텀시트 표시 여부
-    val isDeleting: Boolean = false            // 삭제 진행 중 여부
+    val isDeleting: Boolean = false,            // 삭제 진행 중 여부
+    val completionStats: List<DailyReviewCompletionStat> = emptyList(),
+    val selectedCompletionStat: DailyReviewCompletionStat? = null,
+    val isCompletionStatsLoading: Boolean = false
 )
 
 @HiltViewModel
@@ -60,7 +67,12 @@ class ReviewCalendarViewModel @Inject constructor(
     val isUidReady: StateFlow<Boolean> = _isUidReady.asStateFlow()
 
     private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    private val seoulZone = ZoneId.of("Asia/Seoul")
     private var loadJob: Job? = null
+    private var recentLegacySchedules: List<ReviewCompletionSchedule> = emptyList()
+    private var recentScheduleItems: List<ReviewCompletionSchedule> = emptyList()
+    private var recentLegacyLoaded = false
+    private var recentItemsLoaded = false
 
     // ✅ init 블록 제거 — Screen의 LaunchedEffect에서 suspend refreshUid() 호출로 통일
 
@@ -85,6 +97,7 @@ class ReviewCalendarViewModel @Inject constructor(
             // ✅ 핵심 추가: uid 세팅 직후 스케줄 로드
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             loadSchedulesForMonth(_uiState.value.displayYearMonth)
+            observeRecentCompletionSchedules(uid)
         }
     }
 
@@ -101,6 +114,10 @@ class ReviewCalendarViewModel @Inject constructor(
                 selectedDateSchedules = schedules
             )
         }
+    }
+
+    fun onCompletionStatSelected(stat: DailyReviewCompletionStat) {
+        _uiState.update { it.copy(selectedCompletionStat = stat) }
     }
 
     fun onCompleteSchedule(scheduleId: String) {
@@ -290,6 +307,88 @@ class ReviewCalendarViewModel @Inject constructor(
                         )
                     }
                 }
+        }
+    }
+
+    private fun observeRecentCompletionSchedules(uid: String) {
+        val today = LocalDate.now(seoulZone)
+        val startDate = today.minusDays(6).format(dateFormatter)
+        val endDate = today.format(dateFormatter)
+        _uiState.update { it.copy(isCompletionStatsLoading = true) }
+
+        viewModelScope.launch {
+            reviewScheduleRepository
+                .getReviewSchedulesByDateRange(uid, startDate, endDate)
+                .catch { exception ->
+                    _uiState.update {
+                        it.copy(
+                            isCompletionStatsLoading = false,
+                            errorMessage = exception.message ?: "복습 통계를 불러오지 못했습니다."
+                        )
+                    }
+                }
+                .collectLatest { schedules ->
+                    recentLegacyLoaded = true
+                    recentLegacySchedules = schedules.map { schedule ->
+                        ReviewCompletionSchedule(
+                            id = schedule.scheduleId,
+                            dueDate = java.time.Instant.ofEpochMilli(schedule.reviewDate)
+                                .atZone(seoulZone)
+                                .toLocalDate(),
+                            isCompleted = schedule.isCompleted,
+                            sourceId = schedule.originProgressId.ifBlank { schedule.blockId },
+                            reviewOrder = schedule.reviewOrder
+                        )
+                    }
+                    updateCompletionStats(today)
+                }
+        }
+
+        viewModelScope.launch {
+            reviewScheduleItemRepository
+                .observeReviewScheduleItems(uid)
+                .catch { exception ->
+                    _uiState.update {
+                        it.copy(
+                            isCompletionStatsLoading = false,
+                            errorMessage = exception.message ?: "복습 통계를 불러오지 못했습니다."
+                        )
+                    }
+                }
+                .collectLatest { items ->
+                    recentItemsLoaded = true
+                    recentScheduleItems = items.mapNotNull { item ->
+                        val dueDate = runCatching {
+                            java.time.Instant.ofEpochMilli(item.reviewDate)
+                                .atZone(seoulZone)
+                                .toLocalDate()
+                        }.getOrNull() ?: return@mapNotNull null
+                        if (dueDate !in today.minusDays(6)..today) return@mapNotNull null
+                        ReviewCompletionSchedule(
+                            id = item.id,
+                            dueDate = dueDate,
+                            isCompleted = item.status == com.loorve.domain.model.ReviewStatus.COMPLETED,
+                            sourceId = item.studyRecordId.ifBlank { item.blockId },
+                            reviewOrder = item.reviewOrder
+                        )
+                    }
+                    updateCompletionStats(today)
+                }
+        }
+    }
+
+    private fun updateCompletionStats(today: LocalDate) {
+        val schedules = (recentLegacySchedules + recentScheduleItems)
+            .distinctBy { Triple(it.dueDate, it.sourceId, it.reviewOrder) }
+        val stats = buildRecentReviewCompletionStats(schedules, today)
+        val selectedDate = _uiState.value.selectedCompletionStat?.date ?: today
+        _uiState.update {
+            it.copy(
+                completionStats = stats,
+                selectedCompletionStat = stats.firstOrNull { stat -> stat.date == selectedDate }
+                    ?: stats.lastOrNull(),
+                isCompletionStatsLoading = !(recentLegacyLoaded && recentItemsLoaded)
+            )
         }
     }
 }
