@@ -91,6 +91,8 @@ export interface ReviewSchedule {
   reviewStartDate?: LocalDate;
   lastReviewDate?: LocalDate;
   userMessage?: string;
+  outcome?: ReviewOutcome;
+  completedAt?: LocalDate;
 }
 
 export interface ReviewOutcomeEvent {
@@ -135,6 +137,39 @@ export interface RescheduleAfterOutcomeResult {
     errors: string[];
     warnings: string[];
   };
+}
+
+export interface NotificationRescheduleRequest {
+  reviewScheduleId: string;
+  studyRecordId: string;
+  action: 'CANCEL_AND_RESCHEDULE' | 'CREATE';
+  previousScheduledDate?: LocalDate;
+  scheduledDate: LocalDate;
+  notificationPlan: NotificationPlan;
+  reason: string;
+}
+
+export interface ReviewOutcomeRescheduleInput {
+  completedReview: ReviewSchedule;
+  outcome: ReviewOutcome;
+  today: LocalDate;
+  allSchedules: ReviewSchedule[];
+  studyRecord: StudyRecord;
+  exam: Exam;
+  config: SchedulerConfig;
+}
+
+export interface ReviewOutcomeRescheduleResult {
+  updatedSchedules: ReviewSchedule[];
+  changedScheduleIds: string[];
+  warnings: string[];
+  reason: string;
+  notificationRescheduleRequests: NotificationRescheduleRequest[];
+}
+
+export interface CompleteReviewScheduleResult {
+  completedSchedule: ReviewSchedule;
+  rescheduling: ReviewOutcomeRescheduleResult;
 }
 
 export interface ValidationResult {
@@ -2245,9 +2280,255 @@ export function buildOutcomeFeedbackMessage(
   return `결과 ${outcome}에 따라 일정을 조정했습니다.`;
 }
 
+function isReviewOutcomeRescheduleInput(
+  input: ReviewOutcomeRescheduleInput | RescheduleAfterOutcomeInput,
+): input is ReviewOutcomeRescheduleInput {
+  return 'completedReview' in input && 'allSchedules' in input && 'studyRecord' in input;
+}
+
+function isEligibleOutcomeSchedule(
+  schedule: ReviewSchedule,
+  recordId: string,
+  today: LocalDate,
+): boolean {
+  return schedule.studyRecordId === recordId
+    && schedule.status !== 'COMPLETED'
+    && schedule.scheduledDate >= today;
+}
+
+function isLegalOutcomeDate(
+  candidateDate: LocalDate,
+  schedule: ReviewSchedule,
+  schedules: ReviewSchedule[],
+  exam: Exam,
+  today: LocalDate,
+  finalReviewBufferDays: number,
+  excludedScheduleId: string,
+): boolean {
+  const lastReviewDate = schedule.lastReviewDate
+    ?? getLastReviewDate(exam.examDate, finalReviewBufferDays);
+  const reviewStartDate = schedule.reviewStartDate
+    ?? getReviewStartDate(today);
+  if (candidateDate < today || candidateDate < reviewStartDate || candidateDate > lastReviewDate) {
+    return false;
+  }
+  if (candidateDate >= addDays(exam.examDate, -finalReviewBufferDays)) {
+    return false;
+  }
+  if (candidateDate === exam.examDate) {
+    return false;
+  }
+  return validateRecordSpacingAfterMove(schedule, candidateDate, schedules)
+    && schedules.every((other) => other.id === excludedScheduleId || other.scheduledDate !== candidateDate || other.studyRecordId !== schedule.studyRecordId);
+}
+
+function getOutcomeFutureSchedules(
+  input: ReviewOutcomeRescheduleInput,
+  schedules: ReviewSchedule[],
+): ReviewSchedule[] {
+  return schedules
+    .filter((schedule) => isEligibleOutcomeSchedule(schedule, input.studyRecord.id, input.today))
+    .filter((schedule) => schedule.id !== input.completedReview.id)
+    .sort((a, b) => {
+      const dateOrder = compareLocalDates(a.scheduledDate, b.scheduledDate);
+      return dateOrder !== 0 ? dateOrder : a.id.localeCompare(b.id);
+    });
+}
+
+function createOutcomeReinforcementSchedule(
+  input: ReviewOutcomeRescheduleInput,
+  schedules: ReviewSchedule[],
+  reviewStartDate: LocalDate,
+  lastReviewDate: LocalDate,
+): ReviewSchedule | null {
+  const candidates = getReviewWindowDates(reviewStartDate, lastReviewDate)
+    .filter((date) => date > input.today)
+    .filter((date) => isSameRecordScheduleDateAllowed(
+      date,
+      input.studyRecord.id,
+      schedules,
+      input.exam,
+      input.config.finalReviewBufferDays,
+    ));
+  const scheduledDate = candidates[0];
+  if (!scheduledDate) {
+    return null;
+  }
+  const sameRecord = schedules.filter((schedule) => schedule.studyRecordId === input.studyRecord.id);
+  const reviewIndex = Math.max(-1, ...sameRecord.map((schedule) => schedule.reviewIndex)) + 1;
+  const id = `${input.studyRecord.id}-outcome-failed-${input.completedReview.id}`;
+  return {
+    id,
+    examId: input.exam.id,
+    studyRecordId: input.studyRecord.id,
+    reviewIndex,
+    scheduledDate,
+    originalScheduledDate: scheduledDate,
+    status: 'RESCHEDULED',
+    priorityScore: 0,
+    estimatedReviewMinutes: input.studyRecord.estimatedReviewMinutes,
+    recommendedMethod: getRecommendedMethod(reviewIndex + 1, reviewIndex + 1, false),
+    notificationPlan: createNotificationPlan(scheduledDate, false, input.config),
+    dueDaysBeforeExam: daysBetween(scheduledDate, input.exam.examDate),
+    isFinalReview: false,
+    rescheduleReason: 'OUTCOME_FAILED_REINFORCEMENT',
+    reviewStartDate,
+    lastReviewDate,
+    createdAt: input.today,
+    updatedAt: input.today,
+  };
+}
+
+function rescheduleAfterReviewOutcomeV2(
+  input: ReviewOutcomeRescheduleInput,
+): ReviewOutcomeRescheduleResult {
+  const sourceSchedules = input.allSchedules.map((schedule) => cloneSchedule(schedule));
+  const completedIndex = sourceSchedules.findIndex((schedule) => schedule.id === input.completedReview.id);
+  const warnings: string[] = [];
+  if (completedIndex < 0) {
+    return {
+      updatedSchedules: sourceSchedules,
+      changedScheduleIds: [],
+      warnings: ['완료할 복습 일정을 찾을 수 없습니다.'],
+      reason: 'INVALID_REVIEW',
+      notificationRescheduleRequests: [],
+    };
+  }
+  const completed = sourceSchedules[completedIndex];
+  if (completed.examId !== input.exam.id || completed.studyRecordId !== input.studyRecord.id) {
+    return {
+      updatedSchedules: sourceSchedules,
+      changedScheduleIds: [],
+      warnings: ['복습 일정이 시험 또는 학습기록과 일치하지 않습니다.'],
+      reason: 'INVALID_CONTEXT',
+      notificationRescheduleRequests: [],
+    };
+  }
+  if (completed.status === 'COMPLETED') {
+    return {
+      updatedSchedules: sourceSchedules,
+      changedScheduleIds: [],
+      warnings: ['이미 완료된 복습 일정은 다시 완료 처리할 수 없습니다.'],
+      reason: 'ALREADY_COMPLETED',
+      notificationRescheduleRequests: [],
+    };
+  }
+
+  completed.status = 'COMPLETED';
+  completed.outcome = input.outcome;
+  completed.completedAt = input.today;
+  const beforeById = new Map(
+    sourceSchedules.map((schedule) => [schedule.id, cloneSchedule(schedule)]),
+  );
+  const future = getOutcomeFutureSchedules(input, sourceSchedules);
+  const reviewStartDate = completed.reviewStartDate
+    ?? getReviewStartDate(input.studyRecord.studiedAt);
+  const lastReviewDate = completed.lastReviewDate
+    ?? getLastReviewDate(input.exam.examDate, input.config.finalReviewBufferDays);
+  const target = future[0];
+  let outcomeChanged = false;
+  let reason = `OUTCOME_${input.outcome}`;
+
+  if (input.outcome !== 'SUCCESS' && target) {
+    const offsets: number[] = input.outcome === 'EASY'
+      ? [Math.max(1, Math.round(daysBetween(completed.scheduledDate, target.scheduledDate) * 0.2))]
+      : input.outcome === 'HARD' ? [-1] : [-2, -1];
+    for (const offset of offsets) {
+      const candidate = addDays(target.scheduledDate, offset);
+      if (!isLegalOutcomeDate(candidate, target, sourceSchedules, input.exam, input.today, input.config.finalReviewBufferDays, target.id)) {
+        continue;
+      }
+      target.scheduledDate = candidate;
+      target.status = 'RESCHEDULED';
+      target.rescheduleReason = input.outcome === 'EASY'
+        ? 'OUTCOME_EASY_DELAYED'
+        : input.outcome === 'HARD' ? 'OUTCOME_HARD_ADVANCED' : 'OUTCOME_FAILED_ADVANCED';
+      target.dueDaysBeforeExam = daysBetween(candidate, input.exam.examDate);
+      target.notificationPlan = createNotificationPlan(candidate, target.isFinalReview, input.config);
+      target.updatedAt = input.today;
+      outcomeChanged = true;
+      reason = target.rescheduleReason;
+      break;
+    }
+    if (!outcomeChanged) {
+      warnings.push(`${input.outcome} 결과로 조정할 수 있는 합법적인 미래 복습 날짜가 없습니다.`);
+    }
+  } else if (input.outcome === 'FAILED' && !target) {
+    const reinforcement = createOutcomeReinforcementSchedule(input, sourceSchedules, reviewStartDate, lastReviewDate);
+    if (reinforcement) {
+      sourceSchedules.push(reinforcement);
+      outcomeChanged = true;
+      reason = 'OUTCOME_FAILED_REINFORCEMENT';
+    } else {
+      warnings.push('FAILED 결과를 보강할 수 있는 합법적인 복습 날짜가 없습니다.');
+    }
+  } else if (input.outcome === 'SUCCESS') {
+    reason = 'OUTCOME_SUCCESS_UNCHANGED';
+  }
+
+  const eligibleForRebalance = sourceSchedules.filter((schedule) =>
+    schedule.status !== 'COMPLETED' && schedule.scheduledDate >= input.today);
+  const rebalanceResult = rebalanceDailyLoad({
+    schedules: eligibleForRebalance,
+    exam: input.exam,
+    finalReviewBufferDays: input.config.finalReviewBufferDays,
+    maxDailyReviewMinutes: input.config.maxDailyReviewMinutes,
+  });
+  const rebalanceById = new Map(rebalanceResult.schedules.map((schedule) => [schedule.id, schedule]));
+  for (let index = 0; index < sourceSchedules.length; index += 1) {
+    const replacement = rebalanceById.get(sourceSchedules[index].id);
+    if (replacement) {
+      sourceSchedules[index] = replacement;
+    }
+  }
+  warnings.push(...rebalanceResult.warnings);
+
+  const changedScheduleIds: string[] = [];
+  const notificationRescheduleRequests: NotificationRescheduleRequest[] = [];
+  for (const schedule of sourceSchedules) {
+    const before = beforeById.get(schedule.id);
+    const dateChanged = before !== undefined && before.scheduledDate !== schedule.scheduledDate;
+    const created = before === undefined;
+    if (dateChanged || created) {
+      if (dateChanged) {
+        schedule.notificationPlan = createNotificationPlan(schedule.scheduledDate, schedule.isFinalReview, input.config);
+        schedule.dueDaysBeforeExam = daysBetween(schedule.scheduledDate, input.exam.examDate);
+      }
+      if (schedule.status !== 'COMPLETED') {
+        changedScheduleIds.push(schedule.id);
+        notificationRescheduleRequests.push({
+          reviewScheduleId: schedule.id,
+          studyRecordId: schedule.studyRecordId,
+          action: created ? 'CREATE' : 'CANCEL_AND_RESCHEDULE',
+          previousScheduledDate: before?.scheduledDate,
+          scheduledDate: schedule.scheduledDate,
+          notificationPlan: schedule.notificationPlan,
+          reason: schedule.rescheduleReason ?? reason,
+        });
+      }
+    }
+  }
+  return {
+    updatedSchedules: sourceSchedules,
+    changedScheduleIds: Array.from(new Set(changedScheduleIds)),
+    warnings: Array.from(new Set(warnings)),
+    reason,
+    notificationRescheduleRequests,
+  };
+}
+
+export function rescheduleAfterReviewOutcome(
+  input: ReviewOutcomeRescheduleInput,
+): ReviewOutcomeRescheduleResult;
 export function rescheduleAfterReviewOutcome(
   input: RescheduleAfterOutcomeInput,
-): RescheduleAfterOutcomeResult {
+): RescheduleAfterOutcomeResult;
+export function rescheduleAfterReviewOutcome(
+  input: ReviewOutcomeRescheduleInput | RescheduleAfterOutcomeInput,
+): ReviewOutcomeRescheduleResult | RescheduleAfterOutcomeResult {
+  if (isReviewOutcomeRescheduleInput(input)) {
+    return rescheduleAfterReviewOutcomeV2(input);
+  }
   const validationErrors: string[] = [];
   const validationWarnings: string[] = [];
   const effectiveConfig = createDefaultSchedulerConfig(input.config ?? {});
@@ -2524,6 +2805,45 @@ export function rescheduleAfterReviewOutcome(
       warnings: invariantCheckAfter.warnings,
     },
   };
+}
+
+export function completeReviewSchedule(input: {
+  reviewId: string;
+  outcome: ReviewOutcome;
+  completedAt: LocalDate;
+  allSchedules: ReviewSchedule[];
+  studyRecord: StudyRecord;
+  exam: Exam;
+  config: SchedulerConfig;
+}): CompleteReviewScheduleResult {
+  const review = input.allSchedules.find((schedule) => schedule.id === input.reviewId);
+  if (!review) {
+    throw new Error(`복습 일정을 찾을 수 없습니다: ${input.reviewId}`);
+  }
+  if (review.studyRecordId !== input.studyRecord.id || review.examId !== input.exam.id) {
+    throw new Error('복습 일정이 지정된 학습기록 또는 시험에 속하지 않습니다.');
+  }
+  if (review.status === 'COMPLETED') {
+    throw new Error('이미 완료된 복습 일정은 다시 완료 처리할 수 없습니다.');
+  }
+  if (review.scheduledDate > input.completedAt) {
+    throw new Error('아직 도래하지 않은 복습 일정은 완료 처리할 수 없습니다.');
+  }
+
+  const rescheduling = rescheduleAfterReviewOutcome({
+    completedReview: review,
+    outcome: input.outcome,
+    today: input.completedAt,
+    allSchedules: input.allSchedules,
+    studyRecord: input.studyRecord,
+    exam: input.exam,
+    config: input.config,
+  });
+  const completedSchedule = rescheduling.updatedSchedules.find((schedule) => schedule.id === input.reviewId);
+  if (!completedSchedule) {
+    throw new Error('완료 처리된 복습 일정이 결과에 없습니다.');
+  }
+  return { completedSchedule, rescheduling };
 }
 
 export function sortSchedulesForDailyView(
@@ -2925,12 +3245,115 @@ export function runDailyLoadRebalancingSelfChecks(): void {
   assert(example.result.warnings.length === 0, '통합 예시는 현재 한도에서 과부하를 해결해야 합니다.');
 }
 
+export function runReviewOutcomeSelfChecks(): void {
+  const exam: Exam = {
+    id: 'outcome-check',
+    examDate: '2026-11-15' as LocalDate,
+    timezone: DEFAULT_TIMEZONE,
+    finalReviewBufferDays: 1,
+    maxDailyReviewMinutes: 30,
+    allowRegularReviewOnDayBeforeExam: false,
+    createdAt: '2026-10-01' as LocalDate,
+    updatedAt: '2026-10-01' as LocalDate,
+  };
+  const config = {
+    ...DEFAULT_SCHEDULER_CONFIG,
+    finalReviewBufferDays: 1,
+    maxDailyReviewMinutes: 30,
+  };
+  const record: StudyRecord = {
+    id: 'outcome-record',
+    examId: exam.id,
+    title: '결과 점검',
+    content: '결과 점검',
+    studiedAt: '2026-10-01' as LocalDate,
+    difficulty: 'medium',
+    importance: 'normal',
+    initialMastery: 3,
+    estimatedReviewMinutes: 10,
+    isCompleted: false,
+    createdAt: '2026-10-01' as LocalDate,
+    updatedAt: '2026-10-01' as LocalDate,
+  };
+  const makeSchedule = (
+    id: string,
+    date: LocalDate,
+    index: number,
+  ): ReviewSchedule => ({
+    id,
+    examId: exam.id,
+    studyRecordId: record.id,
+    reviewIndex: index,
+    scheduledDate: date,
+    originalScheduledDate: date,
+    status: 'SCHEDULED',
+    priorityScore: 0,
+    estimatedReviewMinutes: 10,
+    recommendedMethod: '회상',
+    notificationPlan: { kind: 'IN_APP', hour: 9, reminder: false },
+    dueDaysBeforeExam: daysBetween(date, exam.examDate),
+    isFinalReview: false,
+    reviewStartDate: '2026-10-02' as LocalDate,
+    lastReviewDate: '2026-11-13' as LocalDate,
+    createdAt: '2026-10-01' as LocalDate,
+    updatedAt: '2026-10-01' as LocalDate,
+  });
+
+  const hardSchedules = [
+    makeSchedule('outcome-completed', '2026-10-10' as LocalDate, 0),
+    makeSchedule('outcome-next', '2026-10-15' as LocalDate, 1),
+  ];
+  const hard = rescheduleAfterReviewOutcome({
+    completedReview: hardSchedules[0],
+    outcome: 'HARD',
+    today: '2026-10-10' as LocalDate,
+    allSchedules: hardSchedules,
+    studyRecord: record,
+    exam,
+    config,
+  });
+  assert(hard.updatedSchedules[0].status === 'COMPLETED', '완료 일정은 COMPLETED가 되어야 합니다.');
+  assert(hard.updatedSchedules[0].outcome === 'HARD', '완료 결과를 보존해야 합니다.');
+  assert(hard.updatedSchedules[1].scheduledDate === '2026-10-14' as LocalDate, 'HARD는 다음 일정을 하루 앞당겨야 합니다.');
+  assert(hard.notificationRescheduleRequests.length === 1, '변경된 일정에 알림 재생성 요청이 있어야 합니다.');
+
+  const failedSchedule = makeSchedule('failed-completed', '2026-10-10' as LocalDate, 0);
+  const failed = rescheduleAfterReviewOutcome({
+    completedReview: failedSchedule,
+    outcome: 'FAILED',
+    today: '2026-10-10' as LocalDate,
+    allSchedules: [failedSchedule],
+    studyRecord: record,
+    exam,
+    config,
+  });
+  assert(failed.updatedSchedules.length === 2, 'FAILED는 보강 일정을 최대 1개 생성해야 합니다.');
+  assert(failed.updatedSchedules.filter((schedule) => schedule.status !== 'COMPLETED').length === 1, '보강 일정은 하나여야 합니다.');
+  assert(failed.reason === 'OUTCOME_FAILED_REINFORCEMENT', '보강 일정 사유를 보존해야 합니다.');
+
+  const successSchedules = [
+    makeSchedule('success-completed', '2026-10-10' as LocalDate, 0),
+    makeSchedule('success-next', '2026-10-20' as LocalDate, 1),
+  ];
+  const success = rescheduleAfterReviewOutcome({
+    completedReview: successSchedules[0],
+    outcome: 'SUCCESS',
+    today: '2026-10-10' as LocalDate,
+    allSchedules: successSchedules,
+    studyRecord: record,
+    exam,
+    config,
+  });
+  assert(success.changedScheduleIds.length === 0, 'SUCCESS는 용량 재배치가 없으면 일정을 이동하면 안 됩니다.');
+}
+
 /**
  * 실행 시점에 검증 예시를 바로 확인할 수 있도록 하는 경량 self-check.
  * 이 함수는 LocalDate 유틸리티와 정규 리뷰 일정 생성 규칙을 함께 검증한다.
  */
 export function runSelfChecks(): void {
   runDailyLoadRebalancingSelfChecks();
+  runReviewOutcomeSelfChecks();
   // LocalDate는 UTC/DST 경계 문제를 피하고 달력 일 단위로만 계산한다.
   assert(getEarliestAllowedExamDate('2026-10-01' as LocalDate, 1, 3) === '2026-10-06' as LocalDate, '가장 빠른 허용 시험일은 2026-10-06이어야 합니다.');
   assert(getLastReviewDate('2026-10-06' as LocalDate, 1) === '2026-10-04' as LocalDate, '마지막 정규 리뷰일은 시험일 1일 전 버퍼 직전이어야 합니다.');
