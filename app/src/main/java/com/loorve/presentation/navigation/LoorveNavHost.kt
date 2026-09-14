@@ -482,6 +482,10 @@ fun LoorveNavHost(
                         1 -> ReviewCalendarScreen(
                             onNavigateBack = { selectedTabIndex = 0 },
                             onNavigateToAddReviewBlock = {
+                                homeBackStackEntry?.savedStateHandle?.set(
+                                    RETURN_TO_REVIEW_TAB_KEY,
+                                    true
+                                )
                                 navController.navigate(Screen.AddReviewBlock.route) {
                                     launchSingleTop = true
                                 }
