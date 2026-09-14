@@ -83,6 +83,7 @@ import com.loorve.ui.theme.OnSurfaceVariant
 import com.loorve.ui.theme.Primary
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flowOf
 import com.loorve.presentation.reviewblock.ReviewBlockDetailScreen
 
 sealed class Screen(val route: String) {
@@ -110,6 +111,7 @@ sealed class Screen(val route: String) {
 }
 
 private const val RETURN_TO_SETTINGS_TAB_KEY = "return_to_settings_tab"
+private const val RETURN_TO_REVIEW_TAB_KEY = "return_to_review_tab"
 
 private data class BottomNavItem(
     val label: String,
@@ -369,6 +371,7 @@ fun LoorveNavHost(
 
             var batteryGuideShown by remember { mutableStateOf(false) }
             var selectedTabIndex by remember { mutableStateOf(0) }
+            val homeBackStackEntry = navController.currentBackStackEntry
             val returnToSettingsTab by navController.currentBackStackEntry!!
                 .savedStateHandle
                 .getStateFlow(RETURN_TO_SETTINGS_TAB_KEY, false)
@@ -380,6 +383,18 @@ fun LoorveNavHost(
                     navController.currentBackStackEntry
                         ?.savedStateHandle
                         ?.set(RETURN_TO_SETTINGS_TAB_KEY, false)
+                }
+            }
+            val returnToReviewTab by (
+                homeBackStackEntry?.savedStateHandle
+                    ?.getStateFlow(RETURN_TO_REVIEW_TAB_KEY, false)
+                    ?: flowOf(false)
+                ).collectAsStateWithLifecycle(false)
+
+            LaunchedEffect(returnToReviewTab) {
+                if (returnToReviewTab) {
+                    selectedTabIndex = 1
+                    homeBackStackEntry?.savedStateHandle?.set(RETURN_TO_REVIEW_TAB_KEY, false)
                 }
             }
 
@@ -472,6 +487,10 @@ fun LoorveNavHost(
                                 }
                             },
                             onNavigateToReviewBlockDetail = { blockId ->
+                                homeBackStackEntry?.savedStateHandle?.set(
+                                    RETURN_TO_REVIEW_TAB_KEY,
+                                    true
+                                )
                                 navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId)) {
                                     launchSingleTop = true
                                 }
