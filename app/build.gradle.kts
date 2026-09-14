@@ -30,12 +30,12 @@ if (localPropertiesFile.exists()) {
 
 android {
     namespace = "com.loorve"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.loorve"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -134,7 +134,7 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging-ktx")
 
     implementation("com.google.android.gms:play-services-ads:23.6.0")
-    implementation("com.android.billingclient:billing-ktx:7.1.1")
+    implementation("com.android.billingclient:billing-ktx:8.0.0")
 
     implementation("com.google.dagger:hilt-android:2.59.2")
     ksp("com.google.dagger:hilt-compiler:2.59.2")

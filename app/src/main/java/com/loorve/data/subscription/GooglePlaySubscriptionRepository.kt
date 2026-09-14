@@ -40,6 +40,7 @@ class GooglePlaySubscriptionRepository @Inject constructor(
                 .enableOneTimeProducts()
                 .build()
         )
+        .enableAutoServiceReconnection()
         .build()
 
     override fun connect() {
@@ -112,7 +113,7 @@ class GooglePlaySubscriptionRepository @Inject constructor(
                 .build()
         ) { result, details ->
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                val productDetails = details.firstOrNull()
+                val productDetails = details.productDetailsList.firstOrNull()
                 _state.value = _state.value.copy(
                     productDetails = productDetails,
                     entitlement = if (productDetails == null) {

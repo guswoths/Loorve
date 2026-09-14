@@ -1,5 +1,5 @@
 
-# 보안 파일 - 절대 커밋 금지
+# 보안 ?�일 - ?��? 커밋 금�?
 app/google-services.json
 app/src/main/res/values/admob_ids.xml
 keystore.properties
@@ -15,3 +15,12 @@ app/build/
 *.iml
 local.properties
 .kotlin/
+
+# Android signing and local secrets
+*.jks
+*.keystore
+*.p12
+*.pem
+key.properties
+local.properties
+.env
