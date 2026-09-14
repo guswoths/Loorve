@@ -29,6 +29,9 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.repository.ReviewBlockRepository
+import com.loorve.domain.subscription.ReviewBlockAccessPolicy
+import com.loorve.domain.subscription.SubscriptionEntitlement
+import com.loorve.domain.subscription.SubscriptionRepository
 import com.loorve.util.CalendarRefreshBus
 
 data class ReviewCalendarUiState(
@@ -45,7 +48,9 @@ data class ReviewCalendarUiState(
     val isDeleting: Boolean = false,            // 삭제 진행 중 여부
     val completionStats: List<DailyReviewCompletionStat> = emptyList(),
     val selectedCompletionStat: DailyReviewCompletionStat? = null,
-    val isCompletionStatsLoading: Boolean = false
+    val isCompletionStatsLoading: Boolean = false,
+    val lockedBlockIds: Set<String> = emptySet(),
+    val subscriptionEntitlement: SubscriptionEntitlement = SubscriptionEntitlement.Loading
 )
 
 @HiltViewModel
@@ -54,7 +59,8 @@ class ReviewCalendarViewModel @Inject constructor(
     private val reviewScheduleItemRepository: ReviewScheduleItemRepository,
     private val updateReviewCompletionUseCase: UpdateReviewCompletionUseCase,
     private val reviewBlockRepository: ReviewBlockRepository,
-    private val calendarRefreshBus: CalendarRefreshBus
+    private val calendarRefreshBus: CalendarRefreshBus,
+    private val subscriptionRepository: SubscriptionRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewCalendarUiState())
@@ -79,6 +85,25 @@ class ReviewCalendarViewModel @Inject constructor(
     private var recentLegacyLoaded = false
     private var recentItemsLoaded = false
 
+    init {
+        viewModelScope.launch {
+            subscriptionRepository.state.collect { subscriptionState ->
+                _uiState.update { state ->
+                    val accessible = ReviewBlockAccessPolicy.accessibleBlockIds(
+                        state.reviewBlocks,
+                        subscriptionState.entitlement
+                    )
+                    state.copy(
+                        subscriptionEntitlement = subscriptionState.entitlement,
+                        lockedBlockIds = state.reviewBlocks
+                            .mapNotNull { it.blockId.takeIf { id -> id !in accessible } }
+                            .toSet()
+                    )
+                }
+            }
+        }
+    }
+
     // ✅ init 블록 제거 — Screen의 LaunchedEffect에서 suspend refreshUid() 호출로 통일
 
     /**
@@ -97,8 +122,8 @@ class ReviewCalendarViewModel @Inject constructor(
         recentBlocksLoaded = false
         recentLegacyLoaded = false
         recentItemsLoaded = false
-        _uiState.update {
-            it.copy(
+        _uiState.update { state ->
+            state.copy(
                 completionStats = emptyList(),
                 selectedCompletionStat = null,
                 isCompletionStatsLoading = true
@@ -132,8 +157,8 @@ class ReviewCalendarViewModel @Inject constructor(
 
     fun onDateSelected(date: LocalDate) {
         val schedules = _uiState.value.schedulesMap[date] ?: emptyList()
-        _uiState.update {
-            it.copy(
+        _uiState.update { currentState ->
+            currentState.copy(
                 selectedDate = date,
                 selectedDateSchedules = schedules
             )
@@ -242,10 +267,20 @@ class ReviewCalendarViewModel @Inject constructor(
             _uiState.update { it.copy(isBlocksLoading = true) }
             reviewBlockRepository.getReviewBlocks(uid)
                 .onSuccess { blocks ->
-                    _uiState.update {
-                        it.copy(
+                    _uiState.update { currentState ->
+                        currentState.copy(
                             reviewBlocks = blocks,
-                            isBlocksLoading = false
+                            isBlocksLoading = false,
+                            lockedBlockIds = blocks
+                                .mapNotNull { block ->
+                                    block.blockId.takeIf {
+                                        it !in ReviewBlockAccessPolicy.accessibleBlockIds(
+                                            blocks,
+                                            currentState.subscriptionEntitlement
+                                        )
+                                    }
+                                }
+                                .toSet()
                         )
                     }
                 }

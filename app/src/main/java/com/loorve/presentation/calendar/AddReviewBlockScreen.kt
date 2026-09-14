@@ -53,6 +53,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.presentation.reviewblock.ReviewBlockUiState
 import com.loorve.presentation.reviewblock.ReviewBlockViewModel
+import com.loorve.presentation.subscription.ProPaywallDialog
+import com.loorve.presentation.subscription.SubscriptionViewModel
+import com.loorve.domain.subscription.SubscriptionEntitlement
 import com.loorve.domain.review.ReviewSchedulingEngine
 import com.loorve.ui.component.BannerAdView
 import java.time.Instant
@@ -66,7 +69,8 @@ import kotlinx.coroutines.launch
 fun AddReviewBlockScreen(
     onNavigateBack: () -> Unit,
     onSaveSuccess: () -> Unit,
-    reviewBlockViewModel: ReviewBlockViewModel = hiltViewModel()
+    reviewBlockViewModel: ReviewBlockViewModel = hiltViewModel(),
+    subscriptionViewModel: SubscriptionViewModel = hiltViewModel()
 ) {
     val currentUid = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid }
     var examName by remember { mutableStateOf("") }
@@ -75,10 +79,12 @@ fun AddReviewBlockScreen(
     var customIntervalText by rememberSaveable { mutableStateOf("") }
     var appliedCustomIntervalDays by rememberSaveable { mutableStateOf<Int?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showProDialog by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val uiState by reviewBlockViewModel.uiState.collectAsState()
+    val subscriptionState by subscriptionViewModel.state.collectAsState()
 
     // ✅ FIX: Success 시 resetState() 후 onSaveSuccess() — reloadCurrentMonth는 상위에서 처리
     LaunchedEffect(uiState) {
@@ -93,6 +99,9 @@ fun AddReviewBlockScreen(
                     duration = SnackbarDuration.Long
                 )
                 reviewBlockViewModel.resetState()
+            }
+            ReviewBlockUiState.RequiresPro -> {
+                showProDialog = true
             }
             else -> Unit
         }
@@ -127,6 +136,16 @@ fun AddReviewBlockScreen(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    if (showProDialog) {
+        ProPaywallDialog(
+            viewModel = subscriptionViewModel,
+            onDismiss = {
+                showProDialog = false
+                reviewBlockViewModel.resetState()
+            }
+        )
     }
 
     val isLoading = uiState is ReviewBlockUiState.Loading
@@ -209,7 +228,9 @@ fun AddReviewBlockScreen(
                         )
                     }
                 }
-                BannerAdView(modifier = Modifier.fillMaxWidth())
+                if (subscriptionState.entitlement !is SubscriptionEntitlement.Pro) {
+                    BannerAdView(modifier = Modifier.fillMaxWidth())
+                }
             }
         }
     ) { paddingValues ->

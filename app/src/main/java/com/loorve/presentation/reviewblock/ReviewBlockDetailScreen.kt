@@ -34,6 +34,8 @@ import com.loorve.domain.review.ReviewPlanStatus
 import com.loorve.domain.review.ScheduleGenerationOutcome
 import com.loorve.domain.usecase.CreateStudyRecordResult
 import com.loorve.presentation.home.HomeViewModel
+import com.loorve.presentation.subscription.ProPaywallDialog
+import com.loorve.presentation.subscription.SubscriptionViewModel
 import com.loorve.ui.component.LoorveCard
 import com.loorve.ui.theme.*
 import java.text.SimpleDateFormat
@@ -50,13 +52,15 @@ fun ReviewBlockDetailScreen(
     block: ReviewBlock?,
     onNavigateBack: () -> Unit,
     viewModel: ReviewBlockDetailViewModel = hiltViewModel(),
-    homeViewModel: HomeViewModel = hiltViewModel()          // ✅ [추가]
+    homeViewModel: HomeViewModel = hiltViewModel(),          // ✅ [추가]
+    subscriptionViewModel: SubscriptionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
     val snackbarHostState = remember { SnackbarHostState() }
+    var showProDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(blockId) {
         viewModel.loadBlockData(uid, blockId, externalBlock = block)
@@ -79,6 +83,10 @@ fun ReviewBlockDetailScreen(
         }
     }
 
+    LaunchedEffect(uiState.requiresPro) {
+        if (uiState.requiresPro) showProDialog = true
+    }
+
     // 블록 삭제 성공 시 뒤로가기
     LaunchedEffect(uiState.deleteSuccess) {
         if (uiState.deleteSuccess) {
@@ -93,6 +101,16 @@ fun ReviewBlockDetailScreen(
     val examName = resolvedBlock?.examName?.ifBlank { resolvedBlock.title }
         ?: resolvedBlock?.title
         ?: blockId
+
+    if (showProDialog) {
+        ProPaywallDialog(
+            viewModel = subscriptionViewModel,
+            onDismiss = {
+                showProDialog = false
+                onNavigateBack()
+            }
+        )
+    }
 
     val dDayText = when {
         resolvedBlock == null -> ""

@@ -58,6 +58,10 @@ import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.review.DailyReviewCompletionStat
 import com.loorve.presentation.reviewblock.ReviewRecordMiniCard
+import com.loorve.presentation.subscription.ProPaywallDialog
+import com.loorve.presentation.subscription.SubscriptionViewModel
+import com.loorve.domain.subscription.ReviewBlockAccessPolicy
+import com.loorve.domain.subscription.SubscriptionEntitlement
 import com.loorve.ui.component.BannerAdView
 import com.loorve.ui.theme.LoorveTypography
 import com.loorve.ui.theme.OnBackground
@@ -73,9 +77,11 @@ fun ReviewCalendarScreen(
     onNavigateBack: () -> Unit,
     onNavigateToAddReviewBlock: () -> Unit,
     onNavigateToReviewBlockDetail: (blockId: String) -> Unit = {},  // ✅ 신규 파라미터
-    reviewCalendarViewModel: ReviewCalendarViewModel = hiltViewModel()
+    reviewCalendarViewModel: ReviewCalendarViewModel = hiltViewModel(),
+    subscriptionViewModel: SubscriptionViewModel = hiltViewModel()
 ) {
     val uiState by reviewCalendarViewModel.uiState.collectAsState()
+    var showProDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         reviewCalendarViewModel.refreshUid()
@@ -116,7 +122,19 @@ fun ReviewCalendarScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onNavigateToAddReviewBlock) {
+            FloatingActionButton(
+                onClick = {
+                    if (ReviewBlockAccessPolicy.canCreate(
+                            uiState.reviewBlocks,
+                            uiState.subscriptionEntitlement
+                        )
+                    ) {
+                        onNavigateToAddReviewBlock()
+                    } else {
+                        showProDialog = true
+                    }
+                }
+            ) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = "복습 블록 생성"
@@ -124,7 +142,9 @@ fun ReviewCalendarScreen(
             }
         },
         bottomBar = {
-            BannerAdView(modifier = Modifier.fillMaxWidth())
+            if (uiState.subscriptionEntitlement !is SubscriptionEntitlement.Pro) {
+                BannerAdView(modifier = Modifier.fillMaxWidth())
+            }
         }
     ) { paddingValues ->
         Column(
@@ -206,8 +226,14 @@ fun ReviewCalendarScreen(
                         ) { block ->
                             ReviewBlockCard(
                                 block = block,
-                                // ✅ 핵심 수정: 네비게이션으로 변경
-                                onClick = { onNavigateToReviewBlockDetail(block.blockId) }
+                                locked = block.blockId in uiState.lockedBlockIds,
+                                onClick = {
+                                    if (block.blockId in uiState.lockedBlockIds) {
+                                        showProDialog = true
+                                    } else {
+                                        onNavigateToReviewBlockDetail(block.blockId)
+                                    }
+                                }
                             )
                             val blockSchedules = uiState.selectedDateSchedules.filter {
                                 it.blockId == block.blockId
@@ -238,6 +264,13 @@ fun ReviewCalendarScreen(
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                 }
+                            }
+
+                            if (showProDialog) {
+                                ProPaywallDialog(
+                                    viewModel = subscriptionViewModel,
+                                    onDismiss = { showProDialog = false }
+                                )
                             }
                         }
                     }
@@ -487,6 +520,7 @@ private fun ReviewSchedule.toReviewScheduleItem(): ReviewScheduleItem =
 @Composable
 private fun ReviewBlockCard(
     block: ReviewBlock,
+    locked: Boolean = false,
     onClick: () -> Unit
 ) {
     Card(
@@ -530,7 +564,15 @@ private fun ReviewBlockCard(
                 }
             }
             Spacer(modifier = Modifier.width(8.dp))
-            if (block.isCompleted) {
+            if (locked) {
+                Badge(containerColor = MaterialTheme.colorScheme.errorContainer) {
+                    Text(
+                        text = "잠김",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            } else if (block.isCompleted) {
                 Badge(containerColor = MaterialTheme.colorScheme.primary) {
                     Text(
                         text = "완료",

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loorve.domain.usecase.CreateReviewBlockRequest
 import com.loorve.domain.usecase.CreateReviewBlockUseCase
+import com.loorve.domain.subscription.SubscriptionRequiredException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ sealed class ReviewBlockUiState {
     data object Idle : ReviewBlockUiState()
     data object Loading : ReviewBlockUiState()
     data object Success : ReviewBlockUiState()
+    data object RequiresPro : ReviewBlockUiState()
     data class Error(val message: String) : ReviewBlockUiState()
 }
 
@@ -51,6 +53,10 @@ class ReviewBlockViewModel @Inject constructor(
             ).onSuccess {
                 _uiState.value = ReviewBlockUiState.Success
             }.onFailure { throwable ->
+                if (throwable is SubscriptionRequiredException) {
+                    _uiState.value = ReviewBlockUiState.RequiresPro
+                    return@onFailure
+                }
                 android.util.Log.e("ReviewBlockVM", "createReviewBlock failed", throwable)
                 _uiState.value = ReviewBlockUiState.Error(
                     throwable.message ?: "복습 블록 생성에 실패했습니다."

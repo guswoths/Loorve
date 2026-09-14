@@ -7,6 +7,7 @@ import com.loorve.data.repository.ReviewBlockRepositoryImpl
 import com.loorve.data.repository.ReviewScheduleItemRepositoryImpl
 import com.loorve.data.repository.StudyRecordRepositoryImpl
 import com.loorve.data.repository.ReviewSchedulingRepositoryImpl
+import com.loorve.data.subscription.GooglePlaySubscriptionRepository
 import com.loorve.domain.repository.AuthRepository
 import com.loorve.domain.repository.ExamRepository
 import com.loorve.domain.repository.ProgressRepository
@@ -14,6 +15,7 @@ import com.loorve.domain.repository.ReviewBlockRepository
 import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.domain.repository.ReviewSchedulingRepository
+import com.loorve.domain.subscription.SubscriptionRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -48,6 +50,11 @@ abstract class RepositoryModule {
     abstract fun bindReviewScheduleItemRepository(
         impl: ReviewScheduleItemRepositoryImpl
     ): ReviewScheduleItemRepository
+
+    @Binds @Singleton
+    abstract fun bindSubscriptionRepository(
+        impl: GooglePlaySubscriptionRepository
+    ): SubscriptionRepository
 
     // ✅ ReviewScheduleRepository는 ReviewScheduleModule.kt에서 이미 바인딩됨 — 여기 없어야 함
 }

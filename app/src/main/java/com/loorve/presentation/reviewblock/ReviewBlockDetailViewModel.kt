@@ -25,9 +25,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import javax.inject.Inject
 import com.loorve.util.CalendarRefreshBus
+import com.loorve.domain.subscription.ReviewBlockAccessPolicy
+import com.loorve.domain.subscription.SubscriptionRepository
 
 enum class ReviewBlockTab {
     STUDY_RECORD,
@@ -50,7 +53,8 @@ data class ReviewBlockDetailUiState(
     val recordToDelete: StudyRecord? = null,
     val selectedTab: ReviewBlockTab = ReviewBlockTab.STUDY_RECORD,
     val defaultAlarmTime: Pair<Int, Int> = 9 to 0
-    ,val lastCreationResult: CreateStudyRecordResult? = null
+    ,val lastCreationResult: CreateStudyRecordResult? = null,
+    val requiresPro: Boolean = false
 )
 
 @HiltViewModel
@@ -62,7 +66,8 @@ class ReviewBlockDetailViewModel @Inject constructor(
     private val reviewBlockRepository: ReviewBlockRepository,
     private val calendarRefreshBus: CalendarRefreshBus,
     private val notificationTimePreferences: NotificationTimePreferences,
-    private val reviewAlarmScheduler: ReviewAlarmScheduler
+    private val reviewAlarmScheduler: ReviewAlarmScheduler,
+    private val subscriptionRepository: SubscriptionRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewBlockDetailUiState())
@@ -159,6 +164,23 @@ class ReviewBlockDetailViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     errorMessage = "블록 정보를 불러올 수 없습니다."
+                )
+                return@launch
+            }
+
+            val allBlocks = reviewBlockRepository.getReviewBlocks(uid).getOrDefault(emptyList())
+            val entitlement = subscriptionRepository.state
+                .first { it.entitlement !is com.loorve.domain.subscription.SubscriptionEntitlement.Loading }
+                .entitlement
+            val accessibleIds = ReviewBlockAccessPolicy.accessibleBlockIds(
+                allBlocks,
+                entitlement
+            )
+            if (resolvedBlock.blockId !in accessibleIds) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    reviewBlock = null,
+                    requiresPro = true
                 )
                 return@launch
             }

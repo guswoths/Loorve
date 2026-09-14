@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.ui.component.*
 import com.loorve.ui.theme.*
+import com.loorve.domain.subscription.SubscriptionEntitlement
+import com.loorve.presentation.subscription.SubscriptionViewModel
 // ✅ [원인3 수정] java.time 패키지를 명시적으로 import — Firebase DataConnect의 LocalDate와 충돌 방지
 import java.time.LocalDate
 import java.time.YearMonth
@@ -38,9 +40,11 @@ import java.time.format.DateTimeFormatter
 fun HomeScreen(
     onNavigateToExamSetting: () -> Unit,
     onNavigateToProgressDetail: (String) -> Unit,
-    viewModel: HomeViewModel = hiltViewModel()
+    viewModel: HomeViewModel = hiltViewModel(),
+    subscriptionViewModel: SubscriptionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val subscriptionState by subscriptionViewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
 
@@ -85,7 +89,9 @@ fun HomeScreen(
             )
         },
         bottomBar = {
-            BannerAdView(modifier = Modifier.fillMaxWidth())
+            if (subscriptionState.entitlement !is SubscriptionEntitlement.Pro) {
+                BannerAdView(modifier = Modifier.fillMaxWidth())
+            }
         },
         containerColor = Background
     ) { paddingValues ->

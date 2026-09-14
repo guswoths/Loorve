@@ -43,4 +43,18 @@
     <string name="settings_delete_account">계정 삭제</string>
     <string name="settings_delete_account_message">정말 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.</string>
     <string name="settings_delete">삭제</string>
+    <string name="settings_loorve_pro">Loorve Pro</string>
+    <string name="settings_loorve_pro_subtitle">배너 광고 없이 복습 블록을 무제한으로 사용</string>
+    <string name="settings_loorve_pro_open">열기</string>
+    <string name="pro_title">Loorve Pro</string>
+    <string name="pro_free_benefits">무료: 배너 광고 표시, 접근 가능한 복습 블록 1개</string>
+    <string name="pro_paid_benefits">Pro: 배너 광고 제거, 복습 블록 무제한</string>
+    <string name="pro_active">현재 Loorve Pro를 이용 중입니다.</string>
+    <string name="pro_pending">결제가 처리 중입니다. 완료되면 Pro가 활성화됩니다.</string>
+    <string name="pro_error">구독 정보를 불러오지 못했습니다: %1$s</string>
+    <string name="pro_close">닫기</string>
+    <string name="pro_subscribe">구독하기 (%1$s/월)</string>
+    <string name="pro_subscribe_unavailable">구독하기</string>
+    <string name="pro_refresh">복원/새로고침</string>
+    <string name="pro_cancel">취소</string>
 </resources>

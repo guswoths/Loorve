@@ -4,6 +4,11 @@ package com.loorve.domain.usecase
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import com.loorve.domain.review.ReviewSchedulingEngine
+import com.loorve.domain.repository.ReviewBlockRepository
+import com.loorve.domain.subscription.ReviewBlockAccessPolicy
+import com.loorve.domain.subscription.SubscriptionEntitlement
+import com.loorve.domain.subscription.SubscriptionRepository
+import com.loorve.domain.subscription.SubscriptionRequiredException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -20,7 +25,9 @@ data class CreateReviewBlockRequest(
 )
 
 class CreateReviewBlockUseCase @Inject constructor(
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val reviewBlockRepository: ReviewBlockRepository,
+    private val subscriptionRepository: SubscriptionRepository
 ) {
     suspend operator fun invoke(request: CreateReviewBlockRequest): Result<Unit> {
         return runCatching {
@@ -54,6 +61,15 @@ class CreateReviewBlockUseCase @Inject constructor(
             } else null
             require(customInterval == null || customInterval.isValid) {
                 customInterval?.message ?: "복습 간격을 확인해주세요."
+            }
+
+            val existingBlocks = reviewBlockRepository.getReviewBlocks(request.uid).getOrThrow()
+            if (!ReviewBlockAccessPolicy.canCreate(
+                    existingBlocks,
+                    subscriptionRepository.state.value.entitlement
+                )
+            ) {
+                throw SubscriptionRequiredException()
             }
 
             val blockId = UUID.randomUUID().toString()

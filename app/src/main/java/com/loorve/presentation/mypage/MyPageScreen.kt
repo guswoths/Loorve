@@ -60,6 +60,9 @@ import com.loorve.BuildConfig
 import com.loorve.R
 import com.loorve.domain.repository.ScheduleSyncStatus
 import com.loorve.presentation.notification.NotificationPermissionViewModel
+import com.loorve.domain.subscription.SubscriptionEntitlement
+import com.loorve.presentation.subscription.ProPaywallDialog
+import com.loorve.presentation.subscription.SubscriptionViewModel
 import com.loorve.ui.component.BannerAdView
 import com.loorve.ui.component.LoorveCard
 import com.loorve.ui.theme.Background
@@ -79,7 +82,8 @@ fun MyPageScreen(
     onNavigateToBatteryOptimization: () -> Unit,
     onNavigateToNotificationPermission: () -> Unit = onNavigateToNotificationTimeSetting,
     onSignOut: () -> Unit,
-    viewModel: MyPageViewModel = hiltViewModel()
+    viewModel: MyPageViewModel = hiltViewModel(),
+    subscriptionViewModel: SubscriptionViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -87,6 +91,8 @@ fun MyPageScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showProDialog by remember { mutableStateOf(false) }
+    val subscriptionState by subscriptionViewModel.state.collectAsStateWithLifecycle()
     val notificationAllowed = lifecycleState.let {
         NotificationPermissionViewModel.hasNotificationPermission(context)
     }
@@ -111,7 +117,11 @@ fun MyPageScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
             )
         },
-        bottomBar = { BannerAdView(modifier = Modifier.fillMaxWidth()) },
+        bottomBar = {
+            if (subscriptionState.entitlement !is SubscriptionEntitlement.Pro) {
+                BannerAdView(modifier = Modifier.fillMaxWidth())
+            }
+        },
         containerColor = Background
     ) { padding ->
         if (uiState.isLoading) {
@@ -220,6 +230,18 @@ fun MyPageScreen(
                 }
 
                 item {
+                    LoorveCard(Modifier.fillMaxWidth()) {
+                        SettingsRow(
+                            icon = Icons.Default.Info,
+                            title = stringResource(R.string.settings_loorve_pro),
+                            subtitle = stringResource(R.string.settings_loorve_pro_subtitle),
+                            actionLabel = stringResource(R.string.settings_loorve_pro_open),
+                            onAction = { showProDialog = true }
+                        )
+                    }
+                }
+
+                item {
                     SectionTitle(stringResource(R.string.settings_app_information))
                     LoorveCard(Modifier.fillMaxWidth()) {
                         SettingsRow(
@@ -248,6 +270,13 @@ fun MyPageScreen(
                 }
             }
         }
+    }
+
+    if (showProDialog) {
+        ProPaywallDialog(
+            viewModel = subscriptionViewModel,
+            onDismiss = { showProDialog = false }
+        )
     }
 
     if (showLogoutDialog) {
