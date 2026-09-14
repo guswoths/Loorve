@@ -109,6 +109,8 @@ sealed class Screen(val route: String) {
 
 }
 
+private const val RETURN_TO_SETTINGS_TAB_KEY = "return_to_settings_tab"
+
 private data class BottomNavItem(
     val label: String,
     val icon: ImageVector,
@@ -367,6 +369,19 @@ fun LoorveNavHost(
 
             var batteryGuideShown by remember { mutableStateOf(false) }
             var selectedTabIndex by remember { mutableStateOf(0) }
+            val returnToSettingsTab by navController.currentBackStackEntry!!
+                .savedStateHandle
+                .getStateFlow(RETURN_TO_SETTINGS_TAB_KEY, false)
+                .collectAsStateWithLifecycle()
+
+            LaunchedEffect(returnToSettingsTab) {
+                if (returnToSettingsTab) {
+                    selectedTabIndex = 2
+                    navController.currentBackStackEntry
+                        ?.savedStateHandle
+                        ?.set(RETURN_TO_SETTINGS_TAB_KEY, false)
+                }
+            }
 
             // ⛔ 기능 금지 구역 — 절대 수정 금지
             LaunchedEffect(lifecycleState) {
@@ -469,14 +484,25 @@ fun LoorveNavHost(
                                     selectedTabIndex = 0
                                 },
                                 onNavigateToNotificationTimeSetting = {
+                                    navController.currentBackStackEntry
+                                        ?.savedStateHandle
+                                        ?.set(RETURN_TO_SETTINGS_TAB_KEY, true)
                                     navController.navigate(Screen.NotificationPermission.route) {
                                         launchSingleTop = true
                                     }
                                 },
                                 onNavigateToBatteryOptimization = {
-                                    navController.navigate(Screen.BatteryOptimizationGuide.route)
+                                    navController.currentBackStackEntry
+                                        ?.savedStateHandle
+                                        ?.set(RETURN_TO_SETTINGS_TAB_KEY, true)
+                                    navController.navigate(Screen.BatteryOptimizationGuide.route) {
+                                        launchSingleTop = true
+                                    }
                                 },
                                 onNavigateToNotificationPermission = {
+                                    navController.currentBackStackEntry
+                                        ?.savedStateHandle
+                                        ?.set(RETURN_TO_SETTINGS_TAB_KEY, true)
                                     navController.navigate(Screen.NotificationPermission.route) {
                                         launchSingleTop = true
                                     }
@@ -555,6 +581,7 @@ fun LoorveNavHost(
                         popUpTo(Screen.NotificationPermission.route) {
                             inclusive = true
                         }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -564,13 +591,19 @@ fun LoorveNavHost(
             MyPageScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToNotificationTimeSetting = {
-                    navController.navigate(Screen.NotificationPermission.route)
+                    navController.navigate(Screen.NotificationPermission.route) {
+                        launchSingleTop = true
+                    }
                 },
                 onNavigateToBatteryOptimization = {
-                    navController.navigate(Screen.BatteryOptimizationGuide.route)
+                    navController.navigate(Screen.BatteryOptimizationGuide.route) {
+                        launchSingleTop = true
+                    }
                 },
                 onNavigateToNotificationPermission = {
-                    navController.navigate(Screen.NotificationPermission.route)
+                    navController.navigate(Screen.NotificationPermission.route) {
+                        launchSingleTop = true
+                    }
                 },
                 onSignOut = {
                     navController.navigate(Screen.Login.route) {
