@@ -33,7 +33,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.loorve_2"
+        applicationId = "com.loorve2"
         minSdk = 26
         targetSdk = 36
         versionCode = 3
