@@ -11,60 +11,6 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("keystore.properties")
-
-if (keystorePropertiesFile.exists()) {
-    keystorePropertiesFile.inputStream().use { input ->
-        keystoreProperties.load(input)
-    }
-}
-
-val signingPropertyKeys = listOf(
-    "storeFile",
-    "storePassword",
-    "keyAlias",
-    "keyPassword"
-)
-
-gradle.taskGraph.whenReady {
-    val releaseSigningTaskRequested = allTasks.any { task ->
-        task.path.substringAfterLast(":").let { taskName ->
-            taskName.endsWith("Release") &&
-                    (taskName.startsWith("assemble") ||
-                            taskName.startsWith("bundle") ||
-                            taskName.startsWith("package") ||
-                            taskName.startsWith("sign"))
-        }
-    }
-
-    if (releaseSigningTaskRequested) {
-        if (!keystorePropertiesFile.exists()) {
-            throw GradleException(
-                "Release signing requires ${keystorePropertiesFile.path}."
-            )
-        }
-
-        val missingProperties = signingPropertyKeys.filter { key ->
-            keystoreProperties.getProperty(key).isNullOrBlank()
-        }
-        if (missingProperties.isNotEmpty()) {
-            throw GradleException(
-                "Release signing properties are missing: ${missingProperties.joinToString()}"
-            )
-        }
-
-        val configuredStoreFile = rootProject.file(
-            keystoreProperties.getProperty("storeFile")
-        )
-        if (!configuredStoreFile.isFile) {
-            throw GradleException(
-                "Release signing keystore does not exist: ${configuredStoreFile.path}"
-            )
-        }
-    }
-}
-
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
@@ -79,15 +25,16 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = keystoreProperties.getProperty("storeFile")?.let(rootProject::file)
-            storePassword = keystoreProperties.getProperty("storePassword")
-            keyAlias = keystoreProperties.getProperty("keyAlias")
-            keyPassword = keystoreProperties.getProperty("keyPassword")
+            // Windows 경로의 백슬래시는 \\ 로 이스케이프하거나 / 로 표기해야 합니다.
+            storeFile = file("C:/Users/hjson/Loorve-keys/loorve-upload-2026-last.jks")
+            storePassword = "sij430107*"
+            keyAlias = "key0"
+            keyPassword = "sij430107*"
         }
     }
 
     defaultConfig {
-        applicationId = "com.loorve2"
+        applicationId = "com.loorve_2"
         minSdk = 26
         targetSdk = 36
         versionCode = 3
@@ -132,7 +79,6 @@ android {
     }
 
     compileOptions {
-        // ✅ [추가] desugaring 활성화
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -166,7 +112,6 @@ dependencies {
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
-    // ✅ [추가] Core Library Desugaring 의존성
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
     implementation("androidx.core:core-ktx:1.16.0")
