@@ -20,6 +20,51 @@ if (keystorePropertiesFile.exists()) {
     }
 }
 
+val signingPropertyKeys = listOf(
+    "storeFile",
+    "storePassword",
+    "keyAlias",
+    "keyPassword"
+)
+
+gradle.taskGraph.whenReady {
+    val releaseSigningTaskRequested = allTasks.any { task ->
+        task.path.substringAfterLast(":").let { taskName ->
+            taskName.endsWith("Release") &&
+                    (taskName.startsWith("assemble") ||
+                            taskName.startsWith("bundle") ||
+                            taskName.startsWith("package") ||
+                            taskName.startsWith("sign"))
+        }
+    }
+
+    if (releaseSigningTaskRequested) {
+        if (!keystorePropertiesFile.exists()) {
+            throw GradleException(
+                "Release signing requires ${keystorePropertiesFile.path}."
+            )
+        }
+
+        val missingProperties = signingPropertyKeys.filter { key ->
+            keystoreProperties.getProperty(key).isNullOrBlank()
+        }
+        if (missingProperties.isNotEmpty()) {
+            throw GradleException(
+                "Release signing properties are missing: ${missingProperties.joinToString()}"
+            )
+        }
+
+        val configuredStoreFile = rootProject.file(
+            keystoreProperties.getProperty("storeFile")
+        )
+        if (!configuredStoreFile.isFile) {
+            throw GradleException(
+                "Release signing keystore does not exist: ${configuredStoreFile.path}"
+            )
+        }
+    }
+}
+
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
@@ -31,6 +76,15 @@ if (localPropertiesFile.exists()) {
 android {
     namespace = "com.loorve"
     compileSdk = 36
+
+    signingConfigs {
+        create("release") {
+            storeFile = keystoreProperties.getProperty("storeFile")?.let(rootProject::file)
+            storePassword = keystoreProperties.getProperty("storePassword")
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+        }
+    }
 
     defaultConfig {
         applicationId = "com.loorve2"
@@ -73,6 +127,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
