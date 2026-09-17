@@ -7,10 +7,12 @@ import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialCustomException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.FirebaseUser
@@ -28,6 +30,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.UUID
 
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
@@ -192,18 +195,41 @@ class AuthRepositoryImpl @Inject constructor(
             }
             Log.d(TAG, "Google Credential 요청 시작 (serverClientId=${maskClientId(serverClientId)})")
             val credentialManager = CredentialManager.create(activityContext)
+            val nonce = UUID.randomUUID().toString()
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
                 .setServerClientId(serverClientId)
                 .setAutoSelectEnabled(false)
+                .setNonce(nonce)
                 .build()
             val request = GetCredentialRequest.Builder()
                 .addCredentialOption(googleIdOption)
                 .build()
-            val credentialResponse = credentialManager.getCredential(
-                request = request,
-                context = activityContext
-            )
+            val credentialResponse = try {
+                credentialManager.getCredential(
+                    request = request,
+                    context = activityContext
+                )
+            } catch (e: NoCredentialException) {
+                Log.w(
+                    TAG,
+                    "GetGoogleIdOption에서 credential을 찾지 못했습니다. " +
+                        "SignInWithGoogle fallback을 시도합니다: type=${e.type}, message=${e.message}",
+                    e
+                )
+                val signInWithGoogleOption = GetSignInWithGoogleOption(
+                    serverClientId,
+                    nonce,
+                    null
+                )
+                val fallbackRequest = GetCredentialRequest.Builder()
+                    .addCredentialOption(signInWithGoogleOption)
+                    .build()
+                credentialManager.getCredential(
+                    request = fallbackRequest,
+                    context = activityContext
+                )
+            }
             val googleIdTokenCredential = GoogleIdTokenCredential
                 .createFrom(credentialResponse.credential.data)
             val idToken = googleIdTokenCredential.idToken
@@ -219,10 +245,26 @@ class AuthRepositoryImpl @Inject constructor(
         } catch (e: NoCredentialException) {
             Log.e(
                 TAG,
-                "Google 계정을 선택할 수 없습니다: type=${e.type}, message=${e.message}",
+                "Google credential provider가 credential을 반환하지 않았습니다: " +
+                    "type=${e.type}, message=${e.message}. " +
+                    "applicationId, OAuth Android client, SHA-1, Google Play services를 확인하세요.",
                 e
             )
-            Result.failure(Exception("Google 계정을 선택할 수 없습니다. 기기에 Google 계정을 추가한 뒤 다시 시도해주세요.", e))
+            Result.failure(
+                Exception(
+                    "Google 계정을 선택할 수 없습니다. Google Play services와 OAuth 설정(SHA-1)을 확인해주세요.",
+                    e
+                )
+            )
+        } catch (e: GetCredentialCustomException) {
+            Log.e(
+                TAG,
+                "Google Credential custom provider 오류: type=${e.type}, message=${e.message}",
+                e
+            )
+            Result.failure(
+                Exception("Google 로그인 설정 또는 제공업체 오류가 발생했습니다: ${e.message}", e)
+            )
         } catch (e: GetCredentialException) {
             Log.e(
                 TAG,
