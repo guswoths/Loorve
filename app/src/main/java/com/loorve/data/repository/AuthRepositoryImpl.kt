@@ -12,7 +12,6 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.FirebaseUser
@@ -30,7 +29,6 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
-import java.util.UUID
 
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
@@ -195,41 +193,21 @@ class AuthRepositoryImpl @Inject constructor(
             }
             Log.d(TAG, "Google Credential 요청 시작 (serverClientId=${maskClientId(serverClientId)})")
             val credentialManager = CredentialManager.create(activityContext)
-            val nonce = UUID.randomUUID().toString()
             val googleIdOption = GetGoogleIdOption.Builder()
+                // Show every Google account available to the provider, including first-time users.
                 .setFilterByAuthorizedAccounts(false)
                 .setServerClientId(serverClientId)
+                // Do not bypass the account chooser or trigger an implicit account transition.
                 .setAutoSelectEnabled(false)
-                .setNonce(nonce)
                 .build()
             val request = GetCredentialRequest.Builder()
                 .addCredentialOption(googleIdOption)
                 .build()
-            val credentialResponse = try {
-                credentialManager.getCredential(
-                    request = request,
-                    context = activityContext
-                )
-            } catch (e: NoCredentialException) {
-                Log.w(
-                    TAG,
-                    "GetGoogleIdOption에서 credential을 찾지 못했습니다. " +
-                        "SignInWithGoogle fallback을 시도합니다: type=${e.type}, message=${e.message}",
-                    e
-                )
-                val signInWithGoogleOption = GetSignInWithGoogleOption(
-                    serverClientId,
-                    nonce,
-                    null
-                )
-                val fallbackRequest = GetCredentialRequest.Builder()
-                    .addCredentialOption(signInWithGoogleOption)
-                    .build()
-                credentialManager.getCredential(
-                    request = fallbackRequest,
-                    context = activityContext
-                )
-            }
+            val credentialResponse = credentialManager.getCredential(
+                request = request,
+                context = activityContext
+            )
+            Log.d(TAG, "Google Credential 응답 수신: type=${credentialResponse.credential.type}")
             val googleIdTokenCredential = GoogleIdTokenCredential
                 .createFrom(credentialResponse.credential.data)
             val idToken = googleIdTokenCredential.idToken
@@ -247,12 +225,13 @@ class AuthRepositoryImpl @Inject constructor(
                 TAG,
                 "Google credential provider가 credential을 반환하지 않았습니다: " +
                     "type=${e.type}, message=${e.message}. " +
-                    "applicationId, OAuth Android client, SHA-1, Google Play services를 확인하세요.",
+                    "applicationId, OAuth Android client, SHA-1, Google Play services를 확인하세요. " +
+                    "계정 추가 화면으로 강제 전환하지 않고 로그인 화면에 오류를 표시합니다.",
                 e
             )
             Result.failure(
                 Exception(
-                    "Google 계정을 선택할 수 없습니다. Google Play services와 OAuth 설정(SHA-1)을 확인해주세요.",
+                    "Google 계정 선택기를 준비하지 못했습니다. Google Play services와 OAuth 설정(SHA-1)을 확인해주세요.",
                     e
                 )
             )
@@ -402,6 +381,13 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    /*
+     * OAuth troubleshooting:
+     * Register the local release keystore SHA-1 and the Google Play App Signing
+     * SHA-1 for applicationId com.loorve_2 in the same Firebase/Google Cloud
+     * Android OAuth client configuration. Keep serverClientId as the Web client
+     * ID (default_web_client_id), not the Android client ID.
+     */
     companion object {
         private const val TAG = "AuthRepository"
     }
