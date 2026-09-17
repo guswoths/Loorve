@@ -7,9 +7,11 @@ import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.BillingResult
+import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.QueryProductDetailsParams
+import com.android.billingclient.api.QueryProductDetailsResult
 import com.android.billingclient.api.QueryPurchasesParams
 import com.loorve.domain.subscription.LOORVE_PRO_MONTHLY_PRODUCT_ID
 import com.loorve.domain.subscription.SubscriptionEntitlement
@@ -43,7 +45,11 @@ class GooglePlaySubscriptionRepository @Inject constructor(
 
     private val billingClient = BillingClient.newBuilder(context)
         .setListener { result, purchases -> handlePurchaseUpdate(result, purchases) }
-        .enablePendingPurchases()
+        .enablePendingPurchases(
+            PendingPurchasesParams.newBuilder()
+                .enableOneTimeProducts()
+                .build()
+        )
         .build()
 
     override fun connect() {
@@ -125,8 +131,8 @@ class GooglePlaySubscriptionRepository @Inject constructor(
                         )
                     )
                     .build()
-            ) { result, details: List<ProductDetails> ->
-                val productDetails = details.firstOrNull()
+            ) { result, details: QueryProductDetailsResult ->
+                val productDetails = details.productDetailsList.firstOrNull()
                 if (result.responseCode == BillingClient.BillingResponseCode.OK &&
                     productDetails != null
                 ) {

@@ -37,8 +37,8 @@ android {
         applicationId = "com.loorve_2"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "1.0.2"
+        versionCode = 12
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -134,7 +134,7 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging-ktx")
 
     implementation("com.google.android.gms:play-services-ads:23.6.0")
-    implementation("com.android.billingclient:billing-ktx:7.0.0")
+    implementation("com.android.billingclient:billing-ktx:8.0.0")
 
     implementation("com.google.dagger:hilt-android:2.59.2")
     ksp("com.google.dagger:hilt-compiler:2.59.2")
