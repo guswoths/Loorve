@@ -3,6 +3,7 @@ package com.loorve.presentation.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.loorve.domain.model.User
 import com.loorve.domain.repository.AuthRepository
 import com.loorve.domain.usecase.SignOutUseCase
@@ -56,6 +57,7 @@ class AuthViewModel @Inject constructor(
                     _uiState.value = AuthUiState.Success(user, isNewUser)
                 }
                 .onFailure { e ->
+                    Log.e(TAG, "Google 로그인 실패: message=${e.message}", e)
                     _uiState.value = if (e.message == "CANCELLED") AuthUiState.Cancelled
                     else classifyError(e)
                 }
@@ -98,7 +100,14 @@ class AuthViewModel @Inject constructor(
                     e.message?.contains("timeout", ignoreCase = true) == true ->
                 AuthUiState.NetworkError("네트워크 연결을 확인해주세요.")
             else ->
-                AuthUiState.Error("Google 로그인에 실패했습니다. 다시 시도해주세요.")
+                AuthUiState.Error(
+                    e.message?.takeIf { it.isNotBlank() }
+                        ?: "Google 로그인에 실패했습니다. 다시 시도해주세요."
+                )
         }
+    }
+
+    companion object {
+        private const val TAG = "AuthViewModel"
     }
 }

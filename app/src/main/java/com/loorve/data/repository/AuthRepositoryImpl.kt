@@ -6,7 +6,9 @@ import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
@@ -16,7 +18,7 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import com.loorve.BuildConfig
+import com.loorve.R
 import com.loorve.domain.model.User
 import com.loorve.domain.repository.AuthRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -179,10 +181,20 @@ class AuthRepositoryImpl @Inject constructor(
     // ─────────────────────────────────────────────────────────────
     override suspend fun launchGoogleSignIn(activityContext: Context): Result<Pair<User, Boolean>> {
         return try {
+            val serverClientId = activityContext
+                .getString(R.string.default_web_client_id)
+                .trim()
+            if (serverClientId.isBlank()) {
+                Log.e(TAG, "Google 로그인 설정 오류: default_web_client_id가 비어 있습니다.")
+                return Result.failure(
+                    IllegalStateException("Google 로그인 설정이 올바르지 않습니다.")
+                )
+            }
+            Log.d(TAG, "Google Credential 요청 시작 (serverClientId=${maskClientId(serverClientId)})")
             val credentialManager = CredentialManager.create(activityContext)
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                .setServerClientId(serverClientId)
                 .setAutoSelectEnabled(false)
                 .build()
             val request = GetCredentialRequest.Builder()
@@ -195,13 +207,32 @@ class AuthRepositoryImpl @Inject constructor(
             val googleIdTokenCredential = GoogleIdTokenCredential
                 .createFrom(credentialResponse.credential.data)
             val idToken = googleIdTokenCredential.idToken
+            if (idToken.isBlank()) {
+                Log.e(TAG, "Google 로그인 실패: 빈 ID token이 반환되었습니다.")
+                return Result.failure(IllegalStateException("Google 인증 토큰이 비어 있습니다."))
+            }
+            Log.d(TAG, "Google Credential 수신 완료")
             signInWithGoogle(idToken)
+        } catch (e: GetCredentialCancellationException) {
+            Log.i(TAG, "Google 로그인 사용자가 취소했습니다: type=${e.type}, message=${e.message}")
+            Result.failure(Exception("CANCELLED", e))
+        } catch (e: NoCredentialException) {
+            Log.e(
+                TAG,
+                "Google 계정을 선택할 수 없습니다: type=${e.type}, message=${e.message}",
+                e
+            )
+            Result.failure(Exception("Google 계정을 선택할 수 없습니다. 기기에 Google 계정을 추가한 뒤 다시 시도해주세요.", e))
         } catch (e: GetCredentialException) {
-            Log.w(TAG, "Credential 취소 또는 실패: ${e.type}", e)
-            Result.failure(Exception("CANCELLED"))
+            Log.e(
+                TAG,
+                "Google Credential 요청 실패: type=${e.type}, message=${e.message}",
+                e
+            )
+            Result.failure(Exception("Google 로그인 요청에 실패했습니다: ${e.message ?: e.type}", e))
         } catch (e: Exception) {
             Log.e(TAG, "Google 로그인 실행 오류", e)
-            Result.failure(Exception("인증 처리 중 오류가 발생했습니다."))
+            Result.failure(Exception("인증 처리 중 오류가 발생했습니다: ${e.message ?: "알 수 없는 오류"}", e))
         }
     }
 
@@ -215,10 +246,13 @@ class AuthRepositoryImpl @Inject constructor(
             val isNewUser = createOrUpdateUserDocument(domainUser)
             Result.success(Pair(domainUser, isNewUser))
         } catch (e: com.google.firebase.auth.FirebaseAuthException) {
+            Log.e(TAG, "Firebase Google 인증 실패: code=${e.errorCode}, message=${e.message}", e)
             Result.failure(Exception(mapFirebaseAuthError(e.errorCode), e))
         } catch (e: java.io.IOException) {
+            Log.e(TAG, "Firebase Google 인증 네트워크 실패: ${e.message}", e)
             Result.failure(Exception("네트워크 연결을 확인해주세요.", e))
         } catch (e: Exception) {
+            Log.e(TAG, "Firebase Google 인증 처리 오류: ${e.message}", e)
             Result.failure(Exception("인증 처리 중 오류가 발생했습니다.", e))
         }
     }
@@ -316,6 +350,14 @@ class AuthRepositoryImpl @Inject constructor(
         "ERROR_OPERATION_NOT_ALLOWED"  -> "이 로그인 방식은 현재 비활성화되어 있습니다."
         "ERROR_EMAIL_ALREADY_IN_USE"   -> "이미 사용 중인 이메일입니다."
         else -> "로그인에 실패했습니다. (코드: $errorCode)"
+    }
+
+    private fun maskClientId(clientId: String): String {
+        return if (clientId.length > 12) {
+            "${clientId.take(8)}...${clientId.takeLast(12)}"
+        } else {
+            "***"
+        }
     }
 
     companion object {
