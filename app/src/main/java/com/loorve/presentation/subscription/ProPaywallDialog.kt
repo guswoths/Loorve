@@ -34,6 +34,7 @@ fun ProPaywallDialog(
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
+        viewModel.querySubscriptionDetails()
         viewModel.refreshWhenResumed()
     }
 
@@ -54,7 +55,18 @@ fun ProPaywallDialog(
                     Button(
                         enabled = productReady,
                         onClick = {
-                            (context as? Activity)?.let(viewModel::launchPurchase)
+                            val productDetails = state.productDetails ?: return@Button
+                            val offerToken = productDetails.subscriptionOfferDetails
+                                ?.firstOrNull()
+                                ?.offerToken
+                                ?: return@Button
+                            (context as? Activity)?.let { activity ->
+                                viewModel.launchBillingFlow(
+                                    activity = activity,
+                                    productDetails = productDetails,
+                                    offerToken = offerToken
+                                )
+                            }
                         }
                     ) {
                         Text(

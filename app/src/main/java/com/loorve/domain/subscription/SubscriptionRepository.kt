@@ -23,15 +23,27 @@ sealed interface SubscriptionEntitlement {
 data class SubscriptionState(
     val entitlement: SubscriptionEntitlement = SubscriptionEntitlement.Loading,
     val productDetails: ProductDetails? = null,
-    val isBillingReady: Boolean = false
+    val isBillingReady: Boolean = false,
+    val lastBillingMessage: String? = null
 )
 
 interface SubscriptionRepository {
     val state: StateFlow<SubscriptionState>
+    val isProSubscribed: StateFlow<Boolean>
 
     fun connect()
 
     fun refresh()
+
+    suspend fun querySubscriptionDetails(
+        productId: String = LOORVE_PRO_MONTHLY_PRODUCT_ID
+    ): ProductDetails?
+
+    fun launchBillingFlow(
+        activity: Activity,
+        productDetails: ProductDetails,
+        offerToken: String
+    ): Boolean
 
     fun launchPurchase(activity: Activity): Boolean
 }
