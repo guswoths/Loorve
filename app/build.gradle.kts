@@ -37,8 +37,8 @@ android {
         applicationId = "com.loorve_2"
         minSdk = 26
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.0.7"
+        versionCode = 24
+        versionName = "1.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

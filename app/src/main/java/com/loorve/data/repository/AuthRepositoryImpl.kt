@@ -11,6 +11,7 @@ import androidx.credentials.exceptions.GetCredentialCustomException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
@@ -194,19 +195,30 @@ class AuthRepositoryImpl @Inject constructor(
             Log.d(TAG, "Google Credential 요청 시작 (serverClientId=${maskClientId(serverClientId)})")
             val credentialManager = CredentialManager.create(activityContext)
             val googleIdOption = GetGoogleIdOption.Builder()
-                // Show every Google account available to the provider, including first-time users.
-                .setFilterByAuthorizedAccounts(false)
                 .setServerClientId(serverClientId)
-                // Do not bypass the account chooser or trigger an implicit account transition.
+                .setFilterByAuthorizedAccounts(false)
                 .setAutoSelectEnabled(false)
                 .build()
             val request = GetCredentialRequest.Builder()
                 .addCredentialOption(googleIdOption)
+                .setPreferImmediatelyAvailableCredentials(false)
                 .build()
-            val credentialResponse = credentialManager.getCredential(
-                request = request,
-                context = activityContext
-            )
+            val credentialResponse = try {
+                credentialManager.getCredential(
+                    request = request,
+                    context = activityContext
+                )
+            } catch (e: NoCredentialException) {
+                logGoogleAuthException(
+                    "Google ID credential을 사용할 수 없어 Sign in with Google 옵션으로 fallback합니다",
+                    e
+                )
+                return signInWithGoogleCredentialOption(
+                    credentialManager = credentialManager,
+                    activityContext = activityContext,
+                    serverClientId = serverClientId
+                )
+            }
             Log.d(TAG, "Google Credential 응답 수신: type=${credentialResponse.credential.type}")
             val googleIdTokenCredential = GoogleIdTokenCredential
                 .createFrom(credentialResponse.credential.data)
@@ -222,11 +234,7 @@ class AuthRepositoryImpl @Inject constructor(
             Result.failure(Exception("CANCELLED", e))
         } catch (e: NoCredentialException) {
             val diagnostic = googleAuthDiagnostic(e)
-            logGoogleAuthException(
-                "Google credential provider가 credential을 반환하지 않았습니다. " +
-                    "OAuth/SHA-1/Google Play services 설정을 확인하세요.",
-                e
-            )
+            logGoogleAuthException("Google credential provider가 credential을 반환하지 않았습니다", e)
             Result.failure(
                 Exception(diagnostic, e)
             )
@@ -242,6 +250,47 @@ class AuthRepositoryImpl @Inject constructor(
             val diagnostic = googleAuthDiagnostic(e)
             logGoogleAuthException("Google 로그인 실행 오류", e)
             Result.failure(Exception(diagnostic, e))
+        }
+    }
+
+    private suspend fun signInWithGoogleCredentialOption(
+        credentialManager: CredentialManager,
+        activityContext: Context,
+        serverClientId: String
+    ): Result<Pair<User, Boolean>> {
+        return try {
+            val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(serverClientId)
+                .build()
+            val fallbackRequest = GetCredentialRequest.Builder()
+                .addCredentialOption(signInWithGoogleOption)
+                .setPreferImmediatelyAvailableCredentials(false)
+                .build()
+            val credentialResponse = credentialManager.getCredential(
+                request = fallbackRequest,
+                context = activityContext
+            )
+            Log.d(
+                TAG,
+                "Sign in with Google fallback credential 응답 수신: " +
+                    "type=${credentialResponse.credential.type}"
+            )
+            val googleIdTokenCredential = GoogleIdTokenCredential
+                .createFrom(credentialResponse.credential.data)
+            val idToken = googleIdTokenCredential.idToken
+            if (idToken.isBlank()) {
+                Log.e(TAG, "Google 로그인 fallback 실패: 빈 ID token이 반환되었습니다.")
+                return Result.failure(IllegalStateException("Google 인증 토큰이 비어 있습니다."))
+            }
+            signInWithGoogle(idToken)
+        } catch (e: GetCredentialCancellationException) {
+            logGoogleAuthException("Google 로그인 fallback을 사용자가 취소했습니다", e)
+            Result.failure(Exception("CANCELLED", e))
+        } catch (e: GetCredentialException) {
+            logGoogleAuthException("Google 로그인 fallback 요청 실패", e)
+            Result.failure(Exception(googleAuthDiagnostic(e), e))
+        } catch (e: Exception) {
+            logGoogleAuthException("Google 로그인 fallback 실행 오류", e)
+            Result.failure(Exception(googleAuthDiagnostic(e), e))
         }
     }
 
