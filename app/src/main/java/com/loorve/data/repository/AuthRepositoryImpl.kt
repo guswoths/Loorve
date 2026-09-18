@@ -230,8 +230,29 @@ class AuthRepositoryImpl @Inject constructor(
             Log.d(TAG, "Google Credential 수신 완료")
             signInWithGoogle(idToken)
         } catch (e: GetCredentialCancellationException) {
-            logGoogleAuthException("Google 로그인 사용자가 취소했습니다", e)
-            Result.failure(Exception("CANCELLED", e))
+            if (isAccountReauthFailure(e)) {
+                logGoogleAuthException(
+                    "Google 계정 재인증 실패: OAuth Web Client ID와 Android OAuth " +
+                        "클라이언트의 package name/SHA-1 일치를 확인하세요. " +
+                        "현재 package=${activityContext.packageName}, " +
+                        "serverClientId=${
+                            maskClientId(
+                                activityContext.getString(R.string.default_web_client_id).trim()
+                            )
+                        }",
+                    e,
+                    Log.WARN
+                )
+                Result.failure(
+                    Exception(
+                        "Google 계정 재인증에 실패했습니다. OAuth Client ID, package name, SHA-1 설정을 확인해주세요.",
+                        e
+                    )
+                )
+            } else {
+                logGoogleAuthException("Google 로그인 사용자가 취소했습니다", e)
+                Result.failure(Exception("CANCELLED", e))
+            }
         } catch (e: NoCredentialException) {
             val diagnostic = googleAuthDiagnostic(e)
             logGoogleAuthException("Google credential provider가 credential을 반환하지 않았습니다", e)
@@ -283,8 +304,25 @@ class AuthRepositoryImpl @Inject constructor(
             }
             signInWithGoogle(idToken)
         } catch (e: GetCredentialCancellationException) {
-            logGoogleAuthException("Google 로그인 fallback을 사용자가 취소했습니다", e)
-            Result.failure(Exception("CANCELLED", e))
+            if (isAccountReauthFailure(e)) {
+                logGoogleAuthException(
+                    "Google 계정 재인증 실패(fallback): OAuth Web Client ID와 Android OAuth " +
+                        "클라이언트의 package name/SHA-1 일치를 확인하세요. " +
+                        "현재 package=${activityContext.packageName}, " +
+                        "serverClientId=${maskClientId(serverClientId)}",
+                    e,
+                    Log.WARN
+                )
+                Result.failure(
+                    Exception(
+                        "Google 계정 재인증에 실패했습니다. OAuth Client ID, package name, SHA-1 설정을 확인해주세요.",
+                        e
+                    )
+                )
+            } else {
+                logGoogleAuthException("Google 로그인 fallback을 사용자가 취소했습니다", e)
+                Result.failure(Exception("CANCELLED", e))
+            }
         } catch (e: GetCredentialException) {
             logGoogleAuthException("Google 로그인 fallback 요청 실패", e)
             Result.failure(Exception(googleAuthDiagnostic(e), e))
@@ -423,14 +461,23 @@ class AuthRepositoryImpl @Inject constructor(
             "${error.localizedMessage ?: error.message ?: "no localized message"}"
     }
 
-    private fun logGoogleAuthException(context: String, error: Throwable) {
-        Log.e(
+    private fun isAccountReauthFailure(error: GetCredentialCancellationException): Boolean {
+        return error.message?.contains("Account reauth failed", ignoreCase = true) == true ||
+            error.type.contains("16", ignoreCase = true)
+    }
+
+    private fun logGoogleAuthException(
+        message: String,
+        error: Throwable,
+        priority: Int = Log.ERROR
+    ) {
+        Log.println(
+            priority,
             GOOGLE_AUTH_TAG,
-            "$context\n" +
+            "$message\n" +
                 "exceptionClass=${error::class.java.name}\n" +
                 "localizedMessage=${error.localizedMessage}\n" +
                 "stackTrace:\n${Log.getStackTraceString(error)}",
-            error
         )
     }
 
