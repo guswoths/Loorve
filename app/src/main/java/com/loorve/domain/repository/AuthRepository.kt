@@ -1,8 +1,13 @@
 package com.loorve.domain.repository
 
 import android.content.Context
+import android.content.Intent
 import com.loorve.domain.model.User
 import kotlinx.coroutines.flow.Flow
+
+class LegacyGoogleSignInRequiredException(
+    val signInIntent: Intent
+) : Exception("LEGACY_GOOGLE_SIGN_IN_REQUIRED")
 
 /**
  * Domain Layer - 인증(Auth) Repository 인터페이스
@@ -24,6 +29,7 @@ interface AuthRepository {
     /** Pair.second = isNewUser (Firestore users 문서 미존재 = 신규) */
     suspend fun signInWithGoogle(idToken: String): Result<Pair<User, Boolean>>
     suspend fun launchGoogleSignIn(activityContext: Context): Result<Pair<User, Boolean>>
+    suspend fun completeLegacyGoogleSignIn(resultIntent: Intent): Result<Pair<User, Boolean>>
 
     suspend fun deleteAccount(): Result<Unit>
 }

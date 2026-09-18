@@ -1,11 +1,13 @@
 // 경로: app/src/main/java/com/loorve/presentation/auth/AuthViewModel.kt
 package com.loorve.presentation.auth
 
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.util.Log
 import com.loorve.domain.model.User
 import com.loorve.domain.repository.AuthRepository
+import com.loorve.domain.repository.LegacyGoogleSignInRequiredException
 import com.loorve.domain.usecase.SignOutUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +23,7 @@ sealed interface AuthUiState {
     data object Loading : AuthUiState
     data object Cancelled : AuthUiState
     data object LogoutComplete : AuthUiState
+    data class LegacyGoogleSignInRequired(val intent: Intent) : AuthUiState
     /** isNewUser = true: Firestore users 문서가 없던 신규(또는 재가입) 사용자 */
     data class Success(val user: User, val isNewUser: Boolean) : AuthUiState
     data class NetworkError(val message: String) : AuthUiState
@@ -65,9 +68,24 @@ class AuthViewModel @Inject constructor(
                             "stackTrace:\n${Log.getStackTraceString(e)}",
                         e
                     )
-                    _uiState.value = if (e.message == "CANCELLED") AuthUiState.Cancelled
-                    else classifyError(e)
+                    _uiState.value = when {
+                        e is LegacyGoogleSignInRequiredException ->
+                            AuthUiState.LegacyGoogleSignInRequired(e.signInIntent)
+                        e.message == "CANCELLED" -> AuthUiState.Cancelled
+                        else -> classifyError(e)
+                    }
                 }
+        }
+    }
+
+    fun completeLegacyGoogleSignIn(resultIntent: Intent) {
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            authRepository.completeLegacyGoogleSignIn(resultIntent)
+                .onSuccess { (user, isNewUser) ->
+                    _uiState.value = AuthUiState.Success(user, isNewUser)
+                }
+                .onFailure { e -> _uiState.value = classifyError(e) }
         }
     }
 

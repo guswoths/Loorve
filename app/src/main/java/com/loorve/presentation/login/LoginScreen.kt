@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,11 +39,22 @@ fun LoginScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val legacyGoogleSignInLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.data == null) {
+            viewModel.onLoginCancelled()
+        } else {
+            viewModel.completeLegacyGoogleSignIn(result.data!!)
+        }
+    }
 
     // 로그인 성공 → isNewUser 여부를 NavHost로 전달
     LaunchedEffect(uiState) {
         when (val state = uiState) {
             is AuthUiState.Success -> onLoginSuccess(state.isNewUser)
+            is AuthUiState.LegacyGoogleSignInRequired ->
+                legacyGoogleSignInLauncher.launch(state.intent)
             is AuthUiState.Cancelled -> viewModel.resetState()
             else -> Unit
         }

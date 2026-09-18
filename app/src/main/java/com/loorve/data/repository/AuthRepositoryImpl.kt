@@ -2,6 +2,7 @@
 package com.loorve.data.repository
 
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
@@ -20,9 +21,13 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import com.loorve.R
 import com.loorve.domain.model.User
 import com.loorve.domain.repository.AuthRepository
+import com.loorve.domain.repository.LegacyGoogleSignInRequiredException
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -232,22 +237,14 @@ class AuthRepositoryImpl @Inject constructor(
         } catch (e: GetCredentialCancellationException) {
             if (isAccountReauthFailure(e)) {
                 logGoogleAuthException(
-                    "Google 계정 재인증 실패: OAuth Web Client ID와 Android OAuth " +
-                        "클라이언트의 package name/SHA-1 일치를 확인하세요. " +
-                        "현재 package=${activityContext.packageName}, " +
-                        "serverClientId=${
-                            maskClientId(
-                                activityContext.getString(R.string.default_web_client_id).trim()
-                            )
-                        }",
+                    "Google 계정 재인증 실패; Sign in with Google 및 legacy Google Sign-In으로 fallback합니다",
                     e,
                     Log.WARN
                 )
-                Result.failure(
-                    Exception(
-                        "Google 계정 재인증에 실패했습니다. OAuth Client ID, package name, SHA-1 설정을 확인해주세요.",
-                        e
-                    )
+                signInWithGoogleCredentialOption(
+                    CredentialManager.create(activityContext),
+                    activityContext,
+                    activityContext.getString(R.string.default_web_client_id).trim()
                 )
             } else {
                 logGoogleAuthException("Google 로그인 사용자가 취소했습니다", e)
@@ -306,19 +303,13 @@ class AuthRepositoryImpl @Inject constructor(
         } catch (e: GetCredentialCancellationException) {
             if (isAccountReauthFailure(e)) {
                 logGoogleAuthException(
-                    "Google 계정 재인증 실패(fallback): OAuth Web Client ID와 Android OAuth " +
-                        "클라이언트의 package name/SHA-1 일치를 확인하세요. " +
-                        "현재 package=${activityContext.packageName}, " +
+                    "Google 계정 재인증 실패(fallback); legacy Google Sign-In chooser를 실행합니다. " +
+                        "package=${activityContext.packageName}, " +
                         "serverClientId=${maskClientId(serverClientId)}",
                     e,
                     Log.WARN
                 )
-                Result.failure(
-                    Exception(
-                        "Google 계정 재인증에 실패했습니다. OAuth Client ID, package name, SHA-1 설정을 확인해주세요.",
-                        e
-                    )
-                )
+                createLegacyGoogleSignInResult(activityContext, serverClientId)
             } else {
                 logGoogleAuthException("Google 로그인 fallback을 사용자가 취소했습니다", e)
                 Result.failure(Exception("CANCELLED", e))
@@ -330,6 +321,47 @@ class AuthRepositoryImpl @Inject constructor(
             logGoogleAuthException("Google 로그인 fallback 실행 오류", e)
             Result.failure(Exception(googleAuthDiagnostic(e), e))
         }
+    }
+
+    override suspend fun completeLegacyGoogleSignIn(
+        resultIntent: Intent
+    ): Result<Pair<User, Boolean>> {
+        return try {
+            val account = GoogleSignIn
+                .getSignedInAccountFromIntent(resultIntent)
+                .getResult(ApiException::class.java)
+            val idToken = account.idToken
+            if (idToken.isNullOrBlank()) {
+                val error = IllegalStateException("Legacy Google Sign-In이 ID token을 반환하지 않았습니다.")
+                logGoogleAuthException("Legacy Google Sign-In ID token 누락", error)
+                Result.failure(error)
+            } else {
+                signInWithGoogle(idToken)
+            }
+        } catch (e: ApiException) {
+            logGoogleAuthException("Legacy Google Sign-In account 처리 실패", e)
+            Result.failure(Exception(googleAuthDiagnostic(e), e))
+        } catch (e: Exception) {
+            logGoogleAuthException("Legacy Google Sign-In 결과 처리 오류", e)
+            Result.failure(Exception(googleAuthDiagnostic(e), e))
+        }
+    }
+
+    private fun createLegacyGoogleSignInResult(
+        activityContext: Context,
+        serverClientId: String
+    ): Result<Pair<User, Boolean>> {
+        val signInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(serverClientId)
+            .requestEmail()
+            .build()
+        val signInIntent = GoogleSignIn.getClient(activityContext, signInOptions).signInIntent
+        logGoogleAuthException(
+            "Legacy Google Sign-In chooser를 실행해야 합니다",
+            LegacyGoogleSignInRequiredException(signInIntent),
+            Log.WARN
+        )
+        return Result.failure(LegacyGoogleSignInRequiredException(signInIntent))
     }
 
     override suspend fun signInWithGoogle(idToken: String): Result<Pair<User, Boolean>> {
