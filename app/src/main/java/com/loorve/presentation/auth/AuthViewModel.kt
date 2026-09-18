@@ -57,7 +57,14 @@ class AuthViewModel @Inject constructor(
                     _uiState.value = AuthUiState.Success(user, isNewUser)
                 }
                 .onFailure { e ->
-                    Log.e(TAG, "Google 로그인 실패: message=${e.message}", e)
+                    Log.e(
+                        GOOGLE_AUTH_TAG,
+                        "Google 로그인 실패\n" +
+                            "exceptionClass=${e::class.java.name}\n" +
+                            "localizedMessage=${e.localizedMessage}\n" +
+                            "stackTrace:\n${Log.getStackTraceString(e)}",
+                        e
+                    )
                     _uiState.value = if (e.message == "CANCELLED") AuthUiState.Cancelled
                     else classifyError(e)
                 }
@@ -108,6 +115,6 @@ class AuthViewModel @Inject constructor(
     }
 
     companion object {
-        private const val TAG = "AuthViewModel"
+        private const val GOOGLE_AUTH_TAG = "GoogleAuth"
     }
 }

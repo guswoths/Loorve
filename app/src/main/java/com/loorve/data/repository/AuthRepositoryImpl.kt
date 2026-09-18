@@ -218,42 +218,30 @@ class AuthRepositoryImpl @Inject constructor(
             Log.d(TAG, "Google Credential 수신 완료")
             signInWithGoogle(idToken)
         } catch (e: GetCredentialCancellationException) {
-            Log.i(TAG, "Google 로그인 사용자가 취소했습니다: type=${e.type}, message=${e.message}")
+            logGoogleAuthException("Google 로그인 사용자가 취소했습니다", e)
             Result.failure(Exception("CANCELLED", e))
         } catch (e: NoCredentialException) {
-            Log.e(
-                TAG,
-                "Google credential provider가 credential을 반환하지 않았습니다: " +
-                    "type=${e.type}, message=${e.message}. " +
-                    "applicationId, OAuth Android client, SHA-1, Google Play services를 확인하세요. " +
-                    "계정 추가 화면으로 강제 전환하지 않고 로그인 화면에 오류를 표시합니다.",
+            val diagnostic = googleAuthDiagnostic(e)
+            logGoogleAuthException(
+                "Google credential provider가 credential을 반환하지 않았습니다. " +
+                    "OAuth/SHA-1/Google Play services 설정을 확인하세요.",
                 e
             )
             Result.failure(
-                Exception(
-                    "Google 계정 선택기를 준비하지 못했습니다. Google Play services와 OAuth 설정(SHA-1)을 확인해주세요.",
-                    e
-                )
+                Exception(diagnostic, e)
             )
         } catch (e: GetCredentialCustomException) {
-            Log.e(
-                TAG,
-                "Google Credential custom provider 오류: type=${e.type}, message=${e.message}",
-                e
-            )
-            Result.failure(
-                Exception("Google 로그인 설정 또는 제공업체 오류가 발생했습니다: ${e.message}", e)
-            )
+            val diagnostic = googleAuthDiagnostic(e)
+            logGoogleAuthException("Google Credential custom provider 오류", e)
+            Result.failure(Exception(diagnostic, e))
         } catch (e: GetCredentialException) {
-            Log.e(
-                TAG,
-                "Google Credential 요청 실패: type=${e.type}, message=${e.message}",
-                e
-            )
-            Result.failure(Exception("Google 로그인 요청에 실패했습니다: ${e.message ?: e.type}", e))
+            val diagnostic = googleAuthDiagnostic(e)
+            logGoogleAuthException("Google Credential 요청 실패", e)
+            Result.failure(Exception(diagnostic, e))
         } catch (e: Exception) {
-            Log.e(TAG, "Google 로그인 실행 오류", e)
-            Result.failure(Exception("인증 처리 중 오류가 발생했습니다: ${e.message ?: "알 수 없는 오류"}", e))
+            val diagnostic = googleAuthDiagnostic(e)
+            logGoogleAuthException("Google 로그인 실행 오류", e)
+            Result.failure(Exception(diagnostic, e))
         }
     }
 
@@ -381,6 +369,22 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    private fun googleAuthDiagnostic(error: Throwable): String {
+        return "${error::class.java.name}: " +
+            "${error.localizedMessage ?: error.message ?: "no localized message"}"
+    }
+
+    private fun logGoogleAuthException(context: String, error: Throwable) {
+        Log.e(
+            GOOGLE_AUTH_TAG,
+            "$context\n" +
+                "exceptionClass=${error::class.java.name}\n" +
+                "localizedMessage=${error.localizedMessage}\n" +
+                "stackTrace:\n${Log.getStackTraceString(error)}",
+            error
+        )
+    }
+
     /*
      * OAuth troubleshooting:
      * Register the local release keystore SHA-1 and the Google Play App Signing
@@ -390,5 +394,6 @@ class AuthRepositoryImpl @Inject constructor(
      */
     companion object {
         private const val TAG = "AuthRepository"
+        private const val GOOGLE_AUTH_TAG = "GoogleAuth"
     }
 }
