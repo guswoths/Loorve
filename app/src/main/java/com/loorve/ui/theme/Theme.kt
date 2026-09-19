@@ -5,6 +5,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -20,12 +25,18 @@ private val LoorveLightColorScheme = lightColorScheme(
     onBackground     = OnBackground,
     onSurface        = OnSurface,
     onSurfaceVariant = OnSurfaceVariant,
-    onPrimary        = Color.White,
-    primaryContainer  = Color(0xFFDDF4F1),
-    onPrimaryContainer = Color(0xFF0B3D39),
+    onPrimary        = OnGradient,
+    primaryContainer  = NoticeContainer,
+    onPrimaryContainer = PrimaryVariant,
+    secondaryContainer = ActiveContainer,
+    onSecondaryContainer = PrimaryVariant,
+    tertiaryContainer = SuccessContainer,
+    onTertiaryContainer = Success,
     outline          = Divider,
     error            = Error,
-    onError          = Color.White
+    onError          = OnGradient,
+    errorContainer   = WarningContainer,
+    onErrorContainer = Error
 )
 
 @Composable
@@ -46,6 +57,18 @@ fun LoorveTheme(content: @Composable () -> Unit) {
         colorScheme = LoorveLightColorScheme,
         typography  = LoorveTypography,
         shapes      = LoorveShapes,
-        content     = content
+        content = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Background, CanvasWarm)
+                        )
+                    )
+            ) {
+                content()
+            }
+        }
     )
 }

@@ -1,11 +1,14 @@
 package com.loorve.presentation.reviewblock
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
@@ -16,6 +19,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -127,6 +133,15 @@ fun ReviewBlockDetailScreen(
             }
         }
     }
+    val totalReviewCount = uiState.reviewScheduleRecords.size
+    val completedReviewCount = uiState.reviewScheduleRecords.count {
+        it.status == ReviewStatus.COMPLETED
+    }
+    val completionRate = if (totalReviewCount > 0) {
+        (completedReviewCount.toFloat() / totalReviewCount.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
 
     // 블록 삭제 확인 AlertDialog
     if (uiState.showDeleteConfirm) {
@@ -196,84 +211,156 @@ fun ReviewBlockDetailScreen(
         )
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        examName,
-                        style = LoorveTypography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Outlined.ArrowBack, contentDescription = "뒤로")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { viewModel.setShowDeleteConfirm(true) },
-                        enabled = !uiState.isLoading
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "블록 삭제",
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Background, CanvasWarm)
+                )
             )
-        },
-        containerColor = Background
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
-        ) {
+    ) {
+        DetailAmbientAura()
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            examName,
+                            style = LoorveTypography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = OnBackground
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                Icons.Outlined.ArrowBack,
+                                contentDescription = "뒤로",
+                                tint = OnBackground
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { viewModel.setShowDeleteConfirm(true) },
+                            enabled = !uiState.isLoading
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "블록 삭제",
+                                tint = Error
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent
+                    )
+                )
+            },
+            containerColor = Color.Transparent
+        ) { paddingValues ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
             // ── 블록 요약 정보 ──
             item {
-                LoorveCard(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = Surface,
+                    border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
+                    shadowElevation = 8.dp
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Column {
-                            Text(
-                                text = examName,
-                                style = LoorveTypography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = OnBackground
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "하루 최대 $dailyCap 회 복습",
-                                style = LoorveTypography.labelSmall,
-                                color = OnSurfaceVariant
-                            )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = examName,
+                                    style = LoorveTypography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = OnBackground
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = "하루 최대 $dailyCap 회 복습",
+                                    style = LoorveTypography.bodySmall,
+                                    color = OnSurfaceVariant
+                                )
+                            }
+                            Surface(
+                                color = NoticeContainer,
+                                shape = CircleShape
+                            ) {
+                                Text(
+                                    text = dDayText,
+                                    modifier = Modifier.padding(
+                                        horizontal = 12.dp,
+                                        vertical = 7.dp
+                                    ),
+                                    style = LoorveTypography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Notice
+                                )
+                            }
                         }
-                        Surface(
-                            color = Primary.copy(alpha = 0.12f),
-                            shape = MaterialTheme.shapes.small
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = dDayText,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                text = "${(completionRate * 100).toInt()}%",
+                                style = LoorveTypography.displayMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = OnBackground
+                            )
+                            Text(
+                                text = "복습 완료율",
                                 style = LoorveTypography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Primary
+                                color = OnSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 5.dp)
                             )
                         }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(CircleShape)
+                                .background(NoticeContainer)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(completionRate)
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(Notice, Active)
+                                        )
+                                    )
+                            )
+                        }
+                        Text(
+                            text = "$completedReviewCount / $totalReviewCount 복습 일정 완료",
+                            style = LoorveTypography.bodySmall,
+                            color = OnSurfaceVariant
+                        )
                     }
                 }
             }
@@ -283,9 +370,9 @@ fun ReviewBlockDetailScreen(
                 item {
                     Text(
                         text = msg,
-                        color = MaterialTheme.colorScheme.error,
+                        color = Error,
                         style = LoorveTypography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 16.dp)
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                     )
                 }
             }
@@ -303,21 +390,32 @@ fun ReviewBlockDetailScreen(
 
             // ── 학습 진도 입력 섹션 ──
             item {
-                StudyProgressInputSection(
-                    onSave = { learningDateMillis, title, content ->
-                        viewModel.saveProgress(
-                            uid = uid,
-                            blockId = blockId,
-                            examId = resolvedBlock?.blockId ?: blockId,
-                            title = title,
-                            content = content,
-                            learningDateMillis = learningDateMillis,
-                            dailyCap = dailyCap,
-                        )
-                    },
-                    isLoading = uiState.isLoading,
-                    isSaveEnabled = resolvedBlock != null && resolvedBlock.examDate != 0L
-                )
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = Surface,
+                    border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
+                    shadowElevation = 6.dp
+                ) {
+                    StudyProgressInputSection(
+                        onSave = { learningDateMillis, title, content ->
+                            viewModel.saveProgress(
+                                uid = uid,
+                                blockId = blockId,
+                                examId = resolvedBlock?.blockId ?: blockId,
+                                title = title,
+                                content = content,
+                                learningDateMillis = learningDateMillis,
+                                dailyCap = dailyCap,
+                            )
+                        },
+                        isLoading = uiState.isLoading,
+                        isSaveEnabled = resolvedBlock != null && resolvedBlock.examDate != 0L,
+                        modifier = Modifier.padding(4.dp)
+                    )
+                }
             }
 
             uiState.lastCreationResult?.let { result ->
@@ -362,9 +460,35 @@ fun ReviewBlockDetailScreen(
                     )
                 }
             }
-
         }
     }
+    }
+}
+
+@Composable
+private fun DetailAmbientAura() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = 220.dp, top = 8.dp)
+            .size(180.dp)
+            .blur(72.dp)
+            .background(
+                color = SkyTint.copy(alpha = 0.5f),
+                shape = CircleShape
+            )
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(end = 220.dp, top = 360.dp)
+            .size(220.dp)
+            .blur(80.dp)
+            .background(
+                color = LavenderTint.copy(alpha = 0.46f),
+                shape = CircleShape
+            )
+    )
 }
 
 // ── 학습기록 / 복습기록 탭 전환 UI ─────────────────────────────
@@ -374,46 +498,68 @@ fun RecordTabRow(
     onTabSelected: (ReviewBlockTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        shape = CircleShape,
+        color = SurfaceVariant,
+        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.04f))
     ) {
-        Text(
-            text = "학습기록",
-            style = LoorveTypography.titleMedium,
-            fontWeight = if (selectedTab == ReviewBlockTab.STUDY_RECORD) FontWeight.Bold else FontWeight.Medium,
-            color = if (selectedTab == ReviewBlockTab.STUDY_RECORD) OnBackground else OnSurfaceVariant,
-            modifier = Modifier
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    onTabSelected(ReviewBlockTab.STUDY_RECORD)
-                }
-                .semantics { contentDescription = "학습기록 탭" }
-        )
-        Text(
-            text = "|",
-            style = LoorveTypography.titleMedium,
-            color = Divider
-        )
-        Text(
-            text = "복습기록",
-            style = LoorveTypography.titleMedium,
-            fontWeight = if (selectedTab == ReviewBlockTab.REVIEW_RECORD) FontWeight.Bold else FontWeight.Medium,
-            color = if (selectedTab == ReviewBlockTab.REVIEW_RECORD) OnBackground else OnSurfaceVariant,
-            modifier = Modifier
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    onTabSelected(ReviewBlockTab.REVIEW_RECORD)
-                }
-                .semantics { contentDescription = "복습기록 탭" }
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SegmentTab(
+                text = "학습 기록",
+                selected = selectedTab == ReviewBlockTab.STUDY_RECORD,
+                contentDescription = "학습기록 탭",
+                modifier = Modifier.weight(1f),
+                onClick = { onTabSelected(ReviewBlockTab.STUDY_RECORD) }
+            )
+            SegmentTab(
+                text = "복습 일정",
+                selected = selectedTab == ReviewBlockTab.REVIEW_RECORD,
+                contentDescription = "복습기록 탭",
+                modifier = Modifier.weight(1f),
+                onClick = { onTabSelected(ReviewBlockTab.REVIEW_RECORD) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SegmentTab(
+    text: String,
+    selected: Boolean,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier
+            .heightIn(min = 44.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .semantics { this.contentDescription = contentDescription },
+        shape = CircleShape,
+        color = if (selected) SurfaceSolid else Color.Transparent,
+        shadowElevation = if (selected) 2.dp else 0.dp
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                style = LoorveTypography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) OnBackground else OnSurfaceVariant
+            )
+        }
     }
 }
 
@@ -464,17 +610,22 @@ fun StudyRecordMiniCard(
         else "-"
     }
 
-    LoorveCard(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
             .semantics {
                 contentDescription = "학습기록: ${record.title}, 날짜: $dateText"
-            }
+            },
+        shape = RoundedCornerShape(16.dp),
+        color = Surface,
+        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
+        shadowElevation = 4.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(SurfaceVariant, shape = MaterialTheme.shapes.medium),
+                .background(SurfaceSolid, shape = RoundedCornerShape(16.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Left accent bar
@@ -482,12 +633,12 @@ fun StudyRecordMiniCard(
                 modifier = Modifier
                     .width(4.dp)
                     .fillMaxHeight()
-                    .background(Primary, shape = MaterialTheme.shapes.medium)
+                    .background(Active, shape = RoundedCornerShape(16.dp))
             )
 
             Surface(
-                color = SurfaceVariant,
-                shape = MaterialTheme.shapes.medium,
+                color = Color.Transparent,
+                shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -614,16 +765,21 @@ fun ReviewRecordMiniCard(
     }
     var showTimePicker by remember { mutableStateOf(false) }
 
-    LoorveCard(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
             .semantics {
                 contentDescription = "복습기록: ${item.title}, 복습 ${item.reviewOrder}회차, ${item.status}, ${dateText}"
-            }
+            },
+        shape = RoundedCornerShape(16.dp),
+        color = Surface,
+        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
+        shadowElevation = 4.dp
     ) {
         Surface(
-            color = Primary.copy(alpha = 0.07f),
-            shape = MaterialTheme.shapes.medium,
+            color = AiSurface,
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -632,7 +788,11 @@ fun ReviewRecordMiniCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(3.dp)
-                        .background(Primary)
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(GradientStart, GradientMiddle, GradientEnd)
+                            )
+                        )
                 )
 
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -644,7 +804,7 @@ fun ReviewRecordMiniCard(
                         Text(
                             text = dateText,
                             style = LoorveTypography.labelSmall,
-                            color = Primary
+                            color = Active
                         )
                     }
 
@@ -669,11 +829,11 @@ fun ReviewRecordMiniCard(
                     ) {
                         Surface(
                             color = when (item.status) {
-                                ReviewStatus.COMPLETED -> Primary.copy(alpha = 0.15f)
-                                ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> Error.copy(alpha = 0.15f)
-                                else -> SurfaceVariant
+                                ReviewStatus.COMPLETED -> SuccessContainer
+                                ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> WarningContainer
+                                else -> NoticeContainer
                             },
-                            shape = MaterialTheme.shapes.medium
+                            shape = CircleShape
                         ) {
                             Text(
                                 text = when (item.status) {
@@ -684,20 +844,20 @@ fun ReviewRecordMiniCard(
                                     ReviewStatus.CRAM_MODE_REQUIRED -> "압축 필요"
                                     ReviewStatus.OVERLOADED_UNRESOLVED -> "과부하"
                                 },
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                                 style = LoorveTypography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = when (item.status) {
-                                    ReviewStatus.COMPLETED -> Primary
-                                    ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> Error
-                                    else -> OnSurface
+                                    ReviewStatus.COMPLETED -> Success
+                                    ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> Warning
+                                    else -> Notice
                                 }
                             )
                         }
                         Spacer(modifier = Modifier.weight(1f))
                         Surface(
                             modifier = Modifier.clickable { showTimePicker = true },
-                            shape = MaterialTheme.shapes.small,
+                            shape = CircleShape,
                             color = SurfaceVariant
                         ) {
                             Row(
@@ -854,29 +1014,64 @@ private fun ScheduleSummaryCard(
         else -> result.userMessage
     }
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = AiSurface,
+        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
+        shadowElevation = 6.dp
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 if (result.generationOutcome != ScheduleGenerationOutcome.FULL) "학습기록이 저장되었습니다."
                 else "복습 일정 ${schedules.size}개가 생성되었습니다.",
-                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                style = LoorveTypography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = OnBackground)
             Text(
                 "이 학습기록에 대해 복습 일정 ${schedules.size}개를 만들었습니다. " +
                     "첫 복습은 ${schedules.minOfOrNull { it.reviewDate }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() } ?: "-"}, " +
                     "마지막 복습은 ${schedules.maxOfOrNull { it.reviewDate }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() } ?: result.lastReviewDate}입니다.",
-                style = MaterialTheme.typography.bodyMedium
+                style = LoorveTypography.bodyMedium,
+                color = OnSurfaceVariant
             )
-            Text("시험까지 ${java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(zone), examDate)}일 남았습니다.")
-            Text("상태: $statusText", fontWeight = FontWeight.Bold)
-            Text("일정 압축 여부: ${if (result.compressed) "압축됨" else "압축되지 않음"}")
-            Text(statusDescription, style = MaterialTheme.typography.bodySmall)
+            Text(
+                "시험까지 ${java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(zone), examDate)}일 남았습니다.",
+                style = LoorveTypography.bodySmall,
+                color = OnSurfaceVariant
+            )
+            Surface(
+                color = if (result.generationOutcome == ScheduleGenerationOutcome.FULL) {
+                    SuccessContainer
+                } else {
+                    WarningContainer
+                },
+                shape = CircleShape
+            ) {
+                Text(
+                    "상태: $statusText",
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    style = LoorveTypography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (result.generationOutcome == ScheduleGenerationOutcome.FULL) {
+                        Success
+                    } else {
+                        Warning
+                    }
+                )
+            }
+            Text(
+                "일정 압축 여부: ${if (result.compressed) "압축됨" else "압축되지 않음"}",
+                style = LoorveTypography.bodySmall,
+                color = OnSurfaceVariant
+            )
+            Text(statusDescription, style = LoorveTypography.bodySmall, color = OnSurfaceVariant)
             schedules.forEach { item ->
                 Text(
                     "• ${Instant.ofEpochMilli(item.reviewDate).atZone(zone).toLocalDate()} · ${item.recommendedMethod.ifBlank { "인출 연습과 오답 점검" }}",
-                    style = MaterialTheme.typography.bodySmall
+                    style = LoorveTypography.bodySmall,
+                    color = OnSurfaceVariant
                 )
             }
         }
@@ -951,7 +1146,14 @@ fun StudyProgressInputSection(
             onClick = { showDatePicker = true },
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics { contentDescription = "학습 날짜 선택: $displayDateText" },
+                .height(52.dp),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.08f)),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = SurfaceSolid,
+                contentColor = OnBackground
+            ),
+            contentPadding = PaddingValues(horizontal = 16.dp),
             enabled = !isLoading
         ) {
             Icon(
@@ -974,7 +1176,14 @@ fun StudyProgressInputSection(
             label = { Text("학습 제목 (제목 또는 내용 중 하나 필수)") },
             placeholder = { Text("예: 수학 미분 1단원") },
             singleLine = true,
-            enabled = !isLoading
+            enabled = !isLoading,
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Active,
+                unfocusedBorderColor = Color.Black.copy(alpha = 0.08f),
+                focusedContainerColor = SurfaceSolid,
+                unfocusedContainerColor = SurfaceSolid
+            )
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -990,7 +1199,14 @@ fun StudyProgressInputSection(
             label = { Text("학습 내용") },
             placeholder = { Text("예: 미분의 정의, 극한 개념 복습 완료") },
             maxLines = 4,
-            enabled = !isLoading
+            enabled = !isLoading,
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Active,
+                unfocusedBorderColor = Color.Black.copy(alpha = 0.08f),
+                focusedContainerColor = SurfaceSolid,
+                unfocusedContainerColor = SurfaceSolid
+            )
         )
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -1009,17 +1225,50 @@ fun StudyProgressInputSection(
 
             },
             modifier = Modifier
-                .align(Alignment.End)
+                .fillMaxWidth()
+                .height(52.dp)
                 .semantics { contentDescription = "학습 진도 저장 버튼" },
-            enabled = canSave
+            enabled = canSave,
+            shape = CircleShape,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                disabledContainerColor = Color.Black.copy(alpha = 0.08f)
+            ),
+            contentPadding = PaddingValues(0.dp)
         ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Text("저장하고 복습 일정 생성")
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = if (canSave) {
+                            Brush.linearGradient(
+                                colors = listOf(GradientStart, GradientMiddle, GradientEnd)
+                            )
+                        } else {
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    Color(0xFFD1D5DB),
+                                    Color(0xFFE5E7EB)
+                                )
+                            )
+                        },
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                } else {
+                    Text(
+                        "학습 기록 및 복습 일정 생성",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }

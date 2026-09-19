@@ -2,33 +2,55 @@ package com.loorve.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ── 배경 계열 ──
-val Background       = Color(0xFFF7F8FA)
-val Surface          = Color(0xFFFFFFFF)
-val SurfaceVariant   = Color(0xFFEEF2F4)
+// ── Canvas & surfaces ──
+val Background       = Color(0xFFF8F9FD)
+val CanvasWarm       = Color(0xFFFCF9F8)
+val Surface          = Color(0xEBFFFFFF)
+val SurfaceSolid     = Color(0xFFFFFFFF)
+val SurfaceVariant   = Color(0xFFF0F3FA)
+val AiSurface        = Color(0xD9F0F4FF)
+val UrgentSurface    = Color(0xFFFFF8F7)
 
-// ── 액센트 ──
-val Primary          = Color(0xFF0F766E)
-val PrimaryVariant   = Color(0xFF0B3D39)
-val Secondary        = Color(0xFF0F766E)
-val Tertiary         = Color(0xFF2E7D32)
+// ── Ambient lighting ──
+val SkyTint          = Color(0xFFE0E8FF)
+val LavenderTint     = Color(0xFFF3E8FF)
 
-// ── 텍스트 ──
-val OnBackground     = Color(0xFF1F2937)
-val OnSurface        = Color(0xFF1F2937)
-val OnSurfaceVariant = Color(0xFF6B7280)
+// ── Aurora brand palette ──
+val Primary          = Color(0xFF2563EB)
+val PrimaryVariant   = Color(0xFF4338CA)
+val Secondary        = Color(0xFF7C3AED)
+val Tertiary         = Color(0xFF059669)
+val AuroraBlue       = Color(0xFF2563EB)
+val AuroraViolet     = Color(0xFF7C3AED)
+val AuroraPink       = Color(0xFFDB2777)
 
-// ── 상태 ──
-val Error            = Color(0xFFC43D5A)
-val Success          = Color(0xFF2E7D32)
-val Warning          = Color(0xFFC58B00)
+// ── Text ──
+val OnBackground     = Color(0xFF1F1F1F)
+val OnSurface        = Color(0xFF1F1F1F)
+val OnSurfaceVariant = Color(0xFF5F6368)
+val TertiaryText     = Color(0xFF9AA0A6)
+val OnGradient       = Color.White
 
-// ── 구분선 ──
-val Divider          = Color(0xFFD1D5DB)
+// ── Semantic status ──
+val Error            = Color(0xFFDC2626)
+val Success          = Color(0xFF059669)
+val Warning          = Color(0xFFE11D48)
+val Notice           = Color(0xFF1A73E8)
+val Active           = Color(0xFF7C3AED)
 
-// ── 광고 플레이스홀더 ──
-val AdBackground     = Color(0xFFEEF2F4)
+val SuccessContainer = Color(0xFFECFDF5)
+val NoticeContainer  = Color(0xFFEFF6FF)
+val ActiveContainer  = Color(0xFFF5F3FF)
+val WarningContainer = Color(0xFFFFF1F2)
 
-// ── 그라디언트 ──
-val GradientStart    = Color(0xFF0F766E)
-val GradientEnd      = Color(0xFF0B3D39)
+// ── Borders & placeholders ──
+val Divider          = Color(0x0F000000)
+val InternalDivider  = Color(0xFFF3F4F6)
+val AdBackground     = Color(0xFFF0F3FA)
+
+// ── Gradients ──
+val GradientStart    = AuroraBlue
+val GradientMiddle   = AuroraViolet
+val GradientEnd      = AuroraPink
+val VioletGlow       = Color(0x597C3AED)
+val SecondaryGradientEnd = Color(0xFF4338CA)

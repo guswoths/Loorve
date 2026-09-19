@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
@@ -31,9 +33,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -45,8 +49,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -64,8 +70,26 @@ import com.loorve.domain.subscription.ReviewBlockAccessPolicy
 import com.loorve.domain.subscription.SubscriptionEntitlement
 import com.loorve.ui.component.BannerAdView
 import com.loorve.ui.theme.LoorveTypography
+import com.loorve.ui.theme.Active
+import com.loorve.ui.theme.ActiveContainer
+import com.loorve.ui.theme.Background
+import com.loorve.ui.theme.CanvasWarm
+import com.loorve.ui.theme.Divider
+import com.loorve.ui.theme.GradientEnd
+import com.loorve.ui.theme.GradientMiddle
+import com.loorve.ui.theme.GradientStart
+import com.loorve.ui.theme.Notice
+import com.loorve.ui.theme.NoticeContainer
 import com.loorve.ui.theme.OnBackground
+import com.loorve.ui.theme.OnSurfaceVariant
 import com.loorve.ui.theme.Primary
+import com.loorve.ui.theme.Surface
+import com.loorve.ui.theme.SurfaceSolid
+import com.loorve.ui.theme.Success
+import com.loorve.ui.theme.SuccessContainer
+import com.loorve.ui.theme.TertiaryText
+import com.loorve.ui.theme.Warning
+import com.loorve.ui.theme.WarningContainer
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -101,85 +125,121 @@ fun ReviewCalendarScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "REVIEW",
-                            style = LoorveTypography.labelSmall,
-                            color = Primary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "복습",
-                            style = LoorveTypography.titleLarge,
-                            color = OnBackground
-                        )
-                    }
-                }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(colors = listOf(Background, CanvasWarm))
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    if (ReviewBlockAccessPolicy.canCreate(
-                            uiState.reviewBlocks,
-                            uiState.subscriptionEntitlement
+    ) {
+        ReviewDashboardAura()
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                text = "GEMINI REVIEW HUB",
+                                style = LoorveTypography.labelSmall,
+                                color = Primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "복습",
+                                style = LoorveTypography.titleLarge,
+                                color = OnBackground
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent
+                    )
+                )
+            },
+            floatingActionButton = {
+                Surface(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(GradientStart, GradientMiddle, Active)
+                            )
+                        ),
+                    shape = CircleShape,
+                    color = Color.Transparent,
+                    shadowElevation = 12.dp
+                ) {
+                    androidx.compose.material3.FloatingActionButton(
+                        onClick = {
+                            if (ReviewBlockAccessPolicy.canCreate(
+                                    uiState.reviewBlocks,
+                                    uiState.subscriptionEntitlement
+                                )
+                            ) {
+                                onNavigateToAddReviewBlock()
+                            } else {
+                                showProDialog = true
+                            }
+                        },
+                        containerColor = Color.Transparent,
+                        contentColor = Color.White,
+                        elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 0.dp,
+                            pressedElevation = 0.dp
                         )
                     ) {
-                        onNavigateToAddReviewBlock()
-                    } else {
-                        showProDialog = true
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "복습 블록 생성"
+                        )
                     }
                 }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "복습 블록 생성"
-                )
-            }
-        },
-        bottomBar = {
-            if (uiState.subscriptionEntitlement !is SubscriptionEntitlement.Pro) {
-                BannerAdView(modifier = Modifier.fillMaxWidth())
-            }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
+            },
+            bottomBar = {
+                if (uiState.subscriptionEntitlement !is SubscriptionEntitlement.Pro) {
+                    BannerAdView(modifier = Modifier.fillMaxWidth())
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        horizontal = 16.dp,
-                        vertical = 4.dp
-                    )
-                ) {
+            },
+            containerColor = Color.Transparent
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                if (uiState.isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Primary)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = 16.dp,
+                            vertical = 8.dp
+                        )
+                    ) {
                     // ── 섹션 1: 날짜별 복습 일정
                     item {
                         Text(
-                            text = "최근 7일 복습 현황",
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            )
+                            text = "이번 주 복습 페이스",
+                            modifier = Modifier.padding(
+                                start = 4.dp,
+                                top = 4.dp,
+                                bottom = 2.dp
+                            ),
+                            style = LoorveTypography.headlineSmall,
+                            color = OnBackground,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                     item {
@@ -196,12 +256,19 @@ fun ReviewCalendarScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "복습 블록 목록",
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            )
+                            modifier = Modifier.padding(
+                                start = 4.dp,
+                                top = 8.dp,
+                                bottom = 4.dp
+                            ),
+                            style = LoorveTypography.headlineSmall,
+                            color = OnBackground,
+                            fontWeight = FontWeight.Bold
                         )
-                        HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
+                        HorizontalDivider(
+                            color = Divider,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
                     }
 
                     if (uiState.isBlocksLoading) {
@@ -277,12 +344,39 @@ fun ReviewCalendarScreen(
 
                     item {
                         Spacer(modifier = Modifier.height(72.dp))
+                        }
                     }
                 }
             }
         }
     }
     // ✅ ReviewBlockDetailBottomSheet 제거 — ReviewBlockDetailScreen으로 대체
+}
+
+@Composable
+private fun ReviewDashboardAura() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = 220.dp, top = 12.dp)
+            .size(180.dp)
+            .blur(72.dp)
+            .background(
+                color = com.loorve.ui.theme.SkyTint.copy(alpha = 0.52f),
+                shape = CircleShape
+            )
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(end = 220.dp, top = 360.dp)
+            .size(220.dp)
+            .blur(80.dp)
+            .background(
+                color = com.loorve.ui.theme.LavenderTint.copy(alpha = 0.48f),
+                shape = CircleShape
+            )
+    )
 }
 
 @Composable
@@ -308,10 +402,14 @@ private fun ReviewWorkloadBarChart(
         return
     }
 
-    val primary = MaterialTheme.colorScheme.primary
     val totalDue = stats.sumOf { it.dueCount.coerceAtLeast(0) }
     val totalCompleted = stats.sumOf { it.completedCount.coerceIn(0, it.dueCount) }
     val totalRemaining = (totalDue - totalCompleted).coerceAtLeast(0)
+    val completionRate = if (totalDue > 0) {
+        (totalCompleted.toFloat() / totalDue.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
     val latestDate = stats.lastOrNull()?.date
     val summary = buildString {
         append("최근 7일 복습 현황. 예정 ${totalDue}개, 완료 ${totalCompleted}개, 미완료 ${totalRemaining}개.")
@@ -326,50 +424,108 @@ private fun ReviewWorkloadBarChart(
             }
         }
     }
-    Column(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .semantics { contentDescription = summary }
+            .semantics { contentDescription = summary },
+        shape = RoundedCornerShape(24.dp),
+        color = Surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.Black.copy(alpha = 0.06f)
+        ),
+        shadowElevation = 8.dp
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            stats.forEach { stat ->
-                ReviewWorkloadBar(
-                    stat = stat,
-                    latestDate = latestDate,
-                    maxDueCount = stats.maxOfOrNull { it.dueCount.coerceAtLeast(0) }
-                        ?.coerceAtLeast(1) ?: 1,
-                    selected = selectedStat?.date == stat.date,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onStatSelected(stat) }
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column {
+                    Text(
+                        text = "주간 복습 완료율",
+                        style = LoorveTypography.labelMedium,
+                        color = OnSurfaceVariant
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "${(completionRate * 100).toInt()}%",
+                        style = LoorveTypography.displayMedium,
+                        color = OnBackground,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+                Surface(
+                    shape = CircleShape,
+                    color = if (completionRate >= 0.8f) {
+                        SuccessContainer
+                    } else {
+                        NoticeContainer
+                    }
+                ) {
+                    Text(
+                        text = if (completionRate >= 0.8f) "최적 페이스" else "목표 진행 중",
+                        style = LoorveTypography.labelSmall,
+                        color = if (completionRate >= 0.8f) Success else Notice,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
             }
-        }
-        ChartLegend()
-        selectedStat?.let { stat ->
             Text(
-                text = if (stat.dueCount <= 0) {
-                    "${stat.date.format(DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN))} · 복습 일정 없음"
-                } else {
-                    val completed = stat.completedCount.coerceIn(0, stat.dueCount)
-                    "${stat.date.format(DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN))} · " +
-                        "완료 ${completed}개 / 전체 ${stat.dueCount}개 · " +
-                        "미완료 ${stat.dueCount - completed}개 · 완료율 ${stat.completionRatePercent ?: 0}%"
-                },
-                modifier = Modifier.padding(top = 12.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold
+                text = "최근 7일 · 예정 ${totalDue}개 · 완료 ${totalCompleted}개",
+                style = LoorveTypography.bodySmall,
+                color = OnSurfaceVariant
             )
-        }
-        Text(
-            text = "최근 7일 · 예정 ${totalDue}개 · 완료 ${totalCompleted}개 · 미완료 ${totalRemaining}개",
-            modifier = Modifier.padding(top = 8.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                stats.forEach { stat ->
+                    ReviewWorkloadBar(
+                        stat = stat,
+                        latestDate = latestDate,
+                        maxDueCount = stats.maxOfOrNull { it.dueCount.coerceAtLeast(0) }
+                            ?.coerceAtLeast(1) ?: 1,
+                        selected = selectedStat?.date == stat.date,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onStatSelected(stat) }
+                    )
+                }
+            }
+            ChartLegend()
+            selectedStat?.let { stat ->
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = NoticeContainer
+                ) {
+                    Text(
+                        text = if (stat.dueCount <= 0) {
+                            "${stat.date.format(DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN))} · 복습 일정 없음"
+                        } else {
+                            val completed = stat.completedCount.coerceIn(0, stat.dueCount)
+                            "${stat.date.format(DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN))} · " +
+                                "완료 ${completed}개 / 전체 ${stat.dueCount}개 · " +
+                                "미완료 ${stat.dueCount - completed}개 · 완료율 ${stat.completionRatePercent ?: 0}%"
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        style = LoorveTypography.bodySmall,
+                        color = OnBackground,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            Text(
+                text = "미완료 ${totalRemaining}개",
+                style = LoorveTypography.bodySmall,
+                color = OnSurfaceVariant
+            )
+            }
     }
 }
 
@@ -382,7 +538,6 @@ private fun ReviewWorkloadBar(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val primary = MaterialTheme.colorScheme.primary
     val completedCount = stat.completedCount.coerceIn(0, stat.dueCount)
     val remainingCount = (stat.dueCount - completedCount).coerceAtLeast(0)
     val totalHeight = 126.dp
@@ -402,20 +557,13 @@ private fun ReviewWorkloadBar(
     } else {
         "$label, 예정 ${stat.dueCount}개, 완료 ${completedCount}개, 미완료 ${remainingCount}개"
     }
-    val outline = when {
-        isToday -> primary
-        selected -> primary.copy(alpha = 0.7f)
-        else -> MaterialTheme.colorScheme.outlineVariant
-    }
-    val outlineWidth = if (isToday || selected) 2.dp else 1.dp
-
     Column(
         modifier = modifier
             .defaultMinSize(minWidth = 34.dp)
-            .clip(MaterialTheme.shapes.small)
-            .border(outlineWidth, outline, MaterialTheme.shapes.small)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) NoticeContainer else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 3.dp, vertical = 6.dp)
+            .padding(horizontal = 3.dp, vertical = 8.dp)
             .semantics { contentDescription = description },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Bottom
@@ -441,17 +589,30 @@ private fun ReviewWorkloadBar(
                 if (remainingCount > 0) {
                     Box(
                         modifier = Modifier
-                            .width(24.dp)
+                            .width(30.dp)
                             .height(remainingBarHeight)
-                            .background(primary.copy(alpha = 0.22f))
+                            .clip(CircleShape)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Active.copy(alpha = 0.28f),
+                                        Notice.copy(alpha = 0.18f)
+                                    )
+                                )
+                            )
                     )
                 }
                 if (completedCount > 0) {
                     Box(
                         modifier = Modifier
-                            .width(24.dp)
+                            .width(30.dp)
                             .height(completedBarHeight)
-                            .background(primary)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Notice, Active)
+                                )
+                            )
                     )
                 }
             }
@@ -461,7 +622,7 @@ private fun ReviewWorkloadBar(
             style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
             ),
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (isToday || selected) OnBackground else OnSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 4.dp)
         )
@@ -470,16 +631,15 @@ private fun ReviewWorkloadBar(
 
 @Composable
 private fun ChartLegend() {
-    val primary = MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp),
+            .padding(top = 4.dp),
         horizontalArrangement = Arrangement.Center
     ) {
-        LegendItem(color = primary, label = "완료")
+        LegendItem(color = Notice, label = "완료")
         Spacer(modifier = Modifier.width(16.dp))
-        LegendItem(color = primary.copy(alpha = 0.22f), label = "미완료")
+        LegendItem(color = Active.copy(alpha = 0.24f), label = "미완료")
     }
 }
 
@@ -492,10 +652,14 @@ private fun LegendItem(
         Box(
             modifier = Modifier
                 .size(10.dp)
-                .background(color, MaterialTheme.shapes.extraSmall)
+                    .background(color, CircleShape)
         )
         Spacer(modifier = Modifier.width(4.dp))
-        Text(text = label, style = MaterialTheme.typography.labelSmall)
+        Text(
+                text = label,
+                style = LoorveTypography.labelSmall,
+                color = OnSurfaceVariant
+        )
     }
 }
 
@@ -528,66 +692,117 @@ private fun ReviewBlockCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = Surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        shape = RoundedCornerShape(24.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.Black.copy(alpha = 0.06f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = block.title,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                if (block.date.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(2.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "시험 종료일: ${block.date}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = block.title,
+                        style = LoorveTypography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = OnBackground
                     )
+                    if (block.date.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = "시험 종료일: ${block.date}",
+                            style = LoorveTypography.bodySmall,
+                            color = OnSurfaceVariant
+                        )
+                    }
                 }
-                if (block.description.isNotBlank()) {
+                val badgeColor = when {
+                    locked -> WarningContainer
+                    block.isCompleted -> SuccessContainer
+                    else -> NoticeContainer
+                }
+                val badgeTextColor = when {
+                    locked -> Warning
+                    block.isCompleted -> Success
+                    else -> Notice
+                }
+                Surface(
+                    shape = CircleShape,
+                    color = badgeColor
+                ) {
                     Text(
-                        text = block.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = when {
+                            locked -> "높은 우선순위"
+                            block.isCompleted -> "최적 페이스"
+                            else -> "목표 진행 중"
+                        },
+                        style = LoorveTypography.labelSmall,
+                        color = badgeTextColor,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            if (block.description.isNotBlank()) {
+                Text(
+                    text = block.description,
+                    style = LoorveTypography.bodySmall,
+                    color = OnSurfaceVariant,
+                    maxLines = 2
+                )
+            }
+            val progress = if (block.isCompleted) 1f else 0.55f
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(6.dp)
+                        .clip(CircleShape)
+                        .background(NoticeContainer)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progress)
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(Notice, Active)
+                                )
+                            )
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = if (block.isCompleted) "100%" else "진행 중",
+                    style = LoorveTypography.labelSmall,
+                    color = if (block.isCompleted) Success else Active
+                )
+            }
             if (locked) {
-                Badge(containerColor = MaterialTheme.colorScheme.errorContainer) {
-                    Text(
-                        text = "잠김",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                }
-            } else if (block.isCompleted) {
-                Badge(containerColor = MaterialTheme.colorScheme.primary) {
-                    Text(
-                        text = "완료",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
+                Text(
+                    text = "Pro에서 전체 복습 블록을 이용할 수 있습니다.",
+                    style = LoorveTypography.bodySmall,
+                    color = Warning
+                )
             } else {
-                Badge(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
-                    Text(
-                        text = "진행중",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
+                Text(
+                    text = "탭하여 복습 기록과 일정을 확인하세요",
+                    style = LoorveTypography.bodySmall,
+                    color = TertiaryText
+                )
             }
         }
     }

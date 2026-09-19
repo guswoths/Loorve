@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.BatteryFull
@@ -44,6 +45,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -53,6 +56,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -66,13 +70,30 @@ import com.loorve.presentation.subscription.SubscriptionViewModel
 import com.loorve.ui.component.BannerAdView
 import com.loorve.ui.component.LoorveCard
 import com.loorve.ui.theme.Background
+import com.loorve.ui.theme.CanvasWarm
 import com.loorve.ui.theme.Error
+import com.loorve.ui.theme.Active
+import com.loorve.ui.theme.ActiveContainer
+import com.loorve.ui.theme.AiSurface
+import com.loorve.ui.theme.AuroraBlue
+import com.loorve.ui.theme.AuroraPink
+import com.loorve.ui.theme.AuroraViolet
+import com.loorve.ui.theme.Divider
+import com.loorve.ui.theme.InternalDivider
 import com.loorve.ui.theme.LoorveTypography
 import com.loorve.ui.theme.OnBackground
 import com.loorve.ui.theme.OnSurfaceVariant
 import com.loorve.ui.theme.Primary
 import com.loorve.ui.theme.Surface
+import com.loorve.ui.theme.SurfaceSolid
 import com.loorve.ui.theme.SurfaceVariant
+import com.loorve.ui.theme.Success
+import com.loorve.ui.theme.SuccessContainer
+import com.loorve.ui.theme.Warning
+import com.loorve.ui.theme.WarningContainer
+import com.loorve.ui.theme.Notice
+import com.loorve.ui.theme.NoticeContainer
+import com.loorve.ui.theme.VioletGlow
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -105,35 +126,56 @@ fun MyPageScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(stringResource(R.string.settings_header_english), style = LoorveTypography.labelSmall, color = Primary, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.settings_header_korean), style = LoorveTypography.titleLarge, color = OnBackground)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
-            )
-        },
-        bottomBar = {
-            if (subscriptionState.entitlement !is SubscriptionEntitlement.Pro) {
-                BannerAdView(modifier = Modifier.fillMaxWidth())
-            }
-        },
-        containerColor = Background
-    ) { padding ->
-        if (uiState.isLoading) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Primary)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
-            ) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Background, CanvasWarm)))
+    ) {
+        SettingsAmbientAura()
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                stringResource(R.string.settings_header_english),
+                                style = LoorveTypography.labelSmall,
+                                color = Primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                stringResource(R.string.settings_header_korean),
+                                style = LoorveTypography.titleLarge,
+                                color = OnBackground
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent
+                    )
+                )
+            },
+            bottomBar = {
+                if (subscriptionState.entitlement !is SubscriptionEntitlement.Pro) {
+                    BannerAdView(modifier = Modifier.fillMaxWidth())
+                }
+            },
+            containerColor = Color.Transparent
+        ) { padding ->
+            if (uiState.isLoading) {
+                Box(
+                    Modifier.fillMaxSize().padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Primary)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
+                ) {
                 item {
                     SectionTitle(stringResource(R.string.settings_account))
                     LoorveCard(Modifier.fillMaxWidth()) {
@@ -230,15 +272,9 @@ fun MyPageScreen(
                 }
 
                 item {
-                    LoorveCard(Modifier.fillMaxWidth()) {
-                        SettingsRow(
-                            icon = Icons.Default.Info,
-                            title = stringResource(R.string.settings_loorve_pro),
-                            subtitle = stringResource(R.string.settings_loorve_pro_subtitle),
-                            actionLabel = stringResource(R.string.settings_loorve_pro_open),
-                            onAction = { showProDialog = true }
-                        )
-                    }
+                    ProShowcaseBanner(
+                        onClick = { showProDialog = true }
+                    )
                 }
 
                 item {
@@ -266,6 +302,7 @@ fun MyPageScreen(
                             color = Error.copy(alpha = 0.7f),
                             style = LoorveTypography.bodyMedium
                         )
+                        }
                     }
                 }
             }
@@ -330,11 +367,91 @@ fun MyPageScreen(
 @Composable
 private fun SectionTitle(text: String) {
     Text(
-        text = text,
-        style = LoorveTypography.labelLarge,
+        text = text.uppercase(),
+        style = LoorveTypography.labelMedium,
         color = OnSurfaceVariant,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.1.sp,
         modifier = Modifier.padding(start = 4.dp, top = 8.dp)
     )
+}
+
+@Composable
+private fun SettingsAmbientAura() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = 250.dp, top = 12.dp)
+            .size(150.dp)
+            .blur(70.dp)
+            .background(Color(0xFFE8EEFF).copy(alpha = 0.7f), CircleShape)
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(end = 220.dp, top = 380.dp)
+            .size(200.dp)
+            .blur(76.dp)
+            .background(Color(0xFFF3E8FF).copy(alpha = 0.62f), CircleShape)
+    )
+}
+
+@Composable
+private fun ProShowcaseBanner(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFF18113C),
+                        Color(0xFF2E1A5A),
+                        Color(0xFF0D0F28)
+                    )
+                )
+            )
+            .clickable(onClick = onClick)
+            .padding(20.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "LOORVE PRO",
+                style = LoorveTypography.labelSmall,
+                color = Color(0xFFC4B5FD),
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = stringResource(R.string.settings_loorve_pro),
+                style = LoorveTypography.headlineSmall,
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Text(
+                text = stringResource(R.string.settings_loorve_pro_subtitle),
+                style = LoorveTypography.bodySmall,
+                color = Color(0xFFD8D5E8)
+            )
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(AuroraBlue, AuroraViolet, Color(0xFFD946EF))
+                        )
+                    )
+                    .clickable(onClick = onClick)
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_loorve_pro_open),
+                    style = LoorveTypography.labelLarge,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -354,13 +471,35 @@ private fun SettingsSwitchRow(
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 4.dp),
+        Modifier.fillMaxWidth().padding(vertical = 15.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Default.Notifications, contentDescription = null, tint = OnBackground, modifier = Modifier.size(22.dp))
+        Icon(
+            Icons.Default.Notifications,
+            contentDescription = null,
+            tint = Active,
+            modifier = Modifier.size(22.dp)
+        )
         Spacer(Modifier.width(14.dp))
-        Text(title, Modifier.weight(1f), style = LoorveTypography.bodyLarge, color = OnBackground)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Text(
+            title,
+            Modifier.weight(1f),
+            style = LoorveTypography.bodyLarge,
+            color = OnBackground,
+            fontWeight = FontWeight.Medium
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = androidx.compose.material3.SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Active,
+                checkedBorderColor = Active,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = SurfaceVariant,
+                uncheckedBorderColor = Divider
+            )
+        )
     }
 }
 
@@ -406,15 +545,47 @@ private fun NotificationSettingRow(
                 )
             }
             if (!notificationAllowed) {
-                TextButton(onClick = onRequestPermission) {
-                    Text(
-                        text = stringResource(R.string.settings_allow_notifications),
-                        color = Primary
-                    )
-                }
+                StatusBadge(
+                    text = stringResource(R.string.settings_allow_notifications),
+                    containerColor = NoticeContainer,
+                    contentColor = Notice,
+                    onClick = onRequestPermission
+                )
+            } else {
+                StatusBadge(
+                    text = stringResource(R.string.settings_notifications_enabled),
+                    containerColor = SuccessContainer,
+                    contentColor = Success
+                )
             }
         }
     }
+}
+
+@Composable
+private fun StatusBadge(
+    text: String,
+    containerColor: Color,
+    contentColor: Color,
+    onClick: (() -> Unit)? = null
+) {
+    Text(
+        text = text,
+        style = LoorveTypography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = contentColor,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(containerColor)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                }
+            )
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    )
 }
 
 @Composable
@@ -436,12 +607,25 @@ private fun SettingsRow(
         Icon(icon, contentDescription = null, tint = OnBackground, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, style = LoorveTypography.bodyLarge, color = OnBackground, fontWeight = FontWeight.Medium)
+            Text(
+                title,
+                style = LoorveTypography.bodyLarge,
+                color = OnBackground,
+                fontWeight = FontWeight.Medium
+            )
             Spacer(Modifier.height(2.dp))
             Text(subtitle, style = LoorveTypography.bodySmall, color = OnSurfaceVariant)
         }
         actionLabel?.let {
-            Text(it, color = actionColor, style = LoorveTypography.labelMedium, fontWeight = FontWeight.SemiBold)
+            StatusBadge(
+                text = it,
+                containerColor = if (actionColor == Error) {
+                    WarningContainer
+                } else {
+                    NoticeContainer
+                },
+                contentColor = actionColor
+            )
         }
     }
 }

@@ -85,6 +85,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import com.loorve.presentation.reviewblock.ReviewBlockDetailScreen
+import com.loorve.ui.component.BottomNavBar
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -416,54 +417,20 @@ fun LoorveNavHost(
             Scaffold(
                 containerColor = Background,
                 bottomBar = {
-                    NavigationBar(containerColor = Background) {
-                        bottomNavItems.forEach { item ->
-                            val isSelected = selectedTabIndex == item.index
-
-                            NavigationBarItem(
-                                selected = isSelected,
-                                onClick = { selectedTabIndex = item.index },
-                                icon = {
-                                    Row(
-                                        modifier = Modifier
-                                            .background(
-                                                color = if (isSelected) {
-                                                    Primary.copy(alpha = 0.1f)
-                                                } else {
-                                                    Color.Transparent
-                                                },
-                                                shape = RoundedCornerShape(50)
-                                            )
-                                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = item.icon,
-                                            contentDescription = item.label,
-                                            tint = if (isSelected) Primary else OnSurfaceVariant
-                                        )
-
-                                        Spacer(modifier = Modifier.width(4.dp))
-
-                                        Text(
-                                            text = item.label,
-                                            color = if (isSelected) Primary else OnSurfaceVariant,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = if (isSelected) {
-                                                FontWeight.Bold
-                                            } else {
-                                                FontWeight.Normal
-                                            }
-                                        )
-                                    }
-                                },
-                                label = null,
-                                colors = NavigationBarItemDefaults.colors(
-                                    indicatorColor = Color.Transparent
-                                )
-                            )
+                    BottomNavBar(
+                        currentRoute = when (selectedTabIndex) {
+                            1 -> "calendar"
+                            2 -> "my_page"
+                            else -> "home"
+                        },
+                        onTabSelected = { route ->
+                            selectedTabIndex = when (route) {
+                                "calendar" -> 1
+                                "my_page" -> 2
+                                else -> 0
+                            }
                         }
-                    }
+                    )
                 }
             ) { innerPadding ->
                 Box(
