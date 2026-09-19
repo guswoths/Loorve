@@ -30,7 +30,7 @@ data class BottomNavItem(
 // ── 목업 기준 3탭으로 변경 ──────────────────────────────────
 val bottomNavItems = listOf(
     BottomNavItem("home",   Icons.Filled.Home,     "HOME"),
-    BottomNavItem("calendar", Icons.Filled.CalendarMonth, "REVIEW"),
+    BottomNavItem("calendar", Icons.Filled.MenuBook, "REVIEW"),
     BottomNavItem("my_page",  Icons.Filled.Settings,      "SETTINGS")
 )
 
@@ -85,7 +85,9 @@ fun BottomNavBar(
                 Text(
                     text = item.label,
                     style = LoorveTypography.labelMedium,
-                    color = iconColor
+                    color = iconColor,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }

@@ -22,10 +22,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -124,7 +123,12 @@ fun HomeScreen(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(Background, CanvasWarm)
+                    colors = listOf(
+                        Background,
+                        Color(0xFFF9F9FD),
+                        Color(0xFFFBF9FC),
+                        CanvasWarm
+                    )
                 )
             )
     ) {
@@ -524,7 +528,7 @@ private fun HomeOverdueReviewSection(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = if (overdueSchedules.isNotEmpty()) UrgentSurface else Surface,
+        color = SurfaceSolid,
         border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
         tonalElevation = 1.dp,
         shadowElevation = 6.dp
@@ -738,7 +742,7 @@ private fun HomeScheduleCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = AiSurface,
+        color = SurfaceSolid,
         border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.04f))
     ) {
         Row(
@@ -747,14 +751,32 @@ private fun HomeScheduleCard(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Checkbox(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                colors = CheckboxDefaults.colors(
-                    checkedColor = Active,
-                    checkmarkColor = OnGradient
-                )
-            )
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (checked) Active else Color.Transparent
+                    )
+                    .border(
+                        BorderStroke(
+                            width = 1.5.dp,
+                            color = if (checked) Active else TertiaryText
+                        ),
+                        CircleShape
+                    )
+                    .clickable { onCheckedChange(!checked) },
+                contentAlignment = Alignment.Center
+            ) {
+                if (checked) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = "완료됨",
+                        tint = OnGradient,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 val headerTitle = if (subjectName.isNotBlank()) {
