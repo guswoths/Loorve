@@ -839,7 +839,6 @@ private fun ReviewScheduleDetailDialog(
                 DetailTextBlock("복습 예정일", dateText)
                 DetailTextBlock("상태", item.status.detailLabel())
                 DetailTextBlock("회차별 학습가이드", guide)
-                DetailTextBlock("예상 소요 시간", "${item.estimatedReviewMinutes}분")
                 if (item.rescheduleReason.orEmpty().isNotBlank()) {
                     DetailTextBlock("일정 변경 사유", item.rescheduleReason.orEmpty())
                 }
