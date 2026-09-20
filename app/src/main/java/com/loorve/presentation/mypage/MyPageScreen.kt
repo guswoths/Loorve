@@ -156,8 +156,10 @@ fun MyPageScreen(
                     )
                 )
             },
-            bottomBar = {
-                if (subscriptionState.entitlement !is SubscriptionEntitlement.Pro) {
+            bottomBar = if (subscriptionState.entitlement is SubscriptionEntitlement.Pro) {
+                {}
+            } else {
+                {
                     BannerAdView(modifier = Modifier.fillMaxWidth())
                 }
             },
