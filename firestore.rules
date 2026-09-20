@@ -57,7 +57,9 @@ service cloud.firestore {
             && isValidStudyRecord()
             && get(/databases/$(database)/documents/users/$(uid)/reviewBlocks/$(request.resource.data.blockId)).data.uid == uid;
         allow update: if isOwner(uid)
-            && request.resource.data.uid == resource.data.uid;
+            && request.resource.data.uid == uid
+            && (!resource.data.keys().hasAny(['uid'])
+                || resource.data.uid == uid);
         allow delete: if isOwner(uid);
       }
 
