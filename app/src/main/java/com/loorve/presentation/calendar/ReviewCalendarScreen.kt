@@ -86,6 +86,7 @@ import com.loorve.ui.theme.OnBackground
 import com.loorve.ui.theme.OnSurfaceVariant
 import com.loorve.ui.theme.Primary
 import com.loorve.ui.theme.Surface
+import com.loorve.ui.theme.SurfaceVariant
 import com.loorve.ui.theme.SurfaceSolid
 import com.loorve.ui.theme.Success
 import com.loorve.ui.theme.SuccessContainer
@@ -674,7 +675,7 @@ private fun ReviewBlockCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = Surface
+            containerColor = if (locked) SurfaceVariant else Surface
         ),
         shape = RoundedCornerShape(24.dp),
         border = androidx.compose.foundation.BorderStroke(
@@ -760,7 +761,7 @@ private fun ReviewBlockCard(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.18f)),
+                            .background(Color.Black.copy(alpha = 0.22f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
