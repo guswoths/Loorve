@@ -204,6 +204,8 @@ fun ReviewCalendarScreen(
                     key(showBanner) {
                         BannerAdView(modifier = Modifier.fillMaxWidth())
                     }
+                } else {
+                    Spacer(modifier = Modifier.height(0.dp))
                 }
             },
             containerColor = Color.Transparent

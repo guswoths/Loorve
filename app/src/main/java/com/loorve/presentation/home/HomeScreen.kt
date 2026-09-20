@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -174,6 +175,8 @@ fun HomeScreen(
                     key(showBanner) {
                         BannerAdView(modifier = Modifier.fillMaxWidth())
                     }
+                } else {
+                    Spacer(modifier = Modifier.height(0.dp))
                 }
             },
             containerColor = Color.Transparent
