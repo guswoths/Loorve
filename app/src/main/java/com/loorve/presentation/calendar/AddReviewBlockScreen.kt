@@ -87,6 +87,7 @@ fun AddReviewBlockScreen(
     val coroutineScope = rememberCoroutineScope()
     val uiState by reviewBlockViewModel.uiState.collectAsState()
     val subscriptionState by subscriptionViewModel.state.collectAsState()
+    val isProSubscribed by subscriptionViewModel.isProSubscribed.collectAsState()
 
     // ✅ FIX: Success 시 resetState() 후 onSaveSuccess() — reloadCurrentMonth는 상위에서 처리
     LaunchedEffect(uiState) {
@@ -232,8 +233,8 @@ fun AddReviewBlockScreen(
                         )
                     }
                 }
-                if (subscriptionState.entitlement !is SubscriptionEntitlement.Pro) {
-                    key(subscriptionState.entitlement) {
+                if (!isProSubscribed && subscriptionState.entitlement !is SubscriptionEntitlement.Pro) {
+                    key(subscriptionState.entitlement to isProSubscribed) {
                         BannerAdView(modifier = Modifier.fillMaxWidth())
                     }
                 }
