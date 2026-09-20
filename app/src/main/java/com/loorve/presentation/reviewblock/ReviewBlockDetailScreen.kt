@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -447,6 +448,7 @@ fun ReviewBlockDetailScreen(
                 item {
                     StudyRecordListSection(
                         records = uiState.studyRecords,
+                        reviewSchedules = uiState.reviewScheduleRecords,
                         isLoading = uiState.isLoading,
                         onDeleteRecord = { record -> viewModel.setRecordToDelete(record) },
                         onRecordClick = { record -> selectedStudyRecord = record }
@@ -574,6 +576,7 @@ private fun SegmentTab(
 @Composable
 fun StudyRecordListSection(
     records: List<StudyRecord>,
+    reviewSchedules: List<ReviewScheduleItem> = emptyList(),
     modifier: Modifier = Modifier,
     isLoading: Boolean = false,
     onDeleteRecord: (StudyRecord) -> Unit = {},
@@ -593,8 +596,13 @@ fun StudyRecordListSection(
             )
         } else {
             records.forEach { record ->
+                val associatedSchedules = reviewSchedules.filter {
+                    it.studyRecordId == record.id
+                }
                 StudyRecordMiniCard(
                     record = record,
+                    isResolved = associatedSchedules.isNotEmpty() &&
+                        associatedSchedules.all { it.status == ReviewStatus.COMPLETED },
                     isLoading = isLoading,
                     onDeleteClick = { onDeleteRecord(record) },
                     onClick = { onRecordClick(record) }
@@ -609,6 +617,7 @@ fun StudyRecordListSection(
 @Composable
 fun StudyRecordMiniCard(
     record: StudyRecord,
+    isResolved: Boolean = false,
     modifier: Modifier = Modifier,
     isLoading: Boolean = false,
     onDeleteClick: () -> Unit = {},
@@ -624,19 +633,23 @@ fun StudyRecordMiniCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
+            .alpha(if (isResolved) 0.62f else 1f)
             .clickable(onClick = onClick)
             .semantics {
                 contentDescription = "학습기록: ${record.title}, 날짜: $dateText"
             },
         shape = RoundedCornerShape(16.dp),
-        color = Surface,
+        color = if (isResolved) SurfaceVariant else Surface,
         border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
         shadowElevation = 4.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(SurfaceSolid, shape = RoundedCornerShape(16.dp)),
+                .background(
+                    if (isResolved) OnSurfaceVariant.copy(alpha = 0.14f) else SurfaceSolid,
+                    shape = RoundedCornerShape(16.dp)
+                ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Left accent bar
