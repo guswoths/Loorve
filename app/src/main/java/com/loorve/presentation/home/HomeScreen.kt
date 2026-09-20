@@ -98,7 +98,6 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val subscriptionState by subscriptionViewModel.state.collectAsState()
-    val isProSubscribed by subscriptionViewModel.isProSubscribed.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
 
@@ -170,8 +169,7 @@ fun HomeScreen(
                 )
             },
             bottomBar = {
-                val showBanner = !isProSubscribed &&
-                    subscriptionState.entitlement !is SubscriptionEntitlement.Pro
+                val showBanner = subscriptionState.entitlement is SubscriptionEntitlement.Free
                 if (showBanner) {
                     key(showBanner) {
                         BannerAdView(modifier = Modifier.fillMaxWidth())

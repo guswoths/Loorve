@@ -107,7 +107,6 @@ fun ReviewCalendarScreen(
     subscriptionViewModel: SubscriptionViewModel = hiltViewModel()
 ) {
     val uiState by reviewCalendarViewModel.uiState.collectAsState()
-    val isProSubscribed by subscriptionViewModel.isProSubscribed.collectAsState()
     var showProDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -200,8 +199,7 @@ fun ReviewCalendarScreen(
                 }
             },
             bottomBar = {
-                val showBanner = !isProSubscribed &&
-                    uiState.subscriptionEntitlement !is SubscriptionEntitlement.Pro
+                val showBanner = uiState.subscriptionEntitlement is SubscriptionEntitlement.Free
                 if (showBanner) {
                     key(showBanner) {
                         BannerAdView(modifier = Modifier.fillMaxWidth())

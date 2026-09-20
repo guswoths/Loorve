@@ -115,7 +115,6 @@ fun MyPageScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showProDialog by remember { mutableStateOf(false) }
     val subscriptionState by subscriptionViewModel.state.collectAsStateWithLifecycle()
-    val isProSubscribed by subscriptionViewModel.isProSubscribed.collectAsStateWithLifecycle()
     val notificationAllowed = lifecycleState.let {
         NotificationPermissionViewModel.hasNotificationPermission(context)
     }
@@ -159,8 +158,7 @@ fun MyPageScreen(
                 )
             },
             bottomBar = {
-                val showBanner = !isProSubscribed &&
-                    subscriptionState.entitlement !is SubscriptionEntitlement.Pro
+                val showBanner = subscriptionState.entitlement is SubscriptionEntitlement.Free
                 if (showBanner) {
                     key(showBanner) {
                         BannerAdView(modifier = Modifier.fillMaxWidth())
