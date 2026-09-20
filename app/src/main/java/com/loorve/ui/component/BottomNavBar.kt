@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.loorve.ui.theme.*
 
 data class BottomNavItem(
@@ -84,7 +85,10 @@ fun BottomNavBar(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = item.label,
-                    style = LoorveTypography.labelSmall,
+                    style = LoorveTypography.labelSmall.copy(
+                        fontSize = 10.sp,
+                        letterSpacing = 0.5.sp
+                    ),
                     color = iconColor,
                     maxLines = 1,
                     softWrap = false
