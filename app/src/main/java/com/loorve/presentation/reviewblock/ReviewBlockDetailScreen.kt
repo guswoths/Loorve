@@ -148,7 +148,11 @@ fun ReviewBlockDetailScreen(
     } else {
         0f
     }
-    val reviewProgress = (1f - overdueRatio).coerceIn(0f, 1f)
+    val reviewProgress = if (totalReviewCount == 0) {
+        0f
+    } else {
+        (1f - overdueRatio).coerceIn(0f, 1f)
+    }
 
     // 블록 삭제 확인 AlertDialog
     if (uiState.showDeleteConfirm) {
