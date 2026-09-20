@@ -2,6 +2,7 @@ package com.loorve.presentation.reviewblock
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
@@ -1042,10 +1044,35 @@ fun ReviewRecordMiniCard(
                                 )
                             }
                         }
-                        Checkbox(
-                            checked = item.status == ReviewStatus.COMPLETED,
-                            onCheckedChange = onCheckedChange
-                        )
+                        val isCompleted = item.status == ReviewStatus.COMPLETED
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isCompleted) Active else Color.Transparent
+                                )
+                                .border(
+                                    BorderStroke(
+                                        width = 1.5.dp,
+                                        color = if (isCompleted) Active else TertiaryText
+                                    ),
+                                    CircleShape
+                                )
+                                .clickable {
+                                    onCheckedChange?.invoke(!isCompleted)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isCompleted) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "완료됨",
+                                    tint = OnGradient,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
