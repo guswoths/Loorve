@@ -51,10 +51,10 @@ fun ProPaywallDialog(
 
     AlertDialog(
         modifier = Modifier
-            .widthIn(min = 380.dp, max = 440.dp)
-            .heightIn(min = 420.dp),
+            .widthIn(min = 420.dp, max = 480.dp)
+            .heightIn(min = 460.dp),
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF18113C),
+        containerColor = Color(0xFF2A2340),
         titleContentColor = Color.White,
         textContentColor = Color(0xFFD8D5E8),
         shape = RoundedCornerShape(28.dp),
@@ -139,14 +139,14 @@ private fun SubscriptionContent(state: SubscriptionState) {
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Choose the plan that fits your review routine.",
+            text = "기본과 Loorve Pro의 혜택을 비교해 보세요.",
             color = Color(0xFFD8D5E8)
         )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(
-                    BorderStroke(1.dp, Color(0x66C4B5FD)),
+                    BorderStroke(1.5.dp, Color(0xB3C4B5FD)),
                     RoundedCornerShape(18.dp)
                 )
                 .padding(16.dp),
@@ -157,20 +157,20 @@ private fun SubscriptionContent(state: SubscriptionState) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "FEATURES",
+                    text = "기능",
                     modifier = Modifier.weight(1.8f),
                     color = Color(0xFFC4B5FD),
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "BASIC",
+                    text = "Basic",
                     modifier = Modifier.weight(1f),
                     color = Color(0xFFB8B8C8),
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "PRO",
+                    text = "Loorve Pro",
                     modifier = Modifier.weight(1f),
                     color = Color(0xFFE9D5FF),
                     fontWeight = FontWeight.Bold,
@@ -178,14 +178,14 @@ private fun SubscriptionContent(state: SubscriptionState) {
                 )
             }
             ComparisonRow(
-                feature = "Unlimited Review Block Generation\n무제한 복습블록 생성",
-                basic = "Limited",
-                pro = "Unlimited"
+                feature = "무제한 복습블록 생성",
+                basic = "제한",
+                pro = "무제한"
             )
             ComparisonRow(
-                feature = "No Banner Ads\n배너광고 없음",
-                basic = "Ads",
-                pro = "No banner ads"
+                feature = "배너광고 없음",
+                basic = "광고 표시",
+                pro = "광고 없음"
             )
         }
         when (val entitlement = state.entitlement) {
@@ -217,6 +217,10 @@ private fun ComparisonRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .border(
+                BorderStroke(1.dp, Color(0x669B8BC7)),
+                RoundedCornerShape(10.dp)
+            )
             .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
