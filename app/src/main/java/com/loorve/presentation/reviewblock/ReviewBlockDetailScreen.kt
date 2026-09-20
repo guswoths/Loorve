@@ -143,6 +143,12 @@ fun ReviewBlockDetailScreen(
     } else {
         0f
     }
+    val overdueRatio = if (totalReviewCount > 0) {
+        (uiState.overdueItems.size.toFloat() / totalReviewCount.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    val reviewProgress = (1f - overdueRatio).coerceIn(0f, 1f)
 
     // 블록 삭제 확인 AlertDialog
     if (uiState.showDeleteConfirm) {
@@ -311,12 +317,6 @@ fun ReviewBlockDetailScreen(
                                     fontWeight = FontWeight.Bold,
                                     color = OnBackground
                                 )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = "하루 최대 $dailyCap 회 복습",
-                                    style = LoorveTypography.bodySmall,
-                                    color = OnSurfaceVariant
-                                )
                             }
                             Surface(
                                 color = NoticeContainer,
@@ -361,7 +361,7 @@ fun ReviewBlockDetailScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth(completionRate)
+                                    .fillMaxWidth(reviewProgress)
                                     .fillMaxSize()
                                     .clip(CircleShape)
                                     .background(
