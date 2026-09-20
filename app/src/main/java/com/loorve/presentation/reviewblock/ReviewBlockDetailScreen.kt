@@ -469,15 +469,10 @@ fun ReviewBlockDetailScreen(
                             viewModel.saveCustomAlarmTime(uid, item, hour, minute)
                         },
                         onCheckedChange = { item, checked ->
-                            viewModel.completeReview(
+                            viewModel.toggleReviewCompletion(
                                 uid = uid,
                                 item = item,
-                                result = if (checked) {
-                                    CompletionResult.REMEMBERED
-                                } else {
-                                    CompletionResult.FORGOT
-                                },
-                                examDateMillis = uiState.reviewBlock?.examDate ?: 0L
+                                isCompleted = checked
                             )
                         },
                         onScheduleClick = { item -> selectedReviewSchedule = item },

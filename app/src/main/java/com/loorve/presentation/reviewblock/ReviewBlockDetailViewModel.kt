@@ -307,6 +307,39 @@ class ReviewBlockDetailViewModel @Inject constructor(
         }
     }
 
+    fun toggleReviewCompletion(
+        uid: String,
+        item: ReviewScheduleItem,
+        isCompleted: Boolean
+    ) {
+        viewModelScope.launch {
+            scheduleRepository.updateScheduleCompletion(uid, item.id, isCompleted)
+                .onSuccess {
+                    val updatedItem = item.copy(
+                        status = if (isCompleted) {
+                            com.loorve.domain.model.ReviewStatus.COMPLETED
+                        } else {
+                            com.loorve.domain.model.ReviewStatus.PENDING
+                        }
+                    )
+                    _uiState.value = _uiState.value.copy(
+                        reviewScheduleRecords = _uiState.value.reviewScheduleRecords.map {
+                            if (it.id == item.id) updatedItem else it
+                        },
+                        scheduleItems = _uiState.value.scheduleItems.map {
+                            if (it.id == item.id) updatedItem else it
+                        }
+                    )
+                    calendarRefreshBus.notifyRefresh()
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = error.message ?: "복습 상태 저장에 실패했습니다."
+                    )
+                }
+        }
+    }
+
     fun resetSavedSuccess() {
         _uiState.value = _uiState.value.copy(savedSuccess = false)
     }
