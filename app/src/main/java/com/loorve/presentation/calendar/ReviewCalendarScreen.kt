@@ -197,10 +197,8 @@ fun ReviewCalendarScreen(
                     }
                 }
             },
-            bottomBar = if (uiState.subscriptionEntitlement is SubscriptionEntitlement.Pro) {
-                {}
-            } else {
-                {
+            bottomBar = {
+                if (uiState.subscriptionEntitlement !is SubscriptionEntitlement.Pro) {
                     BannerAdView(modifier = Modifier.fillMaxWidth())
                 }
             },
