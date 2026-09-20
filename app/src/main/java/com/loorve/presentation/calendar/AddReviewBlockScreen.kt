@@ -233,8 +233,10 @@ fun AddReviewBlockScreen(
                         )
                     }
                 }
-                if (!isProSubscribed && subscriptionState.entitlement !is SubscriptionEntitlement.Pro) {
-                    key(subscriptionState.entitlement to isProSubscribed) {
+                val showBanner = !isProSubscribed &&
+                    subscriptionState.entitlement !is SubscriptionEntitlement.Pro
+                if (showBanner) {
+                    key(showBanner) {
                         BannerAdView(modifier = Modifier.fillMaxWidth())
                     }
                 }

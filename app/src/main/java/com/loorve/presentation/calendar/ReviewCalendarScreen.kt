@@ -41,6 +41,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -199,8 +200,12 @@ fun ReviewCalendarScreen(
                 }
             },
             bottomBar = {
-                if (!isProSubscribed && uiState.subscriptionEntitlement !is SubscriptionEntitlement.Pro) {
-                    BannerAdView(modifier = Modifier.fillMaxWidth())
+                val showBanner = !isProSubscribed &&
+                    uiState.subscriptionEntitlement !is SubscriptionEntitlement.Pro
+                if (showBanner) {
+                    key(showBanner) {
+                        BannerAdView(modifier = Modifier.fillMaxWidth())
+                    }
                 }
             },
             containerColor = Color.Transparent

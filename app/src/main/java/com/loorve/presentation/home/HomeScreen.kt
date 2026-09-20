@@ -39,6 +39,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -169,8 +170,12 @@ fun HomeScreen(
                 )
             },
             bottomBar = {
-                if (!isProSubscribed && subscriptionState.entitlement !is SubscriptionEntitlement.Pro) {
-                    BannerAdView(modifier = Modifier.fillMaxWidth())
+                val showBanner = !isProSubscribed &&
+                    subscriptionState.entitlement !is SubscriptionEntitlement.Pro
+                if (showBanner) {
+                    key(showBanner) {
+                        BannerAdView(modifier = Modifier.fillMaxWidth())
+                    }
                 }
             },
             containerColor = Color.Transparent
