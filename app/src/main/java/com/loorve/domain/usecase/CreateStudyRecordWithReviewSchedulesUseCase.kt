@@ -229,7 +229,7 @@ private fun ReviewScheduleEntry.toScheduleItem(
 ) = old.copy(
     uid = uid,
     reviewDate = scheduledDate.atStartOfDay(zone).toInstant().toEpochMilli(),
-    status = ReviewStatus.PENDING,
+    status = old.status,
     planStatus = status,
     priorityScore = priorityScore,
     estimatedReviewMinutes = estimatedReviewMinutes,
