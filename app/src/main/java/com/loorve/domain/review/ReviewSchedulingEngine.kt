@@ -32,7 +32,7 @@ object ReviewSchedulingEngine {
     ): ReviewCreationWindowValidation {
         val daysUntilExam = ChronoUnit.DAYS.between(creationDate, examDate)
         val availableReviewDays = (daysUntilExam - 1L).coerceAtLeast(0L)
-        val valid = daysUntilExam >= MIN_REVIEW_DAYS
+        val valid = availableReviewDays >= MIN_REVIEW_DAYS
         val message = when {
             examDate.isBefore(creationDate) ->
                 "생성불가! 시험일이 생성일보다 이전입니다. 시험일을 다시 설정해 주세요. " +
@@ -40,9 +40,12 @@ object ReviewSchedulingEngine {
             examDate == creationDate ->
                 "생성불가! 시험일이 생성일과 같습니다. 일정 생성에는 생성일과 시험일 사이에 " +
                     "최소 3일의 온전한 달력 날짜가 필요합니다."
+            availableReviewDays < MIN_REVIEW_DAYS ->
+                "생성불가! 학습일과 시험일 사이에 확보되는 실제 복습 가능일이 ${availableReviewDays}일뿐입니다. " +
+                    "학습기록을 생성하려면 두 날짜 사이에 최소 3일의 복습 가능일이 필요합니다."
             else ->
-                "생성불가! 시험일까지 ${daysUntilExam}일 남았습니다. 일정 생성에는 생성일과 시험일 사이에 " +
-                    "최소 3일의 온전한 달력 날짜가 필요합니다."
+                "생성불가! 시험일까지 ${daysUntilExam}일 남았습니다. 일정 생성에는 학습일과 시험일 사이에 " +
+                    "최소 3일의 실제 복습 가능일이 필요합니다."
         }
         return ReviewCreationWindowValidation(valid, availableReviewDays, message)
     }
@@ -266,6 +269,38 @@ object ReviewSchedulingEngine {
                 } else {
                     "생성불가! 시험일이 오늘이어서 시험 전 자동 복습 일정을 만들 수 없습니다.\n오늘 학습한 내용을 직접 한 번 더 확인해 보세요."
                 }
+            )
+        }
+        val futureReviewDays = ChronoUnit.DAYS.between(today, exam.examDate) - 1L
+        if (exam.examDate.isBefore(today)) {
+            return emptyResult(
+                record,
+                exam,
+                today,
+                config.finalReviewBufferDays,
+                ReviewPlanStatus.INSUFFICIENT_WINDOW,
+                "생성불가! 시험일이 이미 지났습니다. 지난 시험에는 새로운 복습 일정을 생성할 수 없습니다."
+            )
+        }
+        if (exam.examDate == today) {
+            return emptyResult(
+                record,
+                exam,
+                today,
+                config.finalReviewBufferDays,
+                ReviewPlanStatus.INSUFFICIENT_WINDOW,
+                "생성불가! 시험일이 오늘입니다. 시험 전 복습을 2회 이상 배정할 수 없어 학습기록을 저장할 수 없습니다."
+            )
+        }
+        if (futureReviewDays < 2L) {
+            return emptyResult(
+                record,
+                exam,
+                today,
+                config.finalReviewBufferDays,
+                ReviewPlanStatus.INSUFFICIENT_WINDOW,
+                "생성불가! 시험일까지 남은 기간에 실제로 진행할 수 있는 복습이 ${futureReviewDays.coerceAtLeast(0L)}회뿐입니다. " +
+                    "학습기록을 저장하려면 시험 전 복습을 최소 2회 진행할 수 있어야 합니다. 시험일을 늦춰주세요."
             )
         }
         if (!record.isCompleted) {

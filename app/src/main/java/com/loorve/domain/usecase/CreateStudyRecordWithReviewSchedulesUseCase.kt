@@ -128,6 +128,16 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
         val generatedEntries = generated.schedules.map {
             it.toScheduleItem(uid, request.blockId, zone, request.title.ifBlank { request.content.take(20) })
         }
+        val futureGeneratedCount = generatedEntries.count {
+            it.reviewDate.toLocalDate(zone).isAfter(today)
+        }
+        if (generated.outcome == ScheduleGenerationOutcome.NOT_GENERATED ||
+            futureGeneratedCount < 2
+        ) {
+            throw IllegalArgumentException(
+                generationWarning ?: "생성불가! 시험일까지 복습을 최소 2회 진행할 수 없어 학습기록을 저장할 수 없습니다."
+            )
+        }
         val existingRecordIds = studyRecordRepositoryFor(uid, request.examId)
         val existingItems = scheduleRepository.getAllScheduleItems(uid).getOrThrow()
             .filter { it.studyRecordId in existingRecordIds }
