@@ -84,7 +84,7 @@ fun BottomNavBar(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = item.label,
-                    style = LoorveTypography.labelMedium,
+                    style = LoorveTypography.labelSmall,
                     color = iconColor,
                     maxLines = 1,
                     softWrap = false

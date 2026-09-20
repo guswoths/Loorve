@@ -187,16 +187,6 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    HomeHeroCard(
-                        weeklyCompletionRate = uiState.weeklyCompletionRate,
-                        weeklyCompleted = uiState.weeklyCompleted,
-                        weeklyTotal = uiState.weeklyTotal,
-                        nearestExam = uiState.nearestExam,
-                        onOpenSettings = onNavigateToExamSetting
-                    )
-                }
-
-                item {
                     HomeMotivationHeader()
                 }
 
