@@ -380,6 +380,12 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun syncReviewScheduleItems(items: List<ReviewScheduleItem>, uid: String) {
         rawReviewScheduleItems = items
+        items.forEach { item ->
+            val serverCompleted = item.status == com.loorve.domain.model.ReviewStatus.COMPLETED
+            if (completionOverrides[item.id] == serverCompleted) {
+                completionOverrides.remove(item.id)
+            }
+        }
 
         val activeBlockIds = reviewBlockRepository.getReviewBlocks(uid)
             .getOrNull()
