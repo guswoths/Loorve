@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.delay
 import com.loorve.domain.subscription.SubscriptionEntitlement
 import com.loorve.presentation.subscription.SubscriptionViewModel
 import com.loorve.ui.component.BannerAdView
@@ -86,6 +87,7 @@ import com.loorve.ui.theme.UrgentSurface
 import com.loorve.ui.theme.Warning
 import com.loorve.ui.theme.WarningContainer
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
@@ -485,25 +487,146 @@ private fun HomeHeroCard(
 
 @Composable
 private fun HomeMotivationHeader() {
+    val seoulZone = remember { ZoneId.of("Asia/Seoul") }
+    var quoteDate by remember { mutableStateOf(LocalDate.now(seoulZone)) }
+    LaunchedEffect(seoulZone) {
+        while (true) {
+            val now = java.time.ZonedDateTime.now(seoulZone)
+            val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay(seoulZone)
+            delay(java.time.Duration.between(now, nextMidnight).toMillis().coerceAtLeast(1L))
+            quoteDate = LocalDate.now(seoulZone)
+        }
+    }
+    val quote = HOME_MOTIVATIONAL_QUOTES[
+        Math.floorMod(quoteDate.toEpochDay().toInt(), HOME_MOTIVATIONAL_QUOTES.size)
+    ]
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         Text(
-            text = "오늘도 한 칸씩 오래 남기기",
-            style = LoorveTypography.headlineSmall,
+            text = quote.text,
+            style = LoorveTypography.bodyLarge,
             fontWeight = FontWeight.Bold,
             color = OnBackground
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "작게 자주 복습하면, 마지막에 덜 불안해집니다.",
-            style = LoorveTypography.bodyMedium,
+            text = "- ${quote.author}",
+            style = LoorveTypography.labelMedium,
             color = OnSurfaceVariant
         )
     }
 }
+
+private data class HomeMotivationalQuote(
+    val text: String,
+    val author: String
+)
+
+private val HOME_MOTIVATIONAL_QUOTES = listOf(
+    HomeMotivationalQuote("학이시습지 불역열호(배우고 때때로 익히면 또한 기쁘지 아니한가).", "공자"),
+    HomeMotivationalQuote("온고이지신 위사가의(옛것을 익혀 새것을 알면 스승이 될 수 있다).", "공자"),
+    HomeMotivationalQuote("반복은 모든 학습의 어머니다(Repetitio est mater studiorum).", "라틴 격언"),
+    HomeMotivationalQuote("우리가 반복적으로 하는 행동이 바로 우리 자신이다. 따라서 탁월함은 행동이 아니라 습관이다.", "윌 듀란트 (아리스토텔레스 사상 해설)"),
+    HomeMotivationalQuote("성공은 매일 반복되는 작은 노력들의 합이다.", "로버트 콜리어"),
+    HomeMotivationalQuote("반복은 설득의 유일한 형태다.", "나폴레옹 보나파르트"),
+    HomeMotivationalQuote("한 권의 책을 백 번 읽으면 그 뜻이 저절로 드러난다(독서백편의자현).", "주희"),
+    HomeMotivationalQuote("배우기만 하고 생각하지 않으면 얻는 것이 없고, 생각하기만 하고 배우지 않으면 위태롭다.", "공자"),
+    HomeMotivationalQuote("한 번의 시선은 단지 지각일 뿐이지만, 반복된 시선은 이해가 된다.", "괴테"),
+    HomeMotivationalQuote("나는 만 가지 발차기를 한 번씩 연습한 사람은 두렵지 않지만, 한 가지 발차기를 만 번 연습한 사람은 두렵다.", "이소룡"),
+    HomeMotivationalQuote("연습은 완벽을 만들지 않는다. 완벽한 연습만이 완벽을 만든다.", "빈스 롬바르디"),
+    HomeMotivationalQuote("지식은 적용할 때까지는 단지 잠재적인 힘에 불과하다.", "나폴레온 힐"),
+    HomeMotivationalQuote("배움의 과정에서 가장 치명적인 오류는 한 번 이해한 것을 완전히 안다고 착각하는 것이다.", "헤르만 에빙하우스"),
+    HomeMotivationalQuote("복습하지 않는 공부는 밑 빠진 독에 물 붓기다.", "율곡 이이"),
+    HomeMotivationalQuote("기억을 지속시키는 유일한 도구는 주기적인 회상이다.", "윌리엄 제임스"),
+    HomeMotivationalQuote("천재성이란 끊임없이 반복하는 인내력에 불과하다.", "뷔퐁"),
+    HomeMotivationalQuote("처음 읽을 때는 배우고, 두 번째 읽을 때는 깊어지며, 세 번째 읽을 때는 비판하게 된다.", "몽테뉴"),
+    HomeMotivationalQuote("망각에 대항하는 유일한 무기는 규칙적인 반복이다.", "헤르만 에빙하우스"),
+    HomeMotivationalQuote("반복은 기억을 단단하게 다지는 망치질과 같다.", "퀸틸리아누스"),
+    HomeMotivationalQuote("새로운 지식을 얻는 가장 좋은 방법은 이미 배운 지식을 다시 검토하는 것이다.", "소크라테스"),
+    HomeMotivationalQuote("이미 안다고 생각하는 순간 배움은 멈춘다.", "클로드 베르나르"),
+    HomeMotivationalQuote("배움은 끝없는 복습의 연속이다. 익숙함이 통찰로 변하는 순간까지 멈추지 마라.", "다산 정약용"),
+    HomeMotivationalQuote("반복되지 않은 정보는 뇌에 머물지 않고 스쳐 지나갈 뿐이다.", "존 메디나"),
+    HomeMotivationalQuote("한 번 배운 것을 마음에 새기지 않으면, 아무리 책을 많이 읽어도 빈 껍데기에 불과하다.", "퇴계 이황"),
+    HomeMotivationalQuote("반복은 예술의 비밀이자 모든 기술의 열쇠다.", "알브레히트 뒤러"),
+    HomeMotivationalQuote("하루를 연습하지 않으면 내가 알고, 이틀을 연습하지 않으면 비평가가 알고, 사흘을 연습하지 않으면 관객이 안다.", "야샤 하이페츠"),
+    HomeMotivationalQuote("복습은 지식을 지혜로 바꾸는 연금술이다.", "세네카"),
+    HomeMotivationalQuote("우리는 보고 들은 것의 일부만 기억하지만, 스스로 되새기고 행동한 것은 온전히 기억한다.", "벤자민 프랭클린"),
+    HomeMotivationalQuote("천 번의 연습이 곧 숙련을 낳는다.", "미야모토 무사시"),
+    HomeMotivationalQuote("한 문장을 열 번 읽으면 문자가 보이고, 백 번 읽으면 뜻이 보이며, 천 번 읽으면 삶이 보인다.", "김득신"),
+    HomeMotivationalQuote("탁월함은 재능이 아니라 끊임없는 되새김과 훈련의 결과다.", "키케로"),
+    HomeMotivationalQuote("기억하려는 노력 없이 머릿속에 들어오는 지식은 쉽게 사라진다.", "존 로크"),
+    HomeMotivationalQuote("지식을 소유하는 것과 그것을 자유자재로 꺼내 쓰는 것은 완전히 다른 차원의 일이다.", "아르투어 쇼펜하우어"),
+    HomeMotivationalQuote("같은 길을 여러 번 걸어야 비로소 주변의 풍경이 세세히 보인다.", "프리드리히 니체"),
+    HomeMotivationalQuote("지혜는 하루아침에 쌓이지 않으며, 어제의 배움을 오늘 다시 확인하는 과정에서 자란다.", "솔론"),
+    HomeMotivationalQuote("단련이란 일천 날의 연습을 '단'이라 하고, 사만 날의 연습을 '련'이라 한다.", "미야모토 무사시"),
+    HomeMotivationalQuote("한 번 읽은 책은 결코 온전히 읽은 것이 아니다.", "버지니아 울프"),
+    HomeMotivationalQuote("숙련은 반복에 지루함을 느끼지 않는 사람에게 주어지는 보상이다.", "콜린 파월"),
+    HomeMotivationalQuote("배운 것을 입 밖으로 소리 내어 말해보고 다시 정리하지 않는다면 진짜 지식이 아니다.", "리처드 파인만"),
+    HomeMotivationalQuote("우리의 두뇌는 반복을 통해 경로를 다지고 고속도로를 건설한다.", "산티아고 라몬 이 카할"),
+    HomeMotivationalQuote("학문이란 강물을 거슬러 올라가는 배와 같아서, 복습하여 나아가지 않으면 곧 퇴보한다.", "한비자"),
+    HomeMotivationalQuote("가장 훌륭한 복습은 타인에게 그것을 가르쳐보는 것이다.", "세네카"),
+    HomeMotivationalQuote("배운 것을 되새기지 않는 지식인은 씨앗만 뿌려두고 수확하지 않는 농부와 같다.", "페스탈로치"),
+    HomeMotivationalQuote("기억은 게으른 하인과 같아서, 끊임없이 부르고 깨우지 않으면 잠들어 버린다.", "새뮤얼 존슨"),
+    HomeMotivationalQuote("복습은 과거로 돌아가는 것이 아니라, 더 높은 곳에서 어제의 지식을 내려다보는 것이다.", "앙리 베르그송"),
+    HomeMotivationalQuote("한 번의 실천적 복습이 백 번의 맹목적 독서보다 낫다.", "존 듀이"),
+    HomeMotivationalQuote("거장은 기초적인 동작을 남들보다 훨씬 더 많이, 더 깊이 반복한 사람일 뿐이다.", "파블로 카잘스"),
+    HomeMotivationalQuote("어제 배운 것을 오늘 다시 보지 않는다면 내일은 흔적조차 남지 않는다.", "순자"),
+    HomeMotivationalQuote("반복은 평범함을 비범함으로 바꾸는 가장 단순한 공식이다.", "짐 론"),
+    HomeMotivationalQuote("배움의 즐거움은 처음 알게 되었을 때가 아니라, 다시 꺼내어 완전히 내 것이 되었을 때 찾아온다.", "에라스뮈스"),
+    HomeMotivationalQuote("이해했다고 느끼는 순간이야말로 복습을 시작해야 할 가장 위험하고도 중요한 순간이다.", "바루흐 스피노자"),
+    HomeMotivationalQuote("훈련의 고통은 잠시지만, 반복하지 않아 생기는 무지는 평생 간다.", "에픽테토스"),
+    HomeMotivationalQuote("글을 쓸 때 고쳐 쓰는 것(퇴고)이 핵심이듯, 공부의 핵심은 다시 보는 것에 있다.", "어니스트 헤밍웨이"),
+    HomeMotivationalQuote("지식의 진정한 깊이는 얼마나 많은 것을 새로 접했느냐가 아니라, 배운 것을 얼마나 깊이 되새겼느냐에 달려 있다.", "르네 데카르트"),
+    HomeMotivationalQuote("복습하지 않는 학생은 도끼날을 갈지 않고 나무를 베려는 나무꾼과 같다.", "스티븐 코비"),
+    HomeMotivationalQuote("우리는 잊어버리기 위해 기억하는 것이 아니므로, 끊임없이 지식을 다듬고 점검해야 한다.", "마르쿠스 아우렐리우스"),
+    HomeMotivationalQuote("지속적인 점검과 피드백 없는 학습은 방향타 없는 배와 같다.", "노버트 위너"),
+    HomeMotivationalQuote("복습은 이미 완성된 그림에 명암을 더해 입체감을 불어넣는 작업이다.", "레오나르도 다빈치"),
+    HomeMotivationalQuote("한 번에 많은 것을 배우려 하지 말고, 적은 분량이라도 완벽히 숙달될 때까지 거듭하라.", "토마스 아퀴나스"),
+    HomeMotivationalQuote("반복은 단순한 노동이 아니라 뇌의 구조를 물리적으로 바꾸는 신경학적 건축 작업이다.", "도널드 헵"),
+    HomeMotivationalQuote("복습은 자신이 무엇을 모르는지 발견하는 가장 정직한 거울이다.", "미셸 드 몽테뉴"),
+    HomeMotivationalQuote("천 번이고 만 번이고 거듭 생각하여 이치에 닿을 때까지 손에서 놓지 마라.", "왕양명"),
+    HomeMotivationalQuote("기억의 궁전을 튼튼하게 세우려면 기초 벽돌을 쌓은 뒤 틈틈이 시멘트를 덧발라야 한다.", "마테오 리치"),
+    HomeMotivationalQuote("자주 돌아보는 자만이 길을 잃지 않는다.", "노자"),
+    HomeMotivationalQuote("연습이란 같은 일을 지루함 없이 새롭게 해내는 능력이다.", "블라디미르 호로비츠"),
+    HomeMotivationalQuote("지식은 소화되지 않으면 독이 되며, 지식을 소화시키는 유일한 위장은 복습이다.", "장 자크 루소"),
+    HomeMotivationalQuote("어떤 개념을 완벽히 이해했다는 증거는, 그것을 보지 않고도 백지에 처음부터 끝까지 설명해낼 수 있는 상태다.", "리처드 파인만"),
+    HomeMotivationalQuote("어제의 나를 넘어서는 공부는 새로운 책을 펼치는 것이 아니라, 어제 덮었던 책의 핵심을 다시 짚어보는 데서 시작한다.", "랄프 왈도 에머슨"),
+    HomeMotivationalQuote("배움에 지름길은 없으며, 되풀이해 걷는 길만이 단단한 대로가 된다.", "유클리드"),
+    HomeMotivationalQuote("복습이란 흩어진 생각의 구슬을 실로 꿰어 보배로 만드는 일이다.", "이덕무"),
+    HomeMotivationalQuote("반복을 두려워하는 사람은 결코 자신의 한계를 넘어설 수 없다.", "에밀 자토펙"),
+    HomeMotivationalQuote("공부란 배운 것을 마음에 담아두고 삭여서 마침내 뼈와 살이 되게 하는 것이다.", "박지원"),
+    HomeMotivationalQuote("자신의 지식을 주기적으로 점검하지 않는 전문가는 시계를 맞추지 않고 시간을 재는 사람과 같다.", "피터 드러커"),
+    HomeMotivationalQuote("지혜로운 자는 이미 배운 기초를 매일 아침 새롭게 다진다.", "달라이 라마"),
+    HomeMotivationalQuote("기억의 힘은 머리의 총명함에 있지 않고, 끈질기게 되뇌는 혀끝과 손끝에 있다.", "정조"),
+    HomeMotivationalQuote("한 번의 깨달음에 만족하지 말고, 그 깨달음을 일상의 생각으로 끌어내리기 위해 복기하라.", "지눌"),
+    HomeMotivationalQuote("학습은 마라톤과 같아서, 앞선 구간의 페이스를 점검하지 않으면 결승선에 도달할 수 없다.", "아베베 비킬라"),
+    HomeMotivationalQuote("인간의 지적 능력은 정보를 습득하는 속도가 아니라, 습득한 정보를 회상하고 재조합하는 능력으로 결정된다.", "허버트 사이먼"),
+    HomeMotivationalQuote("지식의 나무에 물을 주는 행위가 바로 복습이다. 물을 주지 않으면 아무리 큰 나무라도 말라 죽는다.", "페스탈로치"),
+    HomeMotivationalQuote("반복이 없으면 습관이 생기지 않고, 습관이 없으면 성격도, 운명도 바뀌지 않는다.", "윌리엄 제임스"),
+    HomeMotivationalQuote("훌륭한 사상가는 끊임없이 자신의 전제를 의심하고 처음부터 다시 생각해보는 사람이다.", "루트비히 비트겐슈타인"),
+    HomeMotivationalQuote("익숙한 길도 다시 확인하며 걸어야 돌부리에 걸려 넘어지지 않는다.", "명심보감"),
+    HomeMotivationalQuote("학습의 최종 목표는 무의식적인 숙련이며, 무의식적 숙련에 이르는 유일한 다리는 끊임없는 반복이다.", "칼 융"),
+    HomeMotivationalQuote("모든 위대한 대가들은 가장 단순한 기본기를 평생 동안 복습한 사람들이다.", "미켈란젤로"),
+    HomeMotivationalQuote("단 한 줄의 문장이라도 내 삶의 원칙이 될 때까지 곱씹지 않는다면 책을 읽지 않은 것과 같다.", "헨리 데이비드 소로"),
+    HomeMotivationalQuote("기억은 붙잡지 않으면 날아가는 새와 같다. 복습이라는 새장을 만들어 지식을 가두어라.", "프랜시스 베이컨"),
+    HomeMotivationalQuote("생각의 회로는 자주 달릴수록 저항이 줄어든다.", "올리버 색스"),
+    HomeMotivationalQuote("복습은 지식에 영혼을 불어넣어 그것이 내 언어가 되게 하는 과정이다.", "요한 볼프강 폰 괴테"),
+    HomeMotivationalQuote("알고 있는 것을 다시 검토할 때, 우리는 비로소 그 지식의 진정한 한계와 확장을 본다.", "임마누엘 칸트"),
+    HomeMotivationalQuote("기초를 거듭 다지는 사람만이 폭풍 속에서도 흔들리지 않는 지적 탑을 쌓을 수 있다.", "아이작 뉴턴"),
+    HomeMotivationalQuote("한 번의 정독보다 세 번의 간헐적 복습이 뇌리에 훨씬 더 깊은 자국을 남긴다.", "찰스 다윈"),
+    HomeMotivationalQuote("반복은 결코 낭비가 아니다. 그것은 숙련이라는 이름의 조각상을 빚어내는 정질이다.", "오귀스트 로댕"),
+    HomeMotivationalQuote("지식을 머릿속에 쌓아두기만 하고 정리하지 않는 것은 창고에 물건을 마구 쑤셔 넣는 것과 같다.", "조지프 애디슨"),
+    HomeMotivationalQuote("되돌아보아 틀린 부분을 바로잡는 것, 이것이 배움의 본질이다.", "증자"),
+    HomeMotivationalQuote("매일 반복하는 일이야말로 진정으로 우리가 누구인지를 결정짓는다.", "파울로 코엘료"),
+    HomeMotivationalQuote("깊이 파기 위해서는 같은 자리를 파고 또 파야 한다. 복습이야말로 지식의 샘을 터뜨리는 곡괭이다.", "바루흐 스피노자"),
+    HomeMotivationalQuote("배움의 과정에서 가장 위대한 순간은 이미 안다고 믿었던 것을 복습하며 새로운 깊이를 발견할 때다.", "마틴 부버"),
+    HomeMotivationalQuote("숙련에 도달하는 데 기적이 끼어들 자리는 없다. 오직 정직한 반복만이 존재할 뿐이다.", "아르투로 토스카니니"),
+    HomeMotivationalQuote("이미 읽은 것을 다시 읽을 줄 모르는 사람은 책을 읽을 자격이 없다.", "오스카 와일드"),
+    HomeMotivationalQuote("날마다 복습하여 잊지 않게 하는 것이야말로 둔한 자가 영리한 자를 이기는 유일한 비결이다.", "율곡 이이")
+)
 
 @Composable
 private fun HomeOverdueReviewSection(
