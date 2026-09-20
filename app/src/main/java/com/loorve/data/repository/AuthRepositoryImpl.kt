@@ -172,13 +172,6 @@ class AuthRepositoryImpl @Inject constructor(
             firestore.collection("users").document(uid).delete().await()
             Log.d(TAG, "users 문서 삭제 완료 (uid=$uid)")
 
-            try {
-                CredentialManager.create(context)
-                    .clearCredentialState(ClearCredentialStateRequest())
-            } catch (e: Exception) {
-                Log.w(TAG, "deleteAccount: clearCredentialState 실패: ${e.message}")
-            }
-
             currentUser.delete().await()
             Log.d(TAG, "계정 삭제 완료 (uid=$uid)")
 
@@ -190,6 +183,15 @@ class AuthRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "계정 삭제 실패", e)
             Result.failure(Exception("계정 삭제 중 오류가 발생했습니다. 다시 시도해주세요.", e))
+        } finally {
+            try {
+                CredentialManager.create(context)
+                    .clearCredentialState(ClearCredentialStateRequest())
+            } catch (e: Exception) {
+                Log.w(TAG, "deleteAccount: clearCredentialState 실패: ${e.message}")
+            }
+            firebaseAuth.signOut()
+            Log.d(TAG, "계정 삭제 작업 후 세션 정리 완료")
         }
     }
 

@@ -155,6 +155,7 @@ class MyPageViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(isLoading = false, error = "Account deletion failed. Please try again.")
                     }
+                    _events.emit(MyPageEvent.SignOutSuccess)
                 }
         }
     }
