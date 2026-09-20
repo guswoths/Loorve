@@ -329,21 +329,9 @@ fun MyPageScreen(
                     }
                 }
 
-                item {
-                    TextButton(
-                        onClick = { showDeleteDialog = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            stringResource(R.string.settings_delete_account),
-                            color = Error.copy(alpha = 0.7f),
-                            style = LoorveTypography.bodyMedium
-                        )
-                        }
-                    }
-                }
             }
         }
+    }
     }
 
     if (showProDialog) {
