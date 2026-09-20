@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -49,7 +50,9 @@ fun ProPaywallDialog(
     }
 
     AlertDialog(
-        modifier = Modifier.widthIn(min = 340.dp),
+        modifier = Modifier
+            .widthIn(min = 380.dp, max = 440.dp)
+            .heightIn(min = 420.dp),
         onDismissRequest = onDismiss,
         containerColor = Color(0xFF18113C),
         titleContentColor = Color.White,
@@ -146,8 +149,8 @@ private fun SubscriptionContent(state: SubscriptionState) {
                     BorderStroke(1.dp, Color(0x66C4B5FD)),
                     RoundedCornerShape(18.dp)
                 )
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -155,7 +158,7 @@ private fun SubscriptionContent(state: SubscriptionState) {
             ) {
                 Text(
                     text = "FEATURES",
-                    modifier = Modifier.weight(1.5f),
+                    modifier = Modifier.weight(1.8f),
                     color = Color(0xFFC4B5FD),
                     fontWeight = FontWeight.Bold
                 )
@@ -175,12 +178,12 @@ private fun SubscriptionContent(state: SubscriptionState) {
                 )
             }
             ComparisonRow(
-                feature = "Review block generation",
+                feature = "Unlimited Review Block Generation\n무제한 복습블록 생성",
                 basic = "Limited",
                 pro = "Unlimited"
             )
             ComparisonRow(
-                feature = "Banner ads",
+                feature = "No Banner Ads\n배너광고 없음",
                 basic = "Ads",
                 pro = "No banner ads"
             )
@@ -219,7 +222,7 @@ private fun ComparisonRow(
     ) {
         Text(
             text = feature,
-            modifier = Modifier.weight(1.5f),
+            modifier = Modifier.weight(1.8f),
             color = Color.White
         )
         Text(
