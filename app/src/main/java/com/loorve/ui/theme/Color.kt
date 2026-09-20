@@ -3,8 +3,8 @@ package com.loorve.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // ── Canvas & surfaces ──
-val Background       = Color(0xFFF8F9FD)
-val CanvasWarm       = Color(0xFFFCF9F8)
+val Background       = Color(0xFFFFFFFF)
+val CanvasWarm       = Color(0xFFFFFFFF)
 val Surface          = Color(0xEBFFFFFF)
 val SurfaceSolid     = Color(0xFFFFFFFF)
 val SurfaceVariant   = Color(0xFFF0F3FA)
