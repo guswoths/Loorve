@@ -417,7 +417,7 @@ private fun SettingsAmbientAura() {
             .padding(start = 250.dp, top = 12.dp)
             .size(150.dp)
             .blur(70.dp)
-            .background(Color(0xFFE8EEFF).copy(alpha = 0.7f), CircleShape)
+            .background(Color.White, CircleShape)
     )
     Box(
         modifier = Modifier
@@ -425,7 +425,7 @@ private fun SettingsAmbientAura() {
             .padding(end = 220.dp, top = 380.dp)
             .size(200.dp)
             .blur(76.dp)
-            .background(Color(0xFFF3E8FF).copy(alpha = 0.62f), CircleShape)
+            .background(Color.White, CircleShape)
     )
 }
 
