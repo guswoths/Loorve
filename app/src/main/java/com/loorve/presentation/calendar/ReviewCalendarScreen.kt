@@ -489,8 +489,6 @@ private fun ReviewWorkloadBarChart(
                     ReviewWorkloadBar(
                         stat = stat,
                         latestDate = latestDate,
-                        maxDueCount = stats.maxOfOrNull { it.dueCount.coerceAtLeast(0) }
-                            ?.coerceAtLeast(1) ?: 1,
                         selected = selectedStat?.date == stat.date,
                         modifier = Modifier.weight(1f),
                         onClick = { onStatSelected(stat) }
@@ -533,7 +531,6 @@ private fun ReviewWorkloadBarChart(
 private fun ReviewWorkloadBar(
     stat: DailyReviewCompletionStat,
     latestDate: LocalDate?,
-    maxDueCount: Int,
     selected: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
@@ -541,15 +538,12 @@ private fun ReviewWorkloadBar(
     val completedCount = stat.completedCount.coerceIn(0, stat.dueCount)
     val remainingCount = (stat.dueCount - completedCount).coerceAtLeast(0)
     val totalHeight = 126.dp
-    val totalRatio = stat.dueCount.toFloat() / maxDueCount.toFloat()
-    val totalBarHeight = totalHeight * totalRatio
-    val completedFractionOfBar = if (stat.dueCount > 0) {
+    val completionRate = if (stat.dueCount > 0) {
         completedCount.toFloat() / stat.dueCount.toFloat()
     } else {
         0f
     }
-    val completedBarHeight = totalBarHeight * completedFractionOfBar
-    val remainingBarHeight = (totalBarHeight - completedBarHeight).coerceAtLeast(0.dp)
+    val barHeight = totalHeight * completionRate
     val isToday = stat.date == latestDate
     val label = stat.date.chartDateLabel(latestDate)
     val description = if (stat.dueCount <= 0) {
@@ -586,27 +580,11 @@ private fun ReviewWorkloadBar(
                 modifier = Modifier.height(126.dp),
                 verticalArrangement = Arrangement.Bottom
             ) {
-                if (remainingCount > 0) {
+                if (completionRate > 0f) {
                     Box(
                         modifier = Modifier
                             .width(30.dp)
-                            .height(remainingBarHeight)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Active.copy(alpha = 0.28f),
-                                        Notice.copy(alpha = 0.18f)
-                                    )
-                                )
-                            )
-                    )
-                }
-                if (completedCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .width(30.dp)
-                            .height(completedBarHeight)
+                            .height(barHeight)
                             .clip(CircleShape)
                             .background(
                                 Brush.verticalGradient(
@@ -637,9 +615,7 @@ private fun ChartLegend() {
             .padding(top = 4.dp),
         horizontalArrangement = Arrangement.Center
     ) {
-        LegendItem(color = Notice, label = "완료")
-        Spacer(modifier = Modifier.width(16.dp))
-        LegendItem(color = Active.copy(alpha = 0.24f), label = "미완료")
+        LegendItem(color = Active, label = "완료율")
     }
 }
 
