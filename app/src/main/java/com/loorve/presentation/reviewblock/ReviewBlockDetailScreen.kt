@@ -210,20 +210,6 @@ fun ReviewBlockDetailScreen(
                         fontWeight = FontWeight.Bold
                     )
                 }
-
-                selectedStudyRecord?.let { record ->
-                    StudyRecordDetailDialog(
-                        record = record,
-                        onDismiss = { selectedStudyRecord = null }
-                    )
-                }
-
-                selectedReviewSchedule?.let { item ->
-                    ReviewScheduleDetailDialog(
-                        item = item,
-                        onDismiss = { selectedReviewSchedule = null }
-                    )
-                }
             },
             dismissButton = {
                 TextButton(
@@ -233,6 +219,20 @@ fun ReviewBlockDetailScreen(
                     Text("취소")
                 }
             }
+        )
+    }
+
+    selectedStudyRecord?.let { record ->
+        StudyRecordDetailDialog(
+            record = record,
+            onDismiss = { selectedStudyRecord = null }
+        )
+    }
+
+    selectedReviewSchedule?.let { item ->
+        ReviewScheduleDetailDialog(
+            item = item,
+            onDismiss = { selectedReviewSchedule = null }
         )
     }
 
