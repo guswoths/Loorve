@@ -476,7 +476,7 @@ private fun ReviewWorkloadBarChart(
                 }
             }
             Text(
-                text = "최근 7일 · 예정 ${totalDue}개 · 완료 ${totalCompleted}개",
+                text = "최근 7일 · 전체 ${totalDue}개 중 ${totalCompleted}개 완료",
                 style = LoorveTypography.bodySmall,
                 color = OnSurfaceVariant
             )
@@ -508,8 +508,7 @@ private fun ReviewWorkloadBarChart(
                         } else {
                             val completed = stat.completedCount.coerceIn(0, stat.dueCount)
                             "${stat.date.format(DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN))} · " +
-                                "완료 ${completed}개 / 전체 ${stat.dueCount}개 · " +
-                                "미완료 ${stat.dueCount - completed}개 · 완료율 ${stat.completionRatePercent ?: 0}%"
+                                "전체 ${stat.dueCount}개 중 ${completed}개 완료"
                         },
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         style = LoorveTypography.bodySmall,
