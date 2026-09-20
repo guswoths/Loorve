@@ -42,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
@@ -232,7 +233,9 @@ fun AddReviewBlockScreen(
                     }
                 }
                 if (subscriptionState.entitlement !is SubscriptionEntitlement.Pro) {
-                    BannerAdView(modifier = Modifier.fillMaxWidth())
+                    key(subscriptionState.entitlement) {
+                        BannerAdView(modifier = Modifier.fillMaxWidth())
+                    }
                 }
             }
         }
