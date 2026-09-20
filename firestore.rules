@@ -68,10 +68,7 @@ service cloud.firestore {
             && isValidScheduleItem()
             && getAfter(/databases/$(database)/documents/users/$(uid)/studyRecords/$(request.resource.data.studyRecordId)).data.uid == uid;
         allow update: if isOwner(uid)
-            && request.resource.data.uid == resource.data.uid
-            && (resource.data.status == 'COMPLETED'
-                ? request.resource.data.completedAt == resource.data.completedAt
-                : true);
+            && request.resource.data.uid == resource.data.uid;
         allow delete: if isOwner(uid);
       }
 
