@@ -468,6 +468,18 @@ fun ReviewBlockDetailScreen(
                         onTimeSave = { item, hour, minute ->
                             viewModel.saveCustomAlarmTime(uid, item, hour, minute)
                         },
+                        onCheckedChange = { item, checked ->
+                            viewModel.completeReview(
+                                uid = uid,
+                                item = item,
+                                result = if (checked) {
+                                    CompletionResult.REMEMBERED
+                                } else {
+                                    CompletionResult.FORGOT
+                                },
+                                examDateMillis = uiState.reviewBlock?.examDate ?: 0L
+                            )
+                        },
                         onScheduleClick = { item -> selectedReviewSchedule = item },
                         isLoading = uiState.isLoading
                     )
@@ -890,6 +902,7 @@ fun ReviewRecordListSection(
     scheduleItems: List<ReviewScheduleItem>,
     defaultAlarmTime: Pair<Int, Int> = 9 to 0,
     onTimeSave: ((ReviewScheduleItem, Int, Int) -> Unit)? = null,
+    onCheckedChange: ((ReviewScheduleItem, Boolean) -> Unit)? = null,
     onScheduleClick: (ReviewScheduleItem) -> Unit = {},
     modifier: Modifier = Modifier,
     isLoading: Boolean = false
@@ -920,6 +933,9 @@ fun ReviewRecordListSection(
                     onTimeSave = { hour, minute ->
                         timeMap[itemKey] = "%02d:%02d".format(hour, minute)
                         onTimeSave?.invoke(item, hour, minute)
+                    },
+                    onCheckedChange = { checked ->
+                        onCheckedChange?.invoke(item, checked)
                     },
                     onClick = { onScheduleClick(item) }
                 )
