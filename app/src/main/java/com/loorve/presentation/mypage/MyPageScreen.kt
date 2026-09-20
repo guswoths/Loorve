@@ -203,12 +203,43 @@ fun MyPageScreen(
                             }
                             Spacer(Modifier.size(14.dp))
                             Column {
-                                Text(
-                                    uiState.user?.nickname ?: stringResource(R.string.settings_fallback_name),
-                                    style = LoorveTypography.bodyLarge,
-                                    color = OnBackground,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        uiState.user?.nickname
+                                            ?: stringResource(R.string.settings_fallback_name),
+                                        style = LoorveTypography.bodyLarge,
+                                        color = OnBackground,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (subscriptionState.entitlement is SubscriptionEntitlement.Pro) {
+                                                    ActiveContainer
+                                                } else {
+                                                    SurfaceVariant
+                                                }
+                                            )
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = if (subscriptionState.entitlement is SubscriptionEntitlement.Pro) {
+                                                "Pro"
+                                            } else {
+                                                "Basic"
+                                            },
+                                            style = LoorveTypography.labelSmall,
+                                            color = if (subscriptionState.entitlement is SubscriptionEntitlement.Pro) {
+                                                Active
+                                            } else {
+                                                OnSurfaceVariant
+                                            },
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
                                 Text(
                                     uiState.user?.email?.takeIf { it.isNotBlank() }
                                         ?: stringResource(R.string.settings_no_email),
