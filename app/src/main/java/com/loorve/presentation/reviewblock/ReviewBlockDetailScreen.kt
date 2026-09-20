@@ -23,8 +23,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -660,9 +664,18 @@ fun StudyRecordMiniCard(
                             color = OnSurfaceVariant
                         )
                         IconButton(
-                            onClick = onDeleteClick,
+                            onClick = {
+                                onDeleteClick()
+                            },
                             enabled = !isLoading,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier
+                                .size(24.dp)
+                                .pointerInput(Unit) {
+                                    awaitEachGesture {
+                                        awaitFirstDown(requireUnconsumed = false).consume()
+                                        waitForUpOrCancellation()?.consume()
+                                    }
+                                }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
