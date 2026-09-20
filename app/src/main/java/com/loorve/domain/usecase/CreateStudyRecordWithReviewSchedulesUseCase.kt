@@ -64,7 +64,7 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
         } else {
             request.studiedAt
         }
-        val hasLinkedExam = request.examId.isNotBlank()
+        val hasLinkedExam = request.examId.isNotBlank() || block.examDate > 0L
         val hasExamDate = block.examDate > 0L
         val schedulerExam = SchedulerExam(
             examId = request.examId,
