@@ -183,7 +183,7 @@ private fun SplashScreen(
 
     val radialOverlayBrush = Brush.radialGradient(
         colors = listOf(
-            Primary.copy(alpha = 0.06f),
+            Color.Transparent,
             Color.Transparent
         )
     )

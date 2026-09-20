@@ -140,7 +140,7 @@ fun ReviewCalendarScreen(
                     title = {
                         Column {
                             Text(
-                                text = "GEMINI REVIEW HUB",
+                                text = "Review",
                                 style = LoorveTypography.labelSmall,
                                 color = Primary,
                                 fontWeight = FontWeight.Bold

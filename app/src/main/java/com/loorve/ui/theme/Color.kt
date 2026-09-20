@@ -12,8 +12,8 @@ val AiSurface        = Color(0xD9F0F4FF)
 val UrgentSurface    = Color(0xFFFFF8F7)
 
 // ── Ambient lighting ──
-val SkyTint          = Color(0xFFE0E8FF)
-val LavenderTint     = Color(0xFFF3E8FF)
+val SkyTint          = Color(0xFFFFFFFF)
+val LavenderTint     = Color(0xFFFFFFFF)
 
 // ── Aurora brand palette ──
 val Primary          = Color(0xFF2563EB)

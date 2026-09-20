@@ -125,8 +125,8 @@ fun HomeScreen(
                 Brush.verticalGradient(
                     colors = listOf(
                         Background,
-                        Color(0xFFF9F9FD),
-                        Color(0xFFFBF9FC),
+                        Background,
+                        Background,
                         CanvasWarm
                     )
                 )
@@ -149,7 +149,7 @@ fun HomeScreen(
                     title = {
                         Column {
                             Text(
-                                text = "GEMINI REVIEW HUB",
+                                text = "Home",
                                 style = LoorveTypography.labelSmall,
                                 color = Primary,
                                 fontWeight = FontWeight.Bold
