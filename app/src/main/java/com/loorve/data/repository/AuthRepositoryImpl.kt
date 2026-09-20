@@ -126,6 +126,27 @@ class AuthRepositoryImpl @Inject constructor(
             scheduleDocs.documents.forEach { it.reference.delete().await() }
             Log.d(TAG, "reviewSchedules 삭제 완료 (uid=$uid, count=${scheduleDocs.size()})")
 
+            val studyRecordDocs = firestore
+                .collection("users").document(uid)
+                .collection("studyRecords")
+                .get().await()
+            studyRecordDocs.documents.forEach { it.reference.delete().await() }
+            Log.d(TAG, "studyRecords 삭제 완료 (uid=$uid, count=${studyRecordDocs.size()})")
+
+            val scheduleItemDocs = firestore
+                .collection("users").document(uid)
+                .collection("reviewScheduleItems")
+                .get().await()
+            scheduleItemDocs.documents.forEach { it.reference.delete().await() }
+            Log.d(TAG, "reviewScheduleItems 삭제 완료 (uid=$uid, count=${scheduleItemDocs.size()})")
+
+            val notificationDocs = firestore
+                .collection("users").document(uid)
+                .collection("reviewNotificationOutbox")
+                .get().await()
+            notificationDocs.documents.forEach { it.reference.delete().await() }
+            Log.d(TAG, "reviewNotificationOutbox 삭제 완료 (uid=$uid, count=${notificationDocs.size()})")
+
             // ✅ [원인3 수정] reviewBlocks 서브컬렉션 삭제 추가 (기존 누락)
             val reviewBlockDocs = firestore
                 .collection("users").document(uid)

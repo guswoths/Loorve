@@ -739,37 +739,6 @@ private fun ReviewBlockCard(
                     maxLines = 2
                 )
             }
-            val progress = if (block.isCompleted) 1f else 0.55f
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(6.dp)
-                        .clip(CircleShape)
-                        .background(NoticeContainer)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(progress)
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(Notice, Active)
-                                )
-                            )
-                    )
-                }
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = if (block.isCompleted) "100%" else "진행 중",
-                    style = LoorveTypography.labelSmall,
-                    color = if (block.isCompleted) Success else Active
-                )
-            }
             if (locked) {
                 Text(
                     text = "Pro에서 전체 복습 블록을 이용할 수 있습니다.",
