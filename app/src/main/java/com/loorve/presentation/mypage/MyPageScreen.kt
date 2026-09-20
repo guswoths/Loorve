@@ -217,7 +217,7 @@ fun MyPageScreen(
                                             .clip(CircleShape)
                                             .background(
                                                 if (subscriptionState.entitlement is SubscriptionEntitlement.Pro) {
-                                                    ActiveContainer
+                                                    Active
                                                 } else {
                                                     SurfaceVariant
                                                 }
@@ -232,7 +232,7 @@ fun MyPageScreen(
                                             },
                                             style = LoorveTypography.labelSmall,
                                             color = if (subscriptionState.entitlement is SubscriptionEntitlement.Pro) {
-                                                Active
+                                                Color.White
                                             } else {
                                                 OnSurfaceVariant
                                             },
