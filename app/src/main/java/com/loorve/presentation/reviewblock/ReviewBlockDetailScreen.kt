@@ -7,6 +7,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -67,19 +69,11 @@ fun ReviewBlockDetailScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     var showProDialog by remember { mutableStateOf(false) }
+    var selectedStudyRecord by remember { mutableStateOf<StudyRecord?>(null) }
+    var selectedReviewSchedule by remember { mutableStateOf<ReviewScheduleItem?>(null) }
 
     LaunchedEffect(blockId) {
         viewModel.loadBlockData(uid, blockId, externalBlock = block)
-    }
-
-    // 저장 성공 스낵바
-    LaunchedEffect(uiState.savedSuccess) {
-        if (uiState.savedSuccess) {
-            snackbarHostState.showSnackbar(
-                uiState.lastCreationResult?.userMessage ?: "학습기록이 저장되었습니다."
-            )
-            viewModel.resetSavedSuccess()
-        }
     }
 
     LaunchedEffect(uiState.errorMessage) {
@@ -197,6 +191,20 @@ fun ReviewBlockDetailScreen(
                         "삭제",
                         color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+
+                selectedStudyRecord?.let { record ->
+                    StudyRecordDetailDialog(
+                        record = record,
+                        onDismiss = { selectedStudyRecord = null }
+                    )
+                }
+
+                selectedReviewSchedule?.let { item ->
+                    ReviewScheduleDetailDialog(
+                        item = item,
+                        onDismiss = { selectedReviewSchedule = null }
                     )
                 }
             },
@@ -418,15 +426,6 @@ fun ReviewBlockDetailScreen(
                 }
             }
 
-            uiState.lastCreationResult?.let { result ->
-                item {
-                    ScheduleSummaryCard(
-                        result = result,
-                        examDateMillis = examDateMillis
-                    )
-                }
-            }
-
             // ── 학습기록 / 복습기록 탭 전환 UI ──
             item {
                 RecordTabRow(
@@ -443,7 +442,8 @@ fun ReviewBlockDetailScreen(
                     StudyRecordListSection(
                         records = uiState.studyRecords,
                         isLoading = uiState.isLoading,
-                        onDeleteRecord = { record -> viewModel.setRecordToDelete(record) }
+                        onDeleteRecord = { record -> viewModel.setRecordToDelete(record) },
+                        onRecordClick = { record -> selectedStudyRecord = record }
                     )
                 }
             }
@@ -456,6 +456,7 @@ fun ReviewBlockDetailScreen(
                         onTimeSave = { item, hour, minute ->
                             viewModel.saveCustomAlarmTime(uid, item, hour, minute)
                         },
+                        onScheduleClick = { item -> selectedReviewSchedule = item },
                         isLoading = uiState.isLoading
                     )
                 }
@@ -569,7 +570,8 @@ fun StudyRecordListSection(
     records: List<StudyRecord>,
     modifier: Modifier = Modifier,
     isLoading: Boolean = false,
-    onDeleteRecord: (StudyRecord) -> Unit = {}
+    onDeleteRecord: (StudyRecord) -> Unit = {},
+    onRecordClick: (StudyRecord) -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -588,7 +590,8 @@ fun StudyRecordListSection(
                 StudyRecordMiniCard(
                     record = record,
                     isLoading = isLoading,
-                    onDeleteClick = { onDeleteRecord(record) }
+                    onDeleteClick = { onDeleteRecord(record) },
+                    onClick = { onRecordClick(record) }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -602,7 +605,8 @@ fun StudyRecordMiniCard(
     record: StudyRecord,
     modifier: Modifier = Modifier,
     isLoading: Boolean = false,
-    onDeleteClick: () -> Unit = {}
+    onDeleteClick: () -> Unit = {},
+    onClick: () -> Unit = {}
 ) {
     val dateText = remember(record.learningDate) {
         if (record.learningDate > 0L)
@@ -614,6 +618,7 @@ fun StudyRecordMiniCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
             .semantics {
                 contentDescription = "학습기록: ${record.title}, 날짜: $dateText"
             },
@@ -705,12 +710,156 @@ fun StudyRecordMiniCard(
     }
 }
 
+@Composable
+private fun StudyRecordDetailDialog(
+    record: StudyRecord,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .heightIn(max = 620.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = SurfaceSolid,
+            border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.08f)),
+            shadowElevation = 12.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "학습기록",
+                    style = LoorveTypography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = OnBackground
+                )
+                DetailTextBlock("제목", record.title.ifBlank { "제목 없음" })
+                DetailTextBlock("학습 내용 및 메모", record.content.ifBlank { "내용 없음" })
+                DetailTextBlock(
+                    "학습일",
+                    if (record.learningDate > 0L) {
+                        SimpleDateFormat("yyyy년 MM월 dd일", Locale.KOREA)
+                            .format(Date(record.learningDate))
+                    } else {
+                        "-"
+                    }
+                )
+                DetailTextBlock("예정 복습 횟수", "${record.plannedReviewCount}회")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("닫기")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewScheduleDetailDialog(
+    item: ReviewScheduleItem,
+    onDismiss: () -> Unit
+) {
+    val dateText = if (item.reviewDate > 0L) {
+        SimpleDateFormat("yyyy년 MM월 dd일", Locale.KOREA).format(Date(item.reviewDate))
+    } else {
+        "-"
+    }
+    val guide = item.recommendedMethod.ifBlank {
+        when {
+            item.isFinalReview -> "시험 범위의 핵심 구조와 오답 포인트를 인출 점검하세요. 새 내용 학습은 피하세요."
+            item.reviewOrder <= 1 -> "노트 없이 핵심 개념을 먼저 회상한 뒤, 틀린 부분만 확인하세요."
+            item.reviewOrder == 2 -> "플래시카드 또는 짧은 퀴즈로 인출 연습을 하세요."
+            else -> "문제풀이·서술형 회상·오답 설명 중 하나를 수행하세요."
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .heightIn(max = 620.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = SurfaceSolid,
+            border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.08f)),
+            shadowElevation = 12.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "복습 일정 ${item.reviewOrder}회차",
+                    style = LoorveTypography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = OnBackground
+                )
+                DetailTextBlock("학습 내용", item.title.ifBlank { "내용 없음" })
+                DetailTextBlock("복습 예정일", dateText)
+                DetailTextBlock("상태", item.status.detailLabel())
+                DetailTextBlock("회차별 학습가이드", guide)
+                DetailTextBlock("예상 소요 시간", "${item.estimatedReviewMinutes}분")
+                if (item.rescheduleReason.orEmpty().isNotBlank()) {
+                    DetailTextBlock("일정 변경 사유", item.rescheduleReason.orEmpty())
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("닫기")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailTextBlock(
+    label: String,
+    value: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = label,
+            style = LoorveTypography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = OnSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = LoorveTypography.bodyMedium,
+            color = OnBackground
+        )
+    }
+}
+
+private fun ReviewStatus.detailLabel(): String = when (this) {
+    ReviewStatus.PENDING -> "대기 중"
+    ReviewStatus.COMPLETED -> "완료"
+    ReviewStatus.OVERDUE -> "지연"
+    ReviewStatus.FINAL_URGENT_REVIEW -> "최종 복습"
+    ReviewStatus.CRAM_MODE_REQUIRED -> "압축 복습 필요"
+    ReviewStatus.OVERLOADED_UNRESOLVED -> "일일 과부하 확인 필요"
+}
+
 // ── 복습 기록 섹션 (헤더 + 목록) ──────────────────────────────
 @Composable
 fun ReviewRecordListSection(
     scheduleItems: List<ReviewScheduleItem>,
     defaultAlarmTime: Pair<Int, Int> = 9 to 0,
     onTimeSave: ((ReviewScheduleItem, Int, Int) -> Unit)? = null,
+    onScheduleClick: (ReviewScheduleItem) -> Unit = {},
     modifier: Modifier = Modifier,
     isLoading: Boolean = false
 ) {
@@ -740,7 +889,8 @@ fun ReviewRecordListSection(
                     onTimeSave = { hour, minute ->
                         timeMap[itemKey] = "%02d:%02d".format(hour, minute)
                         onTimeSave?.invoke(item, hour, minute)
-                    }
+                    },
+                    onClick = { onScheduleClick(item) }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -756,7 +906,8 @@ fun ReviewRecordMiniCard(
     modifier: Modifier = Modifier,
     savedTime: String? = null,
     onTimeSave: ((Int, Int) -> Unit)? = null,
-    onCheckedChange: ((Boolean) -> Unit)? = null
+    onCheckedChange: ((Boolean) -> Unit)? = null,
+    onClick: () -> Unit = {}
 ) {
     val dateText = remember(item.reviewDate) {
         if (item.reviewDate > 0L)
@@ -769,6 +920,7 @@ fun ReviewRecordMiniCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
             .semantics {
                 contentDescription = "복습기록: ${item.title}, 복습 ${item.reviewOrder}회차, ${item.status}, ${dateText}"
             },
