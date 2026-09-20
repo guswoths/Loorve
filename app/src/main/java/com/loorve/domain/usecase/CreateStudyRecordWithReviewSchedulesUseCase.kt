@@ -120,6 +120,11 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
                 customIntervalDays = block.customIntervalDays
             )
         }
+        val generationWarning = generated.warningMessage
+            ?: generated.schedules.takeIf { it.isEmpty() }?.let {
+                "복습 일정 생성 불가: 현재 학습일, 시험일, 복습 설정으로 생성 가능한 날짜가 없습니다. " +
+                    "시험일과 복습 간격을 확인해주세요."
+            }
         val generatedEntries = generated.schedules.map {
             it.toScheduleItem(uid, request.blockId, zone, request.title.ifBlank { request.content.take(20) })
         }
@@ -187,7 +192,7 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
                 notificationAdapter.schedule(it)
             }
         }
-        val message = rebalanced.warningMessage ?: generated.warningMessage
+        val message = rebalanced.warningMessage ?: generationWarning
             ?: "복습 ${generated.generatedReviewCount}회가 생성되었습니다. 첫 복습일은 ${generated.schedules.firstOrNull()?.scheduledDate ?: "-"}이고 마지막 복습일은 ${generated.schedules.lastOrNull()?.scheduledDate ?: generated.lastReviewDate}입니다."
         CreateStudyRecordResult(
             recordId,

@@ -327,6 +327,17 @@ object ReviewSchedulingEngine {
                 examDate = exam.examDate,
                 intervalDays = customIntervalDays
             )
+            if (customDates.isEmpty()) {
+                return emptyResult(
+                    record,
+                    exam,
+                    today,
+                    config.finalReviewBufferDays,
+                    ReviewPlanStatus.INSUFFICIENT_WINDOW,
+                    "복습 일정 생성 불가: 설정한 복습 간격으로 시험일 전 복습 날짜를 만들 수 없습니다. " +
+                        "학습일과 시험일 사이의 기간을 늘리거나 복습 간격을 줄여주세요."
+                )
+            }
             val customSchedules = customDates.mapIndexed { index, date ->
                 createEntry(
                     record = record,
@@ -360,6 +371,17 @@ object ReviewSchedulingEngine {
             targetReviewCount = target,
             baseIntervals = config.baseIntervals
         )
+        if (dates.isEmpty()) {
+            return emptyResult(
+                record,
+                exam,
+                today,
+                config.finalReviewBufferDays,
+                ReviewPlanStatus.INSUFFICIENT_WINDOW,
+                "복습 일정 생성 불가: 시험 전 복습 가능한 날짜가 없습니다. " +
+                    "시험일을 늦추거나 학습일을 앞당겨 최소 하루 이상의 복습 기간을 확보해주세요."
+            )
+        }
         val compressed = dates.lastOrNull() != null &&
             dates.last() != record.studiedAtDate.plusDays(config.baseIntervals.last().toLong())
         val availableReviewDays = ChronoUnit.DAYS.between(
@@ -375,7 +397,8 @@ object ReviewSchedulingEngine {
             ReviewPlanStatus.INSUFFICIENT_WINDOW
         else ReviewPlanStatus.SCHEDULED
         val warning = if (outcome == ScheduleGenerationOutcome.PARTIAL) {
-            "생성불가! 시험 전 복습 가능일이 ${dates.size}일이라 최소 3회 중 ${dates.size}회의 복습 일정만 생성했어요."
+            "시험 전 복습 가능일이 ${dates.size}일뿐이어서 목표 ${target}회 중 ${dates.size}회의 복습 일정만 생성했습니다. " +
+                "더 많은 복습을 원하면 시험일을 늦추거나 학습일을 앞당겨 주세요."
         } else null
         val schedules = dates.mapIndexed { index, date ->
             createEntry(record, exam, notificationPlan, date, index, dates.last(), status)
