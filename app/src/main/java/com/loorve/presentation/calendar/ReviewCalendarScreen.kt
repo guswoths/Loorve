@@ -77,6 +77,7 @@ import com.loorve.ui.theme.ActiveContainer
 import com.loorve.ui.theme.Background
 import com.loorve.ui.theme.CanvasWarm
 import com.loorve.ui.theme.Divider
+import com.loorve.ui.theme.Error
 import com.loorve.ui.theme.GradientEnd
 import com.loorve.ui.theme.GradientMiddle
 import com.loorve.ui.theme.GradientStart
@@ -94,6 +95,7 @@ import com.loorve.ui.theme.TertiaryText
 import com.loorve.ui.theme.Warning
 import com.loorve.ui.theme.WarningContainer
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import androidx.compose.material3.Card
@@ -301,6 +303,7 @@ fun ReviewCalendarScreen(
                         ) { block ->
                             ReviewBlockCard(
                                 block = block,
+                                isDelayed = block.blockId in uiState.delayedBlockIds,
                                 locked = block.blockId in uiState.lockedBlockIds,
                                 onClick = {
                                     if (block.blockId in uiState.lockedBlockIds) {
@@ -667,6 +670,7 @@ private fun ReviewSchedule.toReviewScheduleItem(): ReviewScheduleItem =
 @Composable
 private fun ReviewBlockCard(
     block: ReviewBlock,
+    isDelayed: Boolean = false,
     locked: Boolean = false,
     onClick: () -> Unit
 ) {
@@ -710,15 +714,18 @@ private fun ReviewBlockCard(
                         )
                     }
                 }
+                val isEnded = runCatching {
+                    LocalDate.now(ZoneId.of("Asia/Seoul")).isAfter(LocalDate.parse(block.date))
+                }.getOrDefault(false)
                 val badgeColor = when {
-                    locked -> WarningContainer
-                    block.isCompleted -> SuccessContainer
+                    isEnded -> SurfaceVariant
+                    isDelayed -> WarningContainer
                     else -> NoticeContainer
                 }
                 val badgeTextColor = when {
-                    locked -> Warning
-                    block.isCompleted -> Success
-                    else -> Notice
+                    isEnded -> OnSurfaceVariant
+                    isDelayed -> Error
+                    else -> Primary
                 }
                 Surface(
                     shape = CircleShape,
@@ -726,9 +733,9 @@ private fun ReviewBlockCard(
                 ) {
                     Text(
                         text = when {
-                            locked -> "높은 우선순위"
-                            block.isCompleted -> "최적 페이스"
-                            else -> "목표 진행 중"
+                            isEnded -> "종료"
+                            isDelayed -> "지연됨"
+                            else -> "진행 중"
                         },
                         style = LoorveTypography.labelSmall,
                         color = badgeTextColor,

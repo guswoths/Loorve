@@ -50,7 +50,8 @@ data class ReviewCalendarUiState(
     val selectedCompletionStat: DailyReviewCompletionStat? = null,
     val isCompletionStatsLoading: Boolean = false,
     val lockedBlockIds: Set<String> = emptySet(),
-    val subscriptionEntitlement: SubscriptionEntitlement = SubscriptionEntitlement.Loading
+    val subscriptionEntitlement: SubscriptionEntitlement = SubscriptionEntitlement.Loading,
+    val delayedBlockIds: Set<String> = emptySet()
 )
 
 @HiltViewModel
@@ -269,7 +270,7 @@ class ReviewCalendarViewModel @Inject constructor(
                 .onSuccess { blocks ->
                     _uiState.update { currentState ->
                         currentState.copy(
-                            reviewBlocks = blocks,
+                            reviewBlocks = blocks.sortedBy { it.createdAt },
                             isBlocksLoading = false,
                             lockedBlockIds = blocks
                                 .mapNotNull { block ->
@@ -442,6 +443,16 @@ class ReviewCalendarViewModel @Inject constructor(
                 }
                 .collectLatest { items ->
                     recentItemsLoaded = true
+                    val delayedItemBlockIds = items
+                        .filter {
+                            it.blockId.isNotBlank() &&
+                                it.reviewDate < today.atStartOfDay(seoulZone)
+                                    .toInstant()
+                                    .toEpochMilli() &&
+                                it.status != com.loorve.domain.model.ReviewStatus.COMPLETED
+                        }
+                        .map { it.blockId }
+                        .toSet()
                     recentScheduleItems = items.mapNotNull { item ->
                         val dueDate = runCatching {
                             java.time.Instant.ofEpochMilli(item.reviewDate)
@@ -458,6 +469,7 @@ class ReviewCalendarViewModel @Inject constructor(
                             blockId = item.blockId
                         )
                     }
+                    _uiState.update { it.copy(delayedBlockIds = delayedItemBlockIds) }
                     updateCompletionStats(today)
                 }
         }
