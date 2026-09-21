@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,6 +31,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +76,7 @@ fun ProPaywallDialog(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var legalContent by remember { mutableStateOf<LegalContent?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.querySubscriptionDetails()
@@ -85,8 +89,8 @@ fun ProPaywallDialog(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.96f)
+                .widthIn(min = 320.dp, max = 440.dp)
+                .heightIn(max = 720.dp)
                 .background(MidnightCanvas)
                 .navigationBarsPadding()
         ) {
@@ -107,22 +111,48 @@ fun ProPaywallDialog(
                     viewModel = viewModel,
                     onDismiss = onDismiss
                 )
-                Text(
-                    text = "무료 체험 종료 후 자동 갱신됩니다. 24시간 전 알림 · 해지 수수료 0원",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp),
-                    color = Color.White.copy(alpha = 0.45f),
-                    textAlign = TextAlign.Center
-                )
                 LegalFooter(
-                    onRefresh = viewModel::refresh,
-                    onDismiss = onDismiss
+                    onRestore = {
+                        viewModel.refresh()
+                        legalContent = LegalContent(
+                            title = "구매 내역 복원",
+                            body = "이전에 구매한 Loorve Pro 구독 정보를 확인하고 있습니다. 확인이 완료되면 구독 상태가 자동으로 업데이트됩니다."
+                        )
+                    },
+                    onTerms = {
+                        legalContent = LegalContent(
+                            title = "이용약관",
+                            body = "Loorve Pro는 복습 블록과 학습 분석 기능을 제공하는 구독 서비스입니다. 구독은 결제 확인 후 적용되며, 결제 및 갱신은 Google Play 계정 설정에 따라 처리됩니다. 사용자는 언제든지 Google Play 구독 관리에서 갱신을 취소할 수 있습니다."
+                        )
+                    },
+                    onPrivacy = {
+                        legalContent = LegalContent(
+                            title = "개인정보처리방침",
+                            body = "Loorve는 구독 상태 확인과 서비스 제공에 필요한 정보만 처리합니다. 결제 정보는 Google Play가 관리하며 Loorve가 카드 번호를 직접 저장하지 않습니다. 서비스 이용 및 문의에 필요한 정보는 안전하게 보호하고, 법령에 정해진 경우를 제외하고 제3자에게 제공하지 않습니다."
+                        )
+                    }
                 )
             }
         }
     }
+    legalContent?.let { content ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { legalContent = null },
+            title = { Text(content.title) },
+            text = { Text(content.body) },
+            confirmButton = {
+                TextButton(onClick = { legalContent = null }) {
+                    Text("확인")
+                }
+            }
+        )
+    }
 }
+
+private data class LegalContent(
+    val title: String,
+    val body: String
+)
 
 @Composable
 private fun TopBar(onDismiss: () -> Unit) {
@@ -168,24 +198,11 @@ private fun HeroHeader() {
             .padding(top = 20.dp, bottom = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "✦ LOORVE PRO MEMBERSHIP",
-                color = Color(0xFFC084FC),
-                fontWeight = FontWeight.Bold
-            )
-            Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.1f))
-                    .padding(horizontal = 9.dp, vertical = 5.dp)
-            ) {
-                Text("● 7일 무료", color = Color.White.copy(alpha = 0.8f))
-            }
-        }
+        Text(
+            text = "✦ LOORVE PRO MEMBERSHIP",
+            color = Color(0xFFC084FC),
+            fontWeight = FontWeight.Bold
+        )
         Spacer(Modifier.height(18.dp))
         Box(
             modifier = Modifier
@@ -210,19 +227,6 @@ private fun HeroHeader() {
             color = Color.White.copy(alpha = 0.75f),
             textAlign = TextAlign.Center
         )
-        Spacer(Modifier.height(16.dp))
-        Row(
-            modifier = Modifier
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.08f))
-                .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Text("복습 달성률 98.4%", color = Color.White, fontWeight = FontWeight.SemiBold)
-            Text("|", color = Color.White.copy(alpha = 0.3f))
-            Text("기억 보존율 3.2배", color = Color(0xFFC084FC), fontWeight = FontWeight.SemiBold)
-        }
     }
 }
 
@@ -250,8 +254,6 @@ private fun SubscriptionContent(state: SubscriptionState) {
             HorizontalDivider(color = Color.White.copy(alpha = 0.14f))
             ComparisonRow("복습 블록 생성", "최대 5개", "무제한 생성")
             ComparisonRow("광고 노출", "광고 있음", "100% 클린")
-            ComparisonRow("망각 주기 분석", "기본 (1·7일)", "AI 실시간 맞춤")
-            ComparisonRow("심층 메타인지 진단", "✕", "무제한 리포트")
         }
         when (val entitlement = state.entitlement) {
             SubscriptionEntitlement.Loading -> CircularProgressIndicator(
@@ -336,15 +338,15 @@ private fun PlanSelector() {
         PlanCard(
             badge = "🔥 BEST 45% 할인",
             title = "연간 플랜",
-            subtitle = "1년 권장 · 연 ₩70,800 결제",
-            price = "₩5,900 / 월",
+            subtitle = "20% 할인",
+            price = "27,840원 / 년",
             active = true
         )
         PlanCard(
             badge = null,
             title = "월간 플랜",
-            subtitle = "정기 결제 · 부담 없이 매월",
-            price = "₩10,900 / 월",
+            subtitle = "정기 결제",
+            price = "2,900원 / 월",
             active = false
         )
     }
@@ -462,7 +464,7 @@ private fun PrimaryAction(
                         .background(CtaGradient),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("⚡ 7일 무료 체험 후 시작하기", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("구독 시작하기", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -471,8 +473,9 @@ private fun PrimaryAction(
 
 @Composable
 private fun LegalFooter(
-    onRefresh: () -> Unit,
-    onDismiss: () -> Unit
+    onRestore: () -> Unit,
+    onTerms: () -> Unit,
+    onPrivacy: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -480,15 +483,15 @@ private fun LegalFooter(
             .padding(top = 8.dp, bottom = 16.dp),
         horizontalArrangement = Arrangement.Center
     ) {
-        TextButton(onClick = onRefresh) {
+        TextButton(onClick = onRestore) {
             Text("구매 내역 복원", color = Color.White.copy(alpha = 0.65f))
         }
         Text("•", modifier = Modifier.padding(top = 12.dp), color = Color.White.copy(alpha = 0.3f))
-        TextButton(onClick = onDismiss) {
+        TextButton(onClick = onTerms) {
             Text("이용약관", color = Color.White.copy(alpha = 0.65f))
         }
         Text("•", modifier = Modifier.padding(top = 12.dp), color = Color.White.copy(alpha = 0.3f))
-        TextButton(onClick = onDismiss) {
+        TextButton(onClick = onPrivacy) {
             Text("개인정보처리방침", color = Color.White.copy(alpha = 0.65f))
         }
     }
