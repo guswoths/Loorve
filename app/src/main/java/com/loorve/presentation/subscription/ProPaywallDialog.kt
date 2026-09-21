@@ -2,8 +2,10 @@ package com.loorve.presentation.subscription
 
 import android.app.Activity
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,10 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,12 +26,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.loorve.R
 import com.loorve.domain.subscription.SubscriptionEntitlement
@@ -49,85 +53,102 @@ fun ProPaywallDialog(
         viewModel.refreshWhenResumed()
     }
 
-    AlertDialog(
-        modifier = Modifier
-            .widthIn(min = 420.dp, max = 480.dp)
-            .heightIn(min = 460.dp),
+    Dialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF2A2340),
-        titleContentColor = Color.White,
-        textContentColor = Color(0xFFD8D5E8),
-        shape = RoundedCornerShape(28.dp),
-        title = {
-            Text(
-                text = stringResource(R.string.pro_title),
-                fontWeight = FontWeight.ExtraBold
-            )
-        },
-        text = {
-            SubscriptionContent(state)
-        },
-        confirmButton = {
-            when (state.entitlement) {
-                SubscriptionEntitlement.Pro -> {
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.pro_close)) }
-                }
-                else -> {
-                    val productReady = state.isBillingReady &&
-                        state.productDetails?.subscriptionOfferDetails?.isNotEmpty() == true
-                    Button(
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = AuroraViolet,
-                            contentColor = Color.White
-                        ),
-                        enabled = productReady,
-                        onClick = {
-                            val productDetails = state.productDetails ?: return@Button
-                            val offerToken = productDetails.subscriptionOfferDetails
-                                ?.firstOrNull()
-                                ?.offerToken
-                                ?: return@Button
-                            (context as? Activity)?.let { activity ->
-                                viewModel.launchBillingFlow(
-                                    activity = activity,
-                                    productDetails = productDetails,
-                                    offerToken = offerToken
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(min = 320.dp, max = 480.dp)
+                .heightIn(min = 460.dp)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFF17132D),
+                            Color(0xFF272052),
+                            Color(0xFF332261)
+                        )
+                    ),
+                    shape = RoundedCornerShape(28.dp)
+                )
+                .padding(24.dp)
+        ) {
+            Column {
+                Text(
+                    text = stringResource(R.string.pro_title),
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                SubscriptionContent(state)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    when (state.entitlement) {
+                        SubscriptionEntitlement.Pro -> {
+                            TextButton(onClick = onDismiss) {
+                                Text(stringResource(R.string.pro_close))
+                            }
+                        }
+                        else -> {
+                            val productReady = state.isBillingReady &&
+                                state.productDetails?.subscriptionOfferDetails?.isNotEmpty() == true
+                            Button(
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = AuroraViolet,
+                                    contentColor = Color.White
+                                ),
+                                enabled = productReady,
+                                onClick = {
+                                    val productDetails = state.productDetails ?: return@Button
+                                    val offerToken = productDetails.subscriptionOfferDetails
+                                        ?.firstOrNull()
+                                        ?.offerToken
+                                        ?: return@Button
+                                    (context as? Activity)?.let { activity ->
+                                        viewModel.launchBillingFlow(
+                                            activity = activity,
+                                            productDetails = productDetails,
+                                            offerToken = offerToken
+                                        )
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    state.productDetails?.subscriptionOfferDetails
+                                        ?.firstOrNull()
+                                        ?.pricingPhases
+                                        ?.pricingPhaseList
+                                        ?.firstOrNull()
+                                        ?.formattedPrice
+                                        ?.let { stringResource(R.string.pro_subscribe, it) }
+                                        ?: stringResource(R.string.pro_subscribe_unavailable)
                                 )
                             }
                         }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFD8CCFF)),
+                        onClick = viewModel::refresh
                     ) {
-                        Text(
-                            state.productDetails?.subscriptionOfferDetails
-                                ?.firstOrNull()
-                                ?.pricingPhases
-                                ?.pricingPhaseList
-                                ?.firstOrNull()
-                                ?.formattedPrice
-                                ?.let { stringResource(R.string.pro_subscribe, it) }
-                                ?: stringResource(R.string.pro_subscribe_unavailable)
-                        )
+                        Text(stringResource(R.string.pro_refresh))
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    TextButton(
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFD8CCFF)),
+                        onClick = onDismiss
+                    ) {
+                        Text(stringResource(R.string.pro_cancel))
                     }
                 }
             }
-        },
-        dismissButton = {
-            Row {
-                TextButton(
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFC4B5FD)),
-                    onClick = viewModel::refresh
-                ) {
-                    Text(stringResource(R.string.pro_refresh))
-                }
-                Spacer(Modifier.width(4.dp))
-                TextButton(
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFC4B5FD)),
-                    onClick = onDismiss
-                ) {
-                    Text(stringResource(R.string.pro_cancel))
-                }
-            }
         }
-    )
+    }
 }
 
 @Composable
@@ -146,11 +167,12 @@ private fun SubscriptionContent(state: SubscriptionState) {
             modifier = Modifier
                 .fillMaxWidth()
                 .border(
-                    BorderStroke(1.5.dp, Color(0xB3C4B5FD)),
+                    BorderStroke(1.dp, Color(0x99D8CCFF)),
                     RoundedCornerShape(18.dp)
                 )
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .background(Color(0x241A153A), RoundedCornerShape(18.dp))
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -177,11 +199,13 @@ private fun SubscriptionContent(state: SubscriptionState) {
                     textAlign = TextAlign.Center
                 )
             }
+            HorizontalDivider(color = Color(0x66D8CCFF), thickness = 1.dp)
             ComparisonRow(
                 feature = "무제한 복습블록 생성",
                 basic = "제한",
                 pro = "무제한"
             )
+            HorizontalDivider(color = Color(0x339B8BC7), thickness = 1.dp)
             ComparisonRow(
                 feature = "배너광고 없음",
                 basic = "광고 표시",
@@ -218,10 +242,11 @@ private fun ComparisonRow(
         modifier = Modifier
             .fillMaxWidth()
             .border(
-                BorderStroke(1.dp, Color(0x669B8BC7)),
-                RoundedCornerShape(10.dp)
+                BorderStroke(1.dp, Color(0x809B8BC7)),
+                RoundedCornerShape(12.dp)
             )
-            .padding(vertical = 2.dp),
+            .background(Color(0x1F0F0B27), RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
