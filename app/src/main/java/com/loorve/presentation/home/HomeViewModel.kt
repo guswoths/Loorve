@@ -75,6 +75,11 @@ data class ReviewBlockUiModel(
     val dailyCap: Int
 )
 
+data class CumulativeReviewCountPoint(
+    val date: LocalDate,
+    val count: Int
+)
+
 data class HomeUiState(
     val exams: List<Exam> = emptyList(),
     val progressList: List<ProgressUiModel> = emptyList(),
@@ -92,7 +97,10 @@ data class HomeUiState(
     val reviewSchedules: List<ReviewScheduleUiModel> = emptyList(),
     val isReviewSchedulesLoaded: Boolean = false,
     val reviewBlocks: List<ReviewBlockUiModel> = emptyList(),
-    val isCreatingBlock: Boolean = false
+    val isCreatingBlock: Boolean = false,
+    val cumulativeReviewCounts: List<CumulativeReviewCountPoint> = emptyList(),
+    val completedReviewBlocks: Int = 0,
+    val ongoingReviewBlocks: Int = 0
 )
 
 @HiltViewModel
@@ -315,6 +323,56 @@ class HomeViewModel @Inject constructor(
                 reviewScheduleDates = combinedDates,
                 reviewSchedules = combinedSchedules,
                 isReviewSchedulesLoaded = reviewScheduleItemsLoaded && legacyReviewSchedulesLoaded
+            )
+        }
+        updateReviewCountSummary()
+    }
+
+    private fun updateReviewCountSummary() {
+        val today = LocalDate.now(seoulZone)
+        val chartDates = (0..6).map { today.minusDays((6 - it).toLong()) }
+        val activeBlockIds = _uiState.value.reviewBlocks.map { it.blockId }.toSet()
+        val completedScheduleDates = linkedMapOf<String, LocalDate>()
+
+        rawReviewScheduleItems
+            .filter {
+                it.blockId in activeBlockIds &&
+                    it.status == com.loorve.domain.model.ReviewStatus.COMPLETED
+            }
+            .forEach { item ->
+                completedScheduleDates.putIfAbsent(
+                    item.id,
+                    Instant.ofEpochMilli(item.completedAt ?: item.reviewDate)
+                        .atZone(seoulZone)
+                        .toLocalDate()
+                )
+            }
+
+        legacyReviewScheduleUiModels
+            .filter { it.isCompleted && (it.examId.isBlank() || it.examId in activeBlockIds) }
+            .forEach { schedule ->
+                val identity = "${schedule.reviewDate}_${schedule.originProgressId}_${schedule.reviewOrder}"
+                completedScheduleDates.putIfAbsent(identity, schedule.reviewDate)
+            }
+
+        val cumulativeCounts = chartDates.map { date ->
+            CumulativeReviewCountPoint(
+                date = date,
+                count = completedScheduleDates.values.count { !it.isAfter(date) }
+            )
+        }
+        val completedBlockCount = _uiState.value.reviewBlocks.count {
+            Instant.ofEpochMilli(it.examDateMillis)
+                .atZone(seoulZone)
+                .toLocalDate()
+                .isBefore(today)
+        }
+
+        _uiState.update {
+            it.copy(
+                cumulativeReviewCounts = cumulativeCounts,
+                completedReviewBlocks = completedBlockCount,
+                ongoingReviewBlocks = (it.reviewBlocks.size - completedBlockCount).coerceAtLeast(0)
             )
         }
     }
@@ -653,6 +711,7 @@ class HomeViewModel @Inject constructor(
                         )
                     }
                     _uiState.update { it.copy(reviewBlocks = uiBlocks) }
+                    updateReviewCountSummary()
                     // ✅ 활성 블록 ID 추출 후 즉시 필터 적용
                     val activeBlockIds = uiBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
                     applyActiveBlocksFilter(activeBlockIds)

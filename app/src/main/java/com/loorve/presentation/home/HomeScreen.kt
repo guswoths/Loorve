@@ -1,6 +1,7 @@
 package com.loorve.presentation.home
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,6 +53,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -196,6 +198,14 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
+                    TotalCumulativeReviewCountBlock(
+                        points = uiState.cumulativeReviewCounts,
+                        completedReviewBlocks = uiState.completedReviewBlocks,
+                        ongoingReviewBlocks = uiState.ongoingReviewBlocks
+                    )
+                }
+
+                item {
                     HomeMotivationHeader()
                 }
 
@@ -321,6 +331,160 @@ fun HomeScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TotalCumulativeReviewCountBlock(
+    points: List<CumulativeReviewCountPoint>,
+    completedReviewBlocks: Int,
+    ongoingReviewBlocks: Int
+) {
+    val chartColor = Primary
+    val dates = if (points.isEmpty()) {
+        val today = LocalDate.now()
+        (0..6).map { today.minusDays((6 - it).toLong()) }
+    } else {
+        points.map { it.date }
+    }
+    val counts = if (points.isEmpty()) List(7) { 0 } else points.map { it.count }
+    val maxCount = counts.maxOrNull()?.coerceAtLeast(1) ?: 1
+
+    LoorveCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Total Cumulative Review Count",
+                style = LoorveTypography.titleSmall,
+                color = OnBackground,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "누적 복습 완료 수",
+                style = LoorveTypography.bodySmall,
+                color = OnSurfaceVariant
+            )
+
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(132.dp)
+            ) {
+                val horizontalPadding = 8.dp.toPx()
+                val verticalPadding = 10.dp.toPx()
+                val chartWidth = size.width - horizontalPadding * 2
+                val chartHeight = size.height - verticalPadding * 2
+                val xStep = if (counts.size > 1) chartWidth / (counts.size - 1) else 0f
+                val pointsInChart = counts.mapIndexed { index, count ->
+                    androidx.compose.ui.geometry.Offset(
+                        x = horizontalPadding + xStep * index,
+                        y = verticalPadding + chartHeight -
+                            (count.toFloat() / maxCount) * chartHeight
+                    )
+                }
+
+                drawLine(
+                    color = Divider,
+                    start = androidx.compose.ui.geometry.Offset(
+                        horizontalPadding,
+                        verticalPadding + chartHeight
+                    ),
+                    end = androidx.compose.ui.geometry.Offset(
+                        horizontalPadding + chartWidth,
+                        verticalPadding + chartHeight
+                    ),
+                    strokeWidth = 1.dp.toPx()
+                )
+
+                if (pointsInChart.size > 1) {
+                    val path = Path().apply {
+                        moveTo(pointsInChart.first().x, pointsInChart.first().y)
+                        pointsInChart.windowed(2).forEach { (start, end) ->
+                            val midpointX = (start.x + end.x) / 2f
+                            cubicTo(
+                                midpointX,
+                                start.y,
+                                midpointX,
+                                end.y,
+                                end.x,
+                                end.y
+                            )
+                        }
+                    }
+                    drawPath(
+                        path = path,
+                        color = chartColor,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = 3.dp.toPx()
+                        )
+                    )
+                }
+                pointsInChart.forEach { point ->
+                    drawCircle(
+                        color = chartColor,
+                        radius = 4.dp.toPx(),
+                        center = point
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                dates.forEach { date ->
+                    Text(
+                        text = date.format(DateTimeFormatter.ofPattern("M/d")),
+                        style = LoorveTypography.labelSmall,
+                        color = OnSurfaceVariant
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ReviewBlockCount(
+                    label = "Completed Review Blocks",
+                    count = completedReviewBlocks,
+                    modifier = Modifier.weight(1f)
+                )
+                ReviewBlockCount(
+                    label = "Ongoing Review Blocks",
+                    count = ongoingReviewBlocks,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewBlockCount(
+    label: String,
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            style = LoorveTypography.labelSmall,
+            color = OnSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = count.toString(),
+            style = LoorveTypography.titleMedium,
+            color = OnBackground,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
