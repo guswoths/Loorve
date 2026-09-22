@@ -41,23 +41,29 @@ fun BottomNavBar(
     onTabSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
             .navigationBarsPadding()
-            .shadow(
-                elevation = 12.dp,
-                shape = RoundedCornerShape(32.dp),
-                clip = false
-            )
-            .clip(RoundedCornerShape(32.dp))
-            .background(Surface)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
     ) {
-        bottomNavItems.forEach { item ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .widthIn(max = 390.dp)
+                .shadow(
+                    elevation = 12.dp,
+                    shape = RoundedCornerShape(32.dp),
+                    clip = false
+                )
+                .clip(RoundedCornerShape(32.dp))
+                .background(Surface)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            bottomNavItems.forEach { item ->
             val selected = currentRoute == item.route
             val iconColor by animateColorAsState(
                 targetValue = if (selected) Primary else OnSurfaceVariant,
@@ -65,35 +71,36 @@ fun BottomNavBar(
                 label = "tabColor_${item.route}"
             )
 
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clip(CircleShape)
-                    .background(if (selected) NoticeContainer else androidx.compose.ui.graphics.Color.Transparent)
-                    .clickable { onTabSelected(item.route) }
-                    .padding(horizontal = 10.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = item.icon,
-                    contentDescription = item.label,
-                    tint = iconColor,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = item.label,
-                    style = LoorveTypography.labelSmall.copy(
-                        fontSize = 10.sp,
-                        letterSpacing = 0.5.sp
-                    ),
-                    color = iconColor,
-                    maxLines = 1,
-                    softWrap = false
-                )
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .clip(CircleShape)
+                            .background(if (selected) NoticeContainer else androidx.compose.ui.graphics.Color.Transparent)
+                            .clickable { onTabSelected(item.route) }
+                            .padding(horizontal = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = item.label,
+                            tint = iconColor,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = item.label,
+                            style = LoorveTypography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = iconColor,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
             }
         }
-    }
 }

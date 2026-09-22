@@ -4,10 +4,18 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 package com.loorve.presentation.login
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,15 +26,21 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.loorve.presentation.auth.AuthUiState
 import com.loorve.presentation.auth.AuthViewModel
 import com.loorve.ui.theme.*
@@ -69,97 +83,186 @@ fun LoginScreen(
         }
     }
 
-    // 로딩 중: 스플래시 화면 표시
+    // 인증 작업 중 기존 로딩 동작 유지
     if (uiState is AuthUiState.Loading) {
         SplashLoadingScreen()
         return
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Background
-    ) { padding ->
-        Box(
+    LoginSystemChrome()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFCF9F8))
+            .clip(RoundedCornerShape(0.dp))
+    ) {
+        LoginAmbientBackground()
+
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(Modifier.height(32.dp))
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.Center)
-                    .padding(horizontal = 32.dp),
+                    .weight(1f)
+                    .padding(horizontal = 8.dp)
+                    .offset(y = (-16).dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(0.dp)
+                verticalArrangement = Arrangement.Center
             ) {
-
-                // ── STEP 1 뱃지 ──
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Primary.copy(alpha = 0.15f))
-                        .border(1.dp, Primary.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 14.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text = "STEP 1",
-                        color = Primary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.5.sp
-                    )
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                // ── 앱 로고 ──
                 Text(
                     text = "Loorve",
-                    style = LoorveTypography.displayLarge,
-                    color = Primary
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                // ── 서브타이틀 ──
-                Text(
-                    text = "구글 계정으로 바로 시작",
-                    style = LoorveTypography.titleMedium,
-                    color = OnBackground,
-                    fontWeight = FontWeight.SemiBold,
+                    style = androidx.compose.ui.text.TextStyle(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 44.sp,
+                        lineHeight = 44.sp,
+                        letterSpacing = (-1.2).sp,
+                        brush = Brush.horizontalGradient(
+                            listOf(AuroraBlue, AuroraViolet, Color(0xFFC026D3))
+                        )
+                    ),
                     textAlign = TextAlign.Center
                 )
-
-                Spacer(Modifier.height(10.dp))
-
-                // ── 설명 텍스트 ──
+                Text(
+                    text = "구글 계정으로 바로 시작",
+                    modifier = Modifier.padding(top = 24.dp),
+                    style = androidx.compose.ui.text.TextStyle(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 22.sp,
+                        lineHeight = 28.sp,
+                        letterSpacing = (-0.44).sp
+                    ),
+                    color = Color(0xFF1E293B),
+                    textAlign = TextAlign.Center
+                )
                 Text(
                     text = "복습 블록과 캘린더를 기기 간 동기화하려면\n로그인부터 한 번만 완료하면 됩니다.",
-                    style = LoorveTypography.bodyMedium,
-                    color = OnSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 22.sp
+                    modifier = Modifier.padding(top = 14.dp),
+                    style = androidx.compose.ui.text.TextStyle(
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.5.sp,
+                        lineHeight = 23.sp
+                    ),
+                    color = Color(0xE647556B),
+                    textAlign = TextAlign.Center
                 )
+            }
 
-                Spacer(Modifier.height(40.dp))
-
-                // ── Google 로그인 버튼 ──
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 GoogleSignInButton(
                     enabled = uiState !is AuthUiState.Loading,
                     onClick = { viewModel.launchGoogleSignIn(context) }
                 )
-
-                Spacer(Modifier.height(20.dp))
-
-                // ── 하단 안내 문구 ──
                 Text(
                     text = "로그인 후 처음 사용자에게만 온보딩이 표시됩니다.",
-                    style = LoorveTypography.bodySmall,
-                    color = OnSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 16.dp),
+                    style = androidx.compose.ui.text.TextStyle(
+                        fontWeight = FontWeight.Normal,
+                        fontSize = 13.sp,
+                        letterSpacing = (-0.4).sp
+                    ),
+                    color = Color(0xE694A3B8),
                     textAlign = TextAlign.Center
+                )
+                Box(
+                    modifier = Modifier
+                        .padding(top = 24.dp)
+                        .width(128.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0x6694A3B8))
                 )
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp)
+        )
+    }
+}
+
+@Composable
+private fun LoginSystemChrome() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val controller = WindowCompat.getInsetsController(
+            (view.context as android.app.Activity).window,
+            view
+        )
+        controller.hide(WindowInsetsCompat.Type.statusBars())
+        onDispose {
+            controller.show(WindowInsetsCompat.Type.statusBars())
+        }
+    }
+}
+
+@Composable
+private fun LoginAmbientBackground() {
+    val transition = rememberInfiniteTransition(label = "loginAmbient")
+    val orb1 by transition.animateFloat(
+        0f, 1f, infiniteRepeatable(tween(20_000), RepeatMode.Reverse), label = "orb1"
+    )
+    val orb2 by transition.animateFloat(
+        0f, 1f, infiniteRepeatable(tween(22_000), RepeatMode.Reverse), label = "orb2"
+    )
+    val orb3 by transition.animateFloat(
+        0f, 1f, infiniteRepeatable(tween(18_000), RepeatMode.Reverse), label = "orb3"
+    )
+    val orb4 by transition.animateFloat(
+        0f, 1f, infiniteRepeatable(tween(24_000), RepeatMode.Reverse), label = "orb4"
+    )
+
+    Canvas(Modifier.fillMaxSize()) {
+        fun drawOrb(center: Offset, radius: Float, color: Color) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(color, color.copy(alpha = 0f)),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center
+            )
+        }
+
+        val r1 = 160.dp.toPx()
+        val r2 = 170.dp.toPx()
+        val r3 = 150.dp.toPx()
+        val r4 = 140.dp.toPx()
+        drawOrb(
+            Offset((-64 + 25 * orb1).dp.toPx() + r1, (-84 + 40 * orb1).dp.toPx() + r1),
+            r1,
+            Color(0x3D2563EB)
+        )
+        drawOrb(
+            Offset(size.width + (80 - 35 * orb2).dp.toPx() - r2, size.height * .32f + (-25 * orb2).dp.toPx()),
+            r2,
+            Color(0x339333EA)
+        )
+        drawOrb(
+            Offset((-45 + 30 * orb3).dp.toPx() + r3, size.height * .88f + (-35 * orb3).dp.toPx()),
+            r3,
+            Color(0x3856BDF8)
+        )
+        drawOrb(
+            Offset(size.width - 14.dp.toPx() - r4, size.height + (-42 + 30 * orb4).dp.toPx() - r4),
+            r4,
+            Color(0x29EC4899)
+        )
     }
 }
 
@@ -237,23 +340,38 @@ private fun GoogleSignInButton(
     onClick: () -> Unit
 ) {
     val gradientBorder = Brush.linearGradient(
-        colors = listOf(GradientStart, GradientEnd),
+        colors = listOf(Color(0xFF3B82F6), Color(0xFF6366F1), Color(0xFFEC4899)),
         start = Offset(0f, 0f),
         end = Offset(Float.POSITIVE_INFINITY, 0f)
+    )
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (pressed) 0.985f else 1f,
+        animationSpec = tween(200),
+        label = "googleButtonScale"
     )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .height(57.dp)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .padding(1.5.dp)
             .height(54.dp)
             .clip(RoundedCornerShape(27.dp))
-            .background(Surface)
+            .background(Color.White.copy(alpha = 0.95f))
             .border(
                 width = 1.5.dp,
                 brush = gradientBorder,
                 shape = RoundedCornerShape(27.dp)
             )
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -261,18 +379,20 @@ private fun GoogleSignInButton(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 20.dp)
         ) {
-            Text(
-                text = "G",
-                color = Primary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+            Icon(
+                imageVector = ImageVector.vectorResource(com.loorve.R.drawable.google_logo),
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
             )
             Spacer(Modifier.width(10.dp))
             Text(
                 text = "Google로 계속하기",
-                style = LoorveTypography.bodyLarge,
-                color = OnBackground,
-                fontWeight = FontWeight.Medium
+                style = androidx.compose.ui.text.TextStyle(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    letterSpacing = (-0.3).sp
+                ),
+                color = Color(0xFF1E293B)
             )
         }
     }

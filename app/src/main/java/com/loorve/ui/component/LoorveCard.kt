@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -22,6 +23,7 @@ fun LoorveCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     elevation: Dp = 2.dp,
+    containerColor: Color = Surface,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
@@ -29,7 +31,7 @@ fun LoorveCard(
         onClick = onClick ?: {},
         enabled = onClick != null,
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = Surface),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
         elevation = CardDefaults.cardElevation(
             defaultElevation = elevation.coerceAtLeast(2.dp),
@@ -37,7 +39,10 @@ fun LoorveCard(
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(containerColor)
+                .padding(16.dp),
             content = content
         )
     }

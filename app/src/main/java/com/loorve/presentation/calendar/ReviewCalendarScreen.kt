@@ -2,6 +2,7 @@ package com.loorve.presentation.calendar
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lock
@@ -51,14 +57,16 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.model.ReviewSchedule
@@ -133,35 +141,11 @@ fun ReviewCalendarScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(colors = listOf(Background, CanvasWarm))
-            )
+            .background(Color(0xFFFCF9F8))
     ) {
         ReviewDashboardAura()
         Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text(
-                                text = "Review",
-                                style = LoorveTypography.labelSmall,
-                                color = Primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "복습",
-                                style = LoorveTypography.titleLarge,
-                                color = OnBackground
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent
-                    )
-                )
-            },
+            topBar = {},
             floatingActionButton = {
                 Surface(
                     modifier = Modifier
@@ -238,19 +222,48 @@ fun ReviewCalendarScreen(
                             vertical = 8.dp
                         )
                     ) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, bottom = 4.dp)
+                        ) {
+                            Text(
+                                text = "REVIEW",
+                                style = LoorveTypography.labelSmall.copy(
+                                    fontSize = 12.sp,
+                                    letterSpacing = 1.5.sp
+                                ),
+                                color = Primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "복습",
+                                style = LoorveTypography.titleLarge.copy(
+                                    fontSize = 26.sp,
+                                    letterSpacing = (-0.6).sp
+                                ),
+                                color = Color(0xFF0F172A),
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
                     // ── 섹션 1: 날짜별 복습 일정
                     item {
-                        Text(
-                            text = "이번 주 복습 페이스",
-                            modifier = Modifier.padding(
-                                start = 4.dp,
-                                top = 4.dp,
-                                bottom = 2.dp
-                            ),
-                            style = LoorveTypography.headlineSmall,
-                            color = OnBackground,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp, bottom = 2.dp),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "이번 주 복습 페이스",
+                                style = LoorveTypography.titleSmall.copy(fontSize = 18.sp),
+                                color = Color(0xFF0F172A),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                     item {
                         ReviewWorkloadBarChart(
@@ -264,21 +277,20 @@ fun ReviewCalendarScreen(
                     // ── 섹션 2: 복습 블록 목록
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "복습 블록 목록",
-                            modifier = Modifier.padding(
-                                start = 4.dp,
-                                top = 8.dp,
-                                bottom = 4.dp
-                            ),
-                            style = LoorveTypography.headlineSmall,
-                            color = OnBackground,
-                            fontWeight = FontWeight.Bold
-                        )
-                        HorizontalDivider(
-                            color = Divider,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, bottom = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "복습 블록 목록",
+                                style = LoorveTypography.titleSmall.copy(fontSize = 17.sp),
+                                color = Color(0xFF0F172A),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     if (uiState.isBlocksLoading) {
@@ -366,28 +378,91 @@ fun ReviewCalendarScreen(
 
 @Composable
 private fun ReviewDashboardAura() {
-    Box(
+    val transition = rememberInfiniteTransition(label = "reviewAmbientOrbs")
+    val blueDrift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(20_000), RepeatMode.Reverse),
+        label = "reviewBlueDrift"
+    )
+    val violetDrift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(22_000), RepeatMode.Reverse),
+        label = "reviewVioletDrift"
+    )
+    val cyanDrift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(18_000), RepeatMode.Reverse),
+        label = "reviewCyanDrift"
+    )
+    val magentaDrift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(24_000), RepeatMode.Reverse),
+        label = "reviewMagentaDrift"
+    )
+
+    Canvas(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 220.dp, top = 12.dp)
-            .size(180.dp)
-            .blur(72.dp)
-            .background(
-                color = com.loorve.ui.theme.SkyTint.copy(alpha = 0.52f),
-                shape = CircleShape
+            .background(Color(0xFFFCF9F8))
+    ) {
+        fun orb(
+            center: Offset,
+            radius: Float,
+            color: Color
+        ) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(color, color.copy(alpha = 0f)),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center
             )
-    )
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(end = 220.dp, top = 360.dp)
-            .size(220.dp)
-            .blur(80.dp)
-            .background(
-                color = com.loorve.ui.theme.LavenderTint.copy(alpha = 0.48f),
-                shape = CircleShape
-            )
-    )
+        }
+
+        val blueRadius = 340.dp.toPx()
+        val violetRadius = 320.dp.toPx()
+        val cyanRadius = 300.dp.toPx()
+        val magentaRadius = 280.dp.toPx()
+
+        orb(
+            center = Offset(
+                x = (-0.25f * size.width) + (30.dp.toPx() * blueDrift),
+                y = (-0.05f * size.height) + (40.dp.toPx() * blueDrift)
+            ),
+            radius = blueRadius,
+            color = Color(0xFF2563EB).copy(alpha = 0.22f)
+        )
+        orb(
+            center = Offset(
+                x = size.width + (0.25f * size.width) - (35.dp.toPx() * violetDrift),
+                y = (0.35f * size.height) - (30.dp.toPx() * violetDrift)
+            ),
+            radius = violetRadius,
+            color = Color(0xFF9333EA).copy(alpha = 0.18f)
+        )
+        orb(
+            center = Offset(
+                x = (-0.20f * size.width) + (35.dp.toPx() * cyanDrift),
+                y = size.height * 0.85f - (35.dp.toPx() * cyanDrift)
+            ),
+            radius = cyanRadius,
+            color = Color(0xFF38BDF8).copy(alpha = 0.20f)
+        )
+        orb(
+            center = Offset(
+                x = size.width * 0.88f - (30.dp.toPx() * magentaDrift),
+                y = size.height * 1.05f - (25.dp.toPx() * magentaDrift)
+            ),
+            radius = magentaRadius,
+            color = Color(0xFFEC4899).copy(alpha = 0.15f)
+        )
+    }
 }
 
 @Composable
@@ -416,12 +491,12 @@ private fun ReviewWorkloadBarChart(
     val totalDue = stats.sumOf { it.dueCount.coerceAtLeast(0) }
     val totalCompleted = stats.sumOf { it.completedCount.coerceIn(0, it.dueCount) }
     val totalRemaining = (totalDue - totalCompleted).coerceAtLeast(0)
-    val completionRate = if (totalDue > 0) {
-        (totalCompleted.toFloat() / totalDue.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
     val latestDate = stats.lastOrNull()?.date
+    val maxDueCount = stats.maxOfOrNull { it.dueCount }?.coerceAtLeast(1) ?: 1
+    val peakDate = stats
+        .filter { it.dueCount > 0 }
+        .maxByOrNull { it.completedCount.toFloat() / it.dueCount }
+        ?.date
     val summary = buildString {
         append("최근 7일 복습 현황. 예정 ${totalDue}개, 완료 ${totalCompleted}개, 미완료 ${totalRemaining}개.")
         stats.forEach { stat ->
@@ -440,7 +515,7 @@ private fun ReviewWorkloadBarChart(
             .fillMaxWidth()
             .semantics { contentDescription = summary },
         shape = RoundedCornerShape(24.dp),
-        color = Surface,
+        color = Color.White.copy(alpha = 0.95f),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
             Color.Black.copy(alpha = 0.06f)
@@ -456,41 +531,46 @@ private fun ReviewWorkloadBarChart(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "주간 복습 완료율",
-                        style = LoorveTypography.labelMedium,
-                        color = OnSurfaceVariant
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "${(completionRate * 100).toInt()}%",
-                        style = LoorveTypography.displayMedium,
-                        color = OnBackground,
+                        text = "• WEEKLY GRAPH",
+                        style = LoorveTypography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            letterSpacing = 1.1.sp
+                        ),
+                        color = Color(0xFF4F46E5),
                         fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = latestDate?.format(
+                            DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
+                        )?.let { dateLabel ->
+                            val today = stats.lastOrNull()
+                            val completed = today?.completedCount?.coerceIn(0, today.dueCount) ?: 0
+                            val due = today?.dueCount ?: 0
+                            "$dateLabel · 전체 ${due}개 중 ${completed}개 완료"
+                        } ?: "최근 7일 복습 현황",
+                        style = LoorveTypography.bodyMedium.copy(
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp
+                        ),
+                        color = Color(0xFF1E293B),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
                 Surface(
                     shape = CircleShape,
-                    color = if (completionRate >= 0.8f) {
-                        SuccessContainer
-                    } else {
-                        NoticeContainer
-                    }
+                    color = Color.Transparent
                 ) {
                     Text(
-                        text = if (completionRate >= 0.8f) "최적 페이스" else "목표 진행 중",
-                        style = LoorveTypography.labelSmall,
-                        color = if (completionRate >= 0.8f) Success else Notice,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        text = "미완료 ${totalRemaining}개",
+                        style = LoorveTypography.labelSmall.copy(fontSize = 12.sp),
+                        color = Color(0xFF64748B),
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
-            Text(
-                text = "최근 7일 · 전체 ${totalDue}개 중 ${totalCompleted}개 완료",
-                style = LoorveTypography.bodySmall,
-                color = OnSurfaceVariant
-            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -500,13 +580,14 @@ private fun ReviewWorkloadBarChart(
                     ReviewWorkloadBar(
                         stat = stat,
                         latestDate = latestDate,
+                        maxDueCount = maxDueCount,
+                        peakDate = peakDate,
                         selected = selectedStat?.date == stat.date,
                         modifier = Modifier.weight(1f),
                         onClick = { onStatSelected(stat) }
                     )
                 }
             }
-            ChartLegend()
             selectedStat?.let { stat ->
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -528,11 +609,6 @@ private fun ReviewWorkloadBarChart(
                     )
                 }
             }
-            Text(
-                text = "미완료 ${totalRemaining}개",
-                style = LoorveTypography.bodySmall,
-                color = OnSurfaceVariant
-            )
             }
     }
 }
@@ -541,6 +617,8 @@ private fun ReviewWorkloadBarChart(
 private fun ReviewWorkloadBar(
     stat: DailyReviewCompletionStat,
     latestDate: LocalDate?,
+    maxDueCount: Int,
+    peakDate: LocalDate?,
     selected: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
@@ -548,19 +626,29 @@ private fun ReviewWorkloadBar(
     val completedCount = stat.completedCount.coerceIn(0, stat.dueCount)
     val remainingCount = (stat.dueCount - completedCount).coerceAtLeast(0)
     val totalHeight = 126.dp
+    val barHeight = (totalHeight * stat.dueCount.toFloat() / maxDueCount)
+        .coerceIn(1.dp, totalHeight)
     val completionRate = if (stat.dueCount > 0) {
         completedCount.toFloat() / stat.dueCount.toFloat()
-    } else {
-        0f
-    }
-    val barHeight = totalHeight * completionRate
+    } else 0f
     val isToday = stat.date == latestDate
+    val isPeak = stat.date == peakDate
     val label = stat.date.chartDateLabel(latestDate)
     val description = if (stat.dueCount <= 0) {
         "$label, 복습 일정 없음"
     } else {
         "$label, 예정 ${stat.dueCount}개, 완료 ${completedCount}개, 미완료 ${remainingCount}개"
     }
+    val pulseTransition = rememberInfiniteTransition(label = "purpleBarPulse")
+    val pulse by pulseTransition.animateFloat(
+        initialValue = 0.98f,
+        targetValue = if (completedCount > 0) 1.02f else 0.98f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "purpleBarPulseValue"
+    )
     Column(
         modifier = modifier
             .defaultMinSize(minWidth = 34.dp)
@@ -572,45 +660,63 @@ private fun ReviewWorkloadBar(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Bottom
     ) {
-        if (stat.dueCount <= 0) {
-            Box(
-                modifier = Modifier
-                    .height(126.dp)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "—",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            Column(
-                modifier = Modifier.height(126.dp),
-                verticalArrangement = Arrangement.Bottom
-            ) {
-                if (completionRate > 0f) {
-                    Box(
-                        modifier = Modifier
-                            .width(30.dp)
-                            .height(barHeight)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(Notice, Active)
+        Column(
+            modifier = Modifier.height(126.dp),
+            verticalArrangement = Arrangement.Bottom,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (stat.dueCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .width(if (isToday || selected) 24.dp else 20.dp)
+                        .height(barHeight)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F5F9)),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    if (completedCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(barHeight * completionRate)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = if (isPeak) {
+                                            listOf(
+                                                Color(0xFFA21CAF),
+                                                Color(0xFF6D28D9),
+                                                Color(0xFF6366F1),
+                                                Color(0xFF3B82F6),
+                                                Color(0xFFA21CAF)
+                                            )
+                                        } else {
+                                            listOf(
+                                                Color(0xFF7E22CE),
+                                                Color(0xFF4338CA),
+                                                Color(0xFF1D4ED8)
+                                            )
+                                        }
+                                    )
                                 )
-                            )
-                    )
+                                .graphicsLayer {
+                                    scaleX = pulse
+                                    scaleY = pulse
+                                    alpha = 0.97f + (pulse - 0.98f) * 0.75f
+                                },
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                        }
+                    }
                 }
             }
         }
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
+                fontWeight = if (isToday || isPeak) FontWeight.Bold else FontWeight.Normal
             ),
-            color = if (isToday || selected) OnBackground else OnSurfaceVariant,
+            color = if (isPeak) Color(0xFF7C3AED) else if (isToday || selected) OnBackground else OnSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 4.dp)
         )
@@ -679,7 +785,7 @@ private fun ReviewBlockCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = if (locked) SurfaceVariant else Surface
+            containerColor = Color.White.copy(alpha = 0.92f)
         ),
         shape = RoundedCornerShape(24.dp),
         border = androidx.compose.foundation.BorderStroke(
@@ -690,7 +796,7 @@ private fun ReviewBlockCard(
     ) {
         Box {
             Column(
-                modifier = Modifier.padding(18.dp),
+                modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
             Row(
@@ -700,8 +806,8 @@ private fun ReviewBlockCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = block.title,
-                        style = LoorveTypography.titleSmall,
+                        text = block.title.ifBlank { block.examName },
+                        style = LoorveTypography.titleSmall.copy(fontSize = 16.sp),
                         fontWeight = FontWeight.Bold,
                         color = OnBackground
                     )
@@ -709,7 +815,7 @@ private fun ReviewBlockCard(
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = "시험 종료일: ${block.date}",
-                            style = LoorveTypography.bodySmall,
+                            style = LoorveTypography.bodySmall.copy(fontSize = 12.5.sp),
                             color = OnSurfaceVariant
                         )
                     }
@@ -751,12 +857,38 @@ private fun ReviewBlockCard(
                     maxLines = 2
                 )
             }
+            Text(
+                text = if (block.customIntervalDays != null) {
+                    "직접 세팅 복습 주기"
+                } else {
+                    "에빙하우스 복습 주기"
+                },
+                style = LoorveTypography.labelMedium.copy(fontSize = 12.5.sp),
+                color = if (block.customIntervalDays != null) {
+                    OnSurfaceVariant
+                } else {
+                    Color(0xFF4F46E5)
+                },
+                fontWeight = FontWeight.SemiBold
+            )
             if (locked) {
-                Text(
-                    text = "Pro에서 전체 복습 블록을 이용할 수 있습니다.",
-                    style = LoorveTypography.bodySmall,
-                    color = Warning
-                )
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFFFDF2F8),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        Color(0xFFFCE7F3)
+                    )
+                ) {
+                    Text(
+                        text = "Pro에서 전체 복습 블록을 이용할 수 있습니다.",
+                        style = LoorveTypography.bodySmall.copy(fontSize = 12.sp),
+                        color = Color(0xFFDB2777),
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             } else {
                 Text(
                     text = "탭하여 복습 기록과 일정을 확인하세요",

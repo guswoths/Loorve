@@ -1,29 +1,23 @@
 package com.loorve.presentation.navigation
 
 import android.os.PowerManager
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoStories
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -31,7 +25,12 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,21 +38,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -77,10 +75,10 @@ import com.loorve.presentation.onboarding.OnboardingScreen
 import com.loorve.presentation.progress.ProgressDetailScreen
 import com.loorve.presentation.settings.BatteryOptimizationGuideScreen
 import com.loorve.ui.theme.Background
-import com.loorve.ui.theme.GradientEnd
-import com.loorve.ui.theme.GradientStart
+import com.loorve.ui.theme.AuroraBlue
+import com.loorve.ui.theme.AuroraPink
+import com.loorve.ui.theme.AuroraViolet
 import com.loorve.ui.theme.OnSurfaceVariant
-import com.loorve.ui.theme.Primary
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
@@ -126,14 +124,12 @@ private val bottomNavItems = listOf(
     BottomNavItem("설정", Icons.Outlined.Settings, 2)
 )
 
-@OptIn(ExperimentalTextApi::class)
 @Composable
 private fun SplashScreen(
     onSplashComplete: (isLoggedIn: Boolean) -> Unit
 ) {
     var triggered by remember { mutableStateOf(false) }
 
-    // ⛔ 기능 금지 구역 — 절대 수정 금지
     LaunchedEffect(Unit) {
         delay(2.seconds)
         if (!triggered) {
@@ -143,156 +139,202 @@ private fun SplashScreen(
         }
     }
 
-    val gradientBrush = Brush.linearGradient(
-        colors = listOf(GradientStart, GradientEnd),
-        start = Offset(0f, 0f),
-        end = Offset(Float.POSITIVE_INFINITY, 0f)
-    )
-
-    val infiniteTransition = rememberInfiniteTransition(label = "splashProgress")
-
-    val sweepRotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "sweepRotation"
-    )
-
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-
-    val dotsAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 700, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dotsAlpha"
-    )
-
-    val radialOverlayBrush = Brush.radialGradient(
-        colors = listOf(
-            Color.Transparent,
-            Color.Transparent
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val controller = WindowCompat.getInsetsController(
+            (view.context as android.app.Activity).window,
+            view
         )
-    )
+        controller.hide(WindowInsetsCompat.Type.statusBars())
+        onDispose {
+            controller.show(WindowInsetsCompat.Type.statusBars())
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
+            .background(Color(0xFFFCF9F8))
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(radialOverlayBrush)
-        )
+        SplashAmbientOrbs()
 
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Loorve",
-                style = TextStyle(
-                    fontFamily = MaterialTheme.typography.displayLarge.fontFamily,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = MaterialTheme.typography.displayLarge.fontSize,
-                    brush = gradientBrush
-                ),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = "시험일 기반 자동 복습 스케줄러",
-                style = MaterialTheme.typography.bodyMedium,
-                color = OnSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
             Spacer(modifier = Modifier.height(48.dp))
 
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(100.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
             ) {
-                Canvas(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale)
-                ) {
-                    val strokeWidth = 8.dp.toPx()
-                    val inset = strokeWidth / 2f
-
-                    drawArc(
-                        color = Primary.copy(alpha = 0.15f),
-                        startAngle = 0f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        topLeft = Offset(inset, inset),
-                        size = Size(size.width - strokeWidth, size.height - strokeWidth),
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                    )
-                }
-
-                Canvas(modifier = Modifier.size(100.dp)) {
-                    val strokeWidth = 8.dp.toPx()
-                    val inset = strokeWidth / 2f
-                    val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
-
-                    val gradientBrushArc = Brush.sweepGradient(
-                        colors = listOf(
-                            GradientStart.copy(alpha = 0f),
-                            GradientStart,
-                            GradientEnd
-                        ),
-                        center = Offset(size.width / 2f, size.height / 2f)
-                    )
-
-                    rotate(degrees = sweepRotation, pivot = center) {
-                        drawArc(
-                            brush = gradientBrushArc,
-                            startAngle = -90f,
-                            sweepAngle = 270f,
-                            useCenter = false,
-                            topLeft = Offset(inset, inset),
-                            size = arcSize,
-                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                        )
-                    }
-                }
-
                 Text(
-                    text = "···",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Primary.copy(alpha = dotsAlpha),
+                    text = "Loorve",
+                    style = TextStyle(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 44.sp,
+                        lineHeight = 44.sp,
+                        letterSpacing = (-1.2).sp,
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(AuroraBlue, AuroraViolet, AuroraPink)
+                        )
+                    ),
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "시험일 기반 자동 복습 스케줄러",
+                    modifier = Modifier.padding(top = 12.dp),
+                    style = TextStyle(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                        letterSpacing = (-0.225).sp
+                    ),
+                    color = Color(0xE647556B),
                     textAlign = TextAlign.Center
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                val infiniteTransition = rememberInfiniteTransition(label = "splashStatus")
+                val statusAlpha by infiniteTransition.animateFloat(
+                    initialValue = 0.95f,
+                    targetValue = 0.45f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(2800),
+                        repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                    ),
+                    label = "splashStatusAlpha"
+                )
+                Text(
+                    text = "계정과 복습 블록을 불러오는 중",
+                    modifier = Modifier.padding(bottom = 28.dp),
+                    style = TextStyle(
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 13.5.sp,
+                        letterSpacing = (-0.4).sp
+                    ),
+                    color = Color(0xE694A3B8).copy(alpha = statusAlpha),
+                    textAlign = TextAlign.Center
+                )
+                Box(
+                    modifier = Modifier
+                        .width(128.dp)
+                        .height(4.dp)
+                        .background(
+                            color = Color(0x6694A3B8),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
+                        )
+                )
+            }
+        }
+    }
+}
 
-            Text(
-                text = "계정과 복습 블록을 불러오는 중",
-                style = MaterialTheme.typography.bodySmall,
-                color = OnSurfaceVariant,
-                textAlign = TextAlign.Center
+@Composable
+private fun SplashAmbientOrbs() {
+    val infiniteTransition = rememberInfiniteTransition(label = "splashAmbient")
+    val orb1 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(20000),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "orb1"
+    )
+    val orb2 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(22000),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "orb2"
+    )
+    val orb3 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(18000),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "orb3"
+    )
+    val orb4 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(24000),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "orb4"
+    )
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val orb1Radius = 320.dp.toPx() / 2f
+        val orb2Radius = 340.dp.toPx() / 2f
+        val orb3Radius = 300.dp.toPx() / 2f
+        val orb4Radius = 280.dp.toPx() / 2f
+
+        fun drawOrb(
+            center: Offset,
+            radius: Float,
+            color: Color
+        ) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(color, color.copy(alpha = 0f)),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center
             )
         }
+
+        drawOrb(
+            center = Offset(
+                x = (-78 + 30 * orb1).dp.toPx() + orb1Radius,
+                y = (-84 + 45 * orb1).dp.toPx() + orb1Radius
+            ),
+            radius = orb1Radius,
+            color = Color(0x3D2563EB)
+        )
+        drawOrb(
+            center = Offset(
+                x = size.width + (85 - 40 * orb2).dp.toPx() - orb2Radius,
+                y = size.height / 2f + (-12 - 30 * orb2).dp.toPx()
+            ),
+            radius = orb2Radius,
+            color = Color(0x339333EA)
+        )
+        drawOrb(
+            center = Offset(
+                x = (-45 + 35 * orb3).dp.toPx() + orb3Radius,
+                y = size.height + (30 - 40 * orb3).dp.toPx() - orb3Radius
+            ),
+            radius = orb3Radius,
+            color = Color(0x3856BDF8)
+        )
+        drawOrb(
+            center = Offset(
+                x = size.width - 14.dp.toPx() - orb4Radius,
+                y = size.height + (-68 + 35 * orb4).dp.toPx() - orb4Radius
+            ),
+            radius = orb4Radius,
+            color = Color(0x29EC4899)
+        )
     }
 }
 
@@ -415,7 +457,7 @@ fun LoorveNavHost(
             }
 
             Scaffold(
-                containerColor = Background,
+                containerColor = Color.Transparent,
                 bottomBar = {
                     BottomNavBar(
                         currentRoute = when (selectedTabIndex) {

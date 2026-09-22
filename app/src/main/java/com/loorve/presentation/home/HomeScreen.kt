@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,10 +22,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.FormatQuote
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,16 +61,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 import com.loorve.domain.subscription.SubscriptionEntitlement
 import com.loorve.presentation.subscription.SubscriptionViewModel
 import com.loorve.ui.component.BannerAdView
@@ -127,18 +144,9 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Background,
-                        Background,
-                        Background,
-                        CanvasWarm
-                    )
-                )
-            )
+            .background(Color(0xFFFCF9F8))
     ) {
-        AmbientAura()
+        HomeAmbientBackground()
 
         Scaffold(
             snackbarHost = {
@@ -150,29 +158,7 @@ fun HomeScreen(
                     )
                 }
             },
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text(
-                                text = "Home",
-                                style = LoorveTypography.labelSmall,
-                                color = Primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "홈",
-                                style = LoorveTypography.titleLarge,
-                                color = OnBackground
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent
-                    )
-                )
-            },
+            topBar = {},
             bottomBar = {
                 val showBanner = subscriptionState.entitlement is SubscriptionEntitlement.Free
                 if (showBanner) {
@@ -192,11 +178,38 @@ fun HomeScreen(
                 contentPadding = PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
-                    top = 8.dp,
-                    bottom = 24.dp
+                    top = 20.dp,
+                    bottom = 144.dp
                 ),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 4.dp)
+                    ) {
+                        Text(
+                            text = "HOME",
+                            style = LoorveTypography.labelSmall.copy(
+                                fontSize = 12.sp,
+                                letterSpacing = 1.5.sp
+                            ),
+                            color = Primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "홈",
+                            style = LoorveTypography.titleLarge.copy(
+                                fontSize = 26.sp,
+                                letterSpacing = (-0.6).sp
+                            ),
+                            color = Color(0xFF0F172A),
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+
                 item {
                     HomeMotivationHeader()
                 }
@@ -222,7 +235,8 @@ fun HomeScreen(
 
                 item {
                     LoorveCard(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = Color.White
                     ) {
                         Column {
                             Row(
@@ -342,7 +356,6 @@ private fun TotalCumulativeReviewCountBlock(
     ongoingReviewBlocks: Int,
     isProSubscribed: Boolean
 ) {
-    val chartColor = Primary
     val dates = if (points.isEmpty()) {
         val today = LocalDate.now()
         (0..6).map { today.minusDays((6 - it).toLong()) }
@@ -351,131 +364,307 @@ private fun TotalCumulativeReviewCountBlock(
     }
     val counts = if (points.isEmpty()) List(7) { 0 } else points.map { it.count }
     val maxCount = counts.maxOrNull()?.coerceAtLeast(1) ?: 1
+    val totalCount = counts.lastOrNull() ?: 0
+    val weeklyDiff = totalCount - (counts.firstOrNull() ?: 0)
+    var selectedPointIndex by remember(counts) { mutableStateOf(counts.lastIndex) }
+    var pulseRequest by remember(counts) { mutableStateOf(0) }
+    val pulseProgress = remember { Animatable(0f) }
+    val linePulseTransition = rememberInfiniteTransition(label = "reviewChartLinePulse")
+    val linePulse by linePulseTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "reviewChartLinePulseValue"
+    )
 
-    LoorveCard(modifier = Modifier.fillMaxWidth()) {
+    LaunchedEffect(pulseRequest) {
+        if (pulseRequest > 0) {
+            pulseProgress.snapTo(0f)
+            pulseProgress.animateTo(1f, animationSpec = tween(500))
+            pulseProgress.animateTo(0f, animationSpec = tween(500))
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.8f)),
+        shadowElevation = 8.dp
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(20.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    text = "Total Cumulative Review Count",
-                    style = LoorveTypography.titleSmall,
-                    color = OnBackground,
-                    fontWeight = FontWeight.Bold
-                )
-                Surface(
-                    shape = CircleShape,
-                    color = if (isProSubscribed) Active else NoticeContainer
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (isProSubscribed) "Pro" else "Basic",
-                        style = LoorveTypography.labelSmall,
-                        color = if (isProSubscribed) Color.White else OnSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        text = "• TOTAL REVIEWS",
+                        style = LoorveTypography.labelSmall.copy(fontSize = 11.sp, letterSpacing = 1.2.sp),
+                        color = Primary,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = "총 누적 복습 횟수",
+                        style = LoorveTypography.titleSmall.copy(fontSize = 18.sp),
+                        color = Color(0xFF1E293B),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 16.dp)
                     )
                 }
-            }
-            Text(
-                text = "누적 복습 횟수 ${counts.lastOrNull() ?: 0}회",
-                style = LoorveTypography.bodySmall,
-                color = OnSurfaceVariant
-            )
-
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(132.dp)
-            ) {
-                val horizontalPadding = 8.dp.toPx()
-                val verticalPadding = 10.dp.toPx()
-                val chartWidth = size.width - horizontalPadding * 2
-                val chartHeight = size.height - verticalPadding * 2
-                val xStep = if (counts.size > 1) chartWidth / (counts.size - 1) else 0f
-                val pointsInChart = counts.mapIndexed { index, count ->
-                    androidx.compose.ui.geometry.Offset(
-                        x = horizontalPadding + xStep * index,
-                        y = verticalPadding + chartHeight -
-                            (count.toFloat() / maxCount) * chartHeight
-                    )
-                }
-
-                drawLine(
-                    color = Divider,
-                    start = androidx.compose.ui.geometry.Offset(
-                        horizontalPadding,
-                        verticalPadding + chartHeight
-                    ),
-                    end = androidx.compose.ui.geometry.Offset(
-                        horizontalPadding + chartWidth,
-                        verticalPadding + chartHeight
-                    ),
-                    strokeWidth = 1.dp.toPx()
-                )
-
-                if (pointsInChart.size > 1) {
-                    val path = Path().apply {
-                        moveTo(pointsInChart.first().x, pointsInChart.first().y)
-                        pointsInChart.windowed(2).forEach { (start, end) ->
-                            val midpointX = (start.x + end.x) / 2f
-                            cubicTo(
-                                midpointX,
-                                start.y,
-                                midpointX,
-                                end.y,
-                                end.x,
-                                end.y
-                            )
+                Column(horizontalAlignment = Alignment.End) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    ) {
+                        if (isProSubscribed) {
+                            ProBadgeLiquid()
+                        } else {
+                            Surface(shape = CircleShape, color = Color(0xFFF1F5F9)) {
+                                Text(
+                                    text = "BASIC",
+                                    style = LoorveTypography.labelSmall.copy(
+                                        fontSize = 10.sp,
+                                        letterSpacing = 0.8.sp
+                                    ),
+                                    color = Color(0xFF94A3B8),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
                     }
-                    drawPath(
-                        path = path,
-                        color = chartColor,
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(
-                            width = 3.dp.toPx()
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = "$totalCount",
+                            style = LoorveTypography.displayMedium.copy(fontSize = 26.sp, lineHeight = 28.sp),
+                            color = Primary,
+                            fontWeight = FontWeight.Black
                         )
-                    )
-                }
-                pointsInChart.forEach { point ->
-                    drawCircle(
-                        color = chartColor,
-                        radius = 4.dp.toPx(),
-                        center = point
-                    )
+                        Text(
+                            text = "회",
+                            style = LoorveTypography.labelLarge,
+                            color = Primary,
+                            modifier = Modifier.padding(start = 3.dp, bottom = 2.dp)
+                        )
+                        Text(
+                            text = "(+$weeklyDiff 이번 주)",
+                            style = LoorveTypography.labelSmall.copy(fontSize = 11.5.sp),
+                            color = Color(0xFF6366F1),
+                            modifier = Modifier.padding(start = 6.dp, bottom = 2.dp)
+                        )
+                    }
                 }
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                dates.forEach { date ->
-                    Text(
-                        text = date.format(DateTimeFormatter.ofPattern("M/d")),
-                        style = LoorveTypography.labelSmall,
-                        color = OnSurfaceVariant
-                    )
+                Text(
+                    text = "누적 복습 추이 (최근 7일)",
+                    style = LoorveTypography.labelSmall.copy(fontSize = 11.sp),
+                    color = Color(0xFF94A3B8)
+                )
+                Text(
+                    text = "기준: ${dates.first().format(DateTimeFormatter.ofPattern("M/d"))} ~ ${dates.last().format(DateTimeFormatter.ofPattern("M/d"))}",
+                    style = LoorveTypography.labelSmall.copy(fontSize = 11.sp),
+                    color = Color(0xFF94A3B8)
+                )
+            }
+
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(148.dp)
+            ) {
+                val chartPoints = remember(counts, maxCount) {
+                    counts.mapIndexed { index, count ->
+                        index to count
+                    }
+                }
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .pointerInput(chartPoints) {
+                            detectTapGestures { tapOffset ->
+                                val horizontalPadding = 8.dp.toPx()
+                                val chartWidth = size.width - horizontalPadding * 2
+                                val xStep = chartWidth / (chartPoints.size - 1).coerceAtLeast(1)
+                                val nearestIndex = ((tapOffset.x - horizontalPadding) / xStep)
+                                    .roundToInt()
+                                    .coerceIn(0, chartPoints.lastIndex)
+                                selectedPointIndex = nearestIndex
+                                pulseRequest++
+                            }
+                        }
+                ) {
+                    val horizontalPadding = 8.dp.toPx()
+                    val verticalPadding = 8.dp.toPx()
+                    val chartWidth = size.width - horizontalPadding * 2
+                    val chartHeight = size.height - verticalPadding * 2
+                    val xStep = chartWidth / (chartPoints.size - 1).coerceAtLeast(1)
+                    val pointsInChart = chartPoints.map { (index, count) ->
+                        androidx.compose.ui.geometry.Offset(
+                            x = horizontalPadding + xStep * index,
+                            y = verticalPadding + chartHeight -
+                                (count.toFloat() / maxCount) * (chartHeight - 4.dp.toPx())
+                        )
+                    }
+
+                    if (pointsInChart.size > 1) {
+                        val linePath = Path().apply {
+                            moveTo(pointsInChart.first().x, pointsInChart.first().y)
+                            pointsInChart.windowed(2).forEach { (start, end) ->
+                                val midpointX = (start.x + end.x) / 2f
+                                cubicTo(
+                                    midpointX,
+                                    start.y,
+                                    midpointX,
+                                    end.y,
+                                    end.x,
+                                    end.y
+                                )
+                            }
+                        }
+                        val areaPath = Path().apply {
+                            addPath(linePath)
+                            lineTo(pointsInChart.last().x, verticalPadding + chartHeight)
+                            lineTo(pointsInChart.first().x, verticalPadding + chartHeight)
+                            close()
+                        }
+                        drawPath(
+                            path = areaPath,
+                            brush = Brush.verticalGradient(
+                                listOf(Color(0x383B82F6), Color.Transparent)
+                            )
+                        )
+                        drawPath(
+                            path = linePath,
+                            brush = Brush.horizontalGradient(
+                                listOf(Color(0xFF38BDF8), Color(0xFF3B82F6), Color(0xFF6366F1))
+                            ),
+                            style = Stroke(width = 3.dp.toPx())
+                        )
+                        drawPath(
+                            path = linePath,
+                            color = Color(0xFF60A5FA).copy(alpha = 0.08f + linePulse * 0.08f),
+                            style = Stroke(width = (8f + linePulse * 2f).dp.toPx())
+                        )
+                    }
+                    pointsInChart.forEachIndexed { index, point ->
+                        if (index == selectedPointIndex) {
+                            drawCircle(
+                                color = Color(0xFF6366F1).copy(
+                                    alpha = 0.18f * (1f - pulseProgress.value)
+                                ),
+                                radius = (8f + pulseProgress.value * 12f).dp.toPx(),
+                                center = point
+                            )
+                        }
+                        drawCircle(
+                            color = Color.White,
+                            radius = if (index == pointsInChart.lastIndex) 5.dp.toPx() else 3.5.dp.toPx(),
+                            center = point
+                        )
+                        drawCircle(
+                            color = if (index == pointsInChart.lastIndex) {
+                                Color(0xFF6366F1)
+                            } else {
+                                Color(0xFF3B82F6)
+                            },
+                            radius = if (index == pointsInChart.lastIndex) {
+                                4.dp.toPx()
+                            } else {
+                                2.dp.toPx()
+                            },
+                            center = point
+                        )
+                    }
+                }
+
+                selectedPointIndex.let { index ->
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .offset(
+                                x = (maxWidth * index / (dates.lastIndex.coerceAtLeast(1))) - 20.dp,
+                                y = 0.dp
+                            ),
+                        shape = CircleShape,
+                        color = Color(0xFF0F172A),
+                        shadowElevation = 3.dp
+                    ) {
+                        Text(
+                            text = "${counts[index]}회",
+                            style = LoorveTypography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                letterSpacing = 0.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    dates.forEach { date ->
+                        Text(
+                            text = date.format(DateTimeFormatter.ofPattern("M/d")),
+                            style = LoorveTypography.labelSmall.copy(
+                                fontSize = 11.sp,
+                                letterSpacing = 0.sp,
+                                fontWeight = if (date == dates.last()) {
+                                    FontWeight.Bold
+                                } else {
+                                    FontWeight.Medium
+                                }
+                            ),
+                            color = if (date == dates.last()) {
+                                Color(0xFF1A73E8)
+                            } else {
+                                Color(0xFF94A3B8)
+                            }
+                        )
+                    }
                 }
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp)
+                    .border(1.dp, Color(0xFFF1F5F9), RoundedCornerShape(18.dp))
+                    .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ReviewBlockCount(
-                    label = "Completed Review Blocks",
+                    label = "완료된 복습 블록",
                     count = completedReviewBlocks,
+                    detail = "(시험종료일 경과)",
                     modifier = Modifier.weight(1f)
                 )
                 ReviewBlockCount(
-                    label = "Ongoing Review Blocks",
+                    label = "진행 중인 복습 블록",
                     count = ongoingReviewBlocks,
+                    detail = "(시험종료일 미도달)",
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -487,50 +676,194 @@ private fun TotalCumulativeReviewCountBlock(
 private fun ReviewBlockCount(
     label: String,
     count: Int,
+    detail: String,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier) {
+    val isOngoing = label.startsWith("진행")
+    val pulseTransition = rememberInfiniteTransition(label = "ongoingReviewDotPulse")
+    val dotScale by pulseTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isOngoing) 1.4f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1300),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ongoingReviewDotScale"
+    )
+    val dotAlpha by pulseTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isOngoing) 0.55f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1300),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ongoingReviewDotAlpha"
+    )
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White)
+            .border(
+                1.dp,
+                if (label.startsWith("진행")) Color(0x66E9D5FF) else Color(0x99F1F5F9),
+                RoundedCornerShape(14.dp)
+            )
+            .padding(10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(if (isOngoing) 18.dp else 8.dp)
+                    .drawBehind {
+                        if (isOngoing) {
+                            drawCircle(
+                                color = Color(0xFF8B5CF6).copy(alpha = 0.22f * dotAlpha),
+                                radius = size.minDimension * 0.48f * dotScale
+                            )
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isOngoing) Color(0xFF8B5CF6) else Color(0xFF3B82F6)
+                        )
+                )
+            }
+            Text(
+                text = label,
+                style = LoorveTypography.labelSmall.copy(fontSize = 12.sp, letterSpacing = 0.sp),
+                color = Color(0xFF475569),
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 10.dp)) {
+            Text(
+                text = count.toString(),
+                style = LoorveTypography.titleMedium.copy(fontSize = 20.sp, lineHeight = 20.sp),
+                color = if (isOngoing) Color(0xFF9333EA) else Color(0xFF0F172A),
+                fontWeight = FontWeight.Black
+            )
+            Text(
+                text = "개",
+                style = LoorveTypography.labelSmall.copy(fontSize = 12.sp, letterSpacing = 0.sp),
+                color = if (isOngoing) Color(0xFF9333EA) else Color(0xFF475569),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+            Text(
+                text = detail,
+                style = LoorveTypography.labelSmall.copy(fontSize = 10.sp, letterSpacing = 0.sp),
+                color = Color(0xFF94A3B8),
+                modifier = Modifier.padding(start = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProBadgeLiquid() {
+    val transition = rememberInfiniteTransition(label = "proBadge")
+    val shift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(6000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "proBadgeShift"
+    )
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(Color(0xFF4F46E5), Color(0xFF7C3AED), Color(0xFFC026D3)),
+                    start = androidx.compose.ui.geometry.Offset(shift * 80f, 0f),
+                    end = androidx.compose.ui.geometry.Offset(120f + shift * 80f, 40f)
+                )
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+            .drawWithCache {
+                val sheenX = size.width * (-0.8f + shift * 2.4f)
+                onDrawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = 0.14f),
+                                Color.White.copy(alpha = 0.5f),
+                                Color.White.copy(alpha = 0.14f),
+                                Color.Transparent
+                            ),
+                            start = androidx.compose.ui.geometry.Offset(sheenX - size.width, 0f),
+                            end = androidx.compose.ui.geometry.Offset(sheenX, size.height)
+                        )
+                    )
+                }
+            }
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+    ) {
         Text(
-            text = label,
-            style = LoorveTypography.labelSmall,
-            color = OnSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = count.toString(),
-            style = LoorveTypography.titleMedium,
-            color = OnBackground,
-            fontWeight = FontWeight.Bold
+            text = "PRO",
+            style = LoorveTypography.labelSmall.copy(
+                fontSize = 10.5.sp,
+                letterSpacing = 0.8.sp
+            ),
+            color = Color.White
         )
     }
 }
 
 @Composable
-private fun AmbientAura() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .offset(x = 180.dp, y = (-48).dp)
-            .size(220.dp)
-            .blur(80.dp)
-            .background(
-                color = com.loorve.ui.theme.SkyTint.copy(alpha = 0.52f),
-                shape = CircleShape
-            )
+private fun HomeAmbientBackground() {
+    val transition = rememberInfiniteTransition(label = "homeAmbient")
+    val drift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(20_000), RepeatMode.Reverse),
+        label = "homeAmbientDrift"
     )
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .offset(x = (-120).dp, y = 360.dp)
-            .size(240.dp)
-            .blur(80.dp)
-            .background(
-                color = com.loorve.ui.theme.LavenderTint.copy(alpha = 0.48f),
-                shape = CircleShape
+    Canvas(Modifier.fillMaxSize()) {
+        fun orb(center: androidx.compose.ui.geometry.Offset, radius: Float, color: Color) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(color, color.copy(alpha = 0f)),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center
             )
-    )
+        }
+        val blue = 170.dp.toPx()
+        val violet = 160.dp.toPx()
+        orb(
+            androidx.compose.ui.geometry.Offset((-70 + 30 * drift).dp.toPx() + blue, -40.dp.toPx() + blue),
+            blue,
+            Color(0x332563EB)
+        )
+        orb(
+            androidx.compose.ui.geometry.Offset(size.width + 70.dp.toPx() - violet, size.height * .38f),
+            violet,
+            Color(0x299333EA)
+        )
+        orb(
+            androidx.compose.ui.geometry.Offset(20.dp.toPx() + blue, size.height - 40.dp.toPx()),
+            blue,
+            Color(0x2E38BDF8)
+        )
+    }
 }
 
 @Composable
@@ -670,36 +1003,48 @@ private fun HomeHeroCard(
 
 @Composable
 private fun HomeMotivationHeader() {
-    val seoulZone = remember { ZoneId.of("Asia/Seoul") }
-    var quoteDate by remember { mutableStateOf(LocalDate.now(seoulZone)) }
-    LaunchedEffect(seoulZone) {
-        while (true) {
-            val now = java.time.ZonedDateTime.now(seoulZone)
-            val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay(seoulZone)
-            delay(java.time.Duration.between(now, nextMidnight).toMillis().coerceAtLeast(1L))
-            quoteDate = LocalDate.now(seoulZone)
-        }
-    }
-    val quote = HOME_MOTIVATIONAL_QUOTES[
-        Math.floorMod(quoteDate.toEpochDay().toInt(), HOME_MOTIVATIONAL_QUOTES.size)
-    ]
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 2.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.8f)),
+        shadowElevation = 4.dp
     ) {
-        Text(
-            text = quote.text,
-            style = LoorveTypography.bodyLarge,
-            fontWeight = FontWeight.Bold,
-            color = OnBackground
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = "- ${quote.author}",
-            style = LoorveTypography.labelMedium,
-            color = OnSurfaceVariant
-        )
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = Color(0xFFEFF6FF)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.FormatQuote,
+                    contentDescription = null,
+                    tint = Primary,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+            Column {
+                Text(
+                    text = "반복은 기억을 단단하게 다지는 망치질과 같다.",
+                    style = LoorveTypography.bodyLarge.copy(
+                        fontSize = 14.5.sp,
+                        lineHeight = 20.sp
+                    ),
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E293B)
+                )
+                Text(
+                    text = "- 퀸틸리아누스",
+                    style = LoorveTypography.labelMedium.copy(fontSize = 12.sp),
+                    color = Color(0xFF94A3B8),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
     }
 }
 
@@ -831,8 +1176,8 @@ private fun HomeOverdueReviewSection(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = SurfaceSolid,
-        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFFEE2E2)),
         tonalElevation = 1.dp,
         shadowElevation = 6.dp
     ) {
@@ -885,17 +1230,44 @@ private fun HomeOverdueReviewSection(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "기억이 흐려지기 전에 확인하세요",
-                    style = LoorveTypography.titleSmall,
-                    color = Warning,
-                    fontWeight = FontWeight.Bold
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFFF43F5E), Color(0xFFFBBF24), Color(0xFF6366F1))
+                            )
+                        )
                 )
-                Text(
-                    text = "${overdueSchedules.size}개의 복습 일정이 지연되었습니다.",
-                    style = LoorveTypography.bodySmall,
-                    color = OnSurfaceVariant
-                )
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    Surface(shape = CircleShape, color = Color(0xFFFFF1F2)) {
+                        Icon(
+                            imageVector = Icons.Outlined.WarningAmber,
+                            contentDescription = null,
+                            tint = Color(0xFFF43F5E),
+                            modifier = Modifier.padding(6.dp).size(18.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "기억이 흐려지기 전에 확인하세요",
+                            style = LoorveTypography.titleSmall.copy(fontSize = 15.5.sp),
+                            color = Color(0xFFE11D48),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${overdueSchedules.size}개의 복습 일정이 지연되었습니다.",
+                            style = LoorveTypography.bodySmall.copy(fontSize = 12.5.sp),
+                            color = OnSurfaceVariant
+                        )
+                    }
+                }
                 Spacer(Modifier.height(4.dp))
                 overdueSchedules.forEach { schedule ->
                     val subjectName = schedule.subjectName.ifBlank {
@@ -934,7 +1306,11 @@ private fun HomeMiniCalendar(
     val daysInMonth = displayYearMonth.lengthOfMonth()
     val dayLabels = listOf("일", "월", "화", "수", "목", "금", "토")
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+    ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             dayLabels.forEachIndexed { index, label ->
                 Text(
