@@ -198,15 +198,16 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    TotalCumulativeReviewCountBlock(
-                        points = uiState.cumulativeReviewCounts,
-                        completedReviewBlocks = uiState.completedReviewBlocks,
-                        ongoingReviewBlocks = uiState.ongoingReviewBlocks
-                    )
+                    HomeMotivationHeader()
                 }
 
                 item {
-                    HomeMotivationHeader()
+                    TotalCumulativeReviewCountBlock(
+                        points = uiState.cumulativeReviewCounts,
+                        completedReviewBlocks = uiState.completedReviewBlocks,
+                        ongoingReviewBlocks = uiState.ongoingReviewBlocks,
+                        isProSubscribed = subscriptionState.entitlement is SubscriptionEntitlement.Pro
+                    )
                 }
 
                 item {
@@ -338,7 +339,8 @@ fun HomeScreen(
 private fun TotalCumulativeReviewCountBlock(
     points: List<CumulativeReviewCountPoint>,
     completedReviewBlocks: Int,
-    ongoingReviewBlocks: Int
+    ongoingReviewBlocks: Int,
+    isProSubscribed: Boolean
 ) {
     val chartColor = Primary
     val dates = if (points.isEmpty()) {
@@ -357,14 +359,31 @@ private fun TotalCumulativeReviewCountBlock(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Total Cumulative Review Count",
+                    style = LoorveTypography.titleSmall,
+                    color = OnBackground,
+                    fontWeight = FontWeight.Bold
+                )
+                Surface(
+                    shape = CircleShape,
+                    color = if (isProSubscribed) Active else NoticeContainer
+                ) {
+                    Text(
+                        text = if (isProSubscribed) "Pro" else "Basic",
+                        style = LoorveTypography.labelSmall,
+                        color = if (isProSubscribed) Color.White else OnSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
             Text(
-                text = "Total Cumulative Review Count",
-                style = LoorveTypography.titleSmall,
-                color = OnBackground,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "누적 복습 완료 수",
+                text = "누적 복습 횟수 ${counts.lastOrNull() ?: 0}회",
                 style = LoorveTypography.bodySmall,
                 color = OnSurfaceVariant
             )
