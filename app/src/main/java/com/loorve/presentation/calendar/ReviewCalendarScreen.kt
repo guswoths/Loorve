@@ -641,10 +641,10 @@ private fun ReviewWorkloadBar(
     }
     val pulseTransition = rememberInfiniteTransition(label = "purpleBarPulse")
     val pulse by pulseTransition.animateFloat(
-        initialValue = 0.98f,
-        targetValue = if (completedCount > 0) 1.02f else 0.98f,
+        initialValue = if (selected) 0.96f else 1f,
+        targetValue = if (selected) 1.04f else 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2200),
+            animation = tween(1800),
             repeatMode = RepeatMode.Reverse
         ),
         label = "purpleBarPulseValue"
@@ -671,7 +671,11 @@ private fun ReviewWorkloadBar(
                         .width(if (isToday || selected) 24.dp else 20.dp)
                         .height(barHeight)
                         .clip(CircleShape)
-                        .background(Color(0xFFF1F5F9)),
+                        .background(Color(0xFFF1F5F9))
+                        .graphicsLayer {
+                            scaleX = pulse
+                            scaleY = pulse
+                        },
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     if (completedCount > 0) {
@@ -682,28 +686,15 @@ private fun ReviewWorkloadBar(
                                 .clip(CircleShape)
                                 .background(
                                     Brush.verticalGradient(
-                                        colors = if (isPeak) {
-                                            listOf(
-                                                Color(0xFFA21CAF),
-                                                Color(0xFF6D28D9),
-                                                Color(0xFF6366F1),
-                                                Color(0xFF3B82F6),
-                                                Color(0xFFA21CAF)
-                                            )
-                                        } else {
-                                            listOf(
-                                                Color(0xFF7E22CE),
-                                                Color(0xFF4338CA),
-                                                Color(0xFF1D4ED8)
-                                            )
-                                        }
+                                        colors = listOf(
+                                            Color(0xFF8B5CF6),
+                                            Color(0xFF6D28D9),
+                                            Color(0xFF4C1D95),
+                                            Color(0xFF6D28D9),
+                                            Color(0xFF8B5CF6)
+                                        )
                                     )
-                                )
-                                .graphicsLayer {
-                                    scaleX = pulse
-                                    scaleY = pulse
-                                    alpha = 0.97f + (pulse - 0.98f) * 0.75f
-                                },
+                                ),
                             contentAlignment = Alignment.TopCenter
                         ) {
                         }
@@ -714,9 +705,9 @@ private fun ReviewWorkloadBar(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = if (isToday || isPeak) FontWeight.Bold else FontWeight.Normal
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
             ),
-            color = if (isPeak) Color(0xFF7C3AED) else if (isToday || selected) OnBackground else OnSurfaceVariant,
+            color = if (selected) Color(0xFF7C3AED) else Color(0xFF0F172A),
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 4.dp)
         )
@@ -756,7 +747,7 @@ private fun LegendItem(
 }
 
 private fun LocalDate.chartDateLabel(latestDate: LocalDate?): String =
-    if (this == latestDate) "오늘" else format(DateTimeFormatter.ofPattern("M/d", Locale.KOREAN))
+    format(DateTimeFormatter.ofPattern("M/d", Locale.KOREAN))
 
 // ── Private Composables ────────────────────────────────────────────────────────
 
