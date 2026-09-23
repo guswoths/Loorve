@@ -3,6 +3,7 @@ package com.loorve.presentation.mypage
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,10 +48,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -130,33 +132,11 @@ fun MyPageScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Background, CanvasWarm)))
+            .background(Color(0xFFFCF9F8))
     ) {
         SettingsAmbientAura()
         Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text(
-                                stringResource(R.string.settings_header_english),
-                                style = LoorveTypography.labelSmall,
-                                color = Primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                stringResource(R.string.settings_header_korean),
-                                style = LoorveTypography.titleLarge,
-                                color = OnBackground
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent
-                    )
-                )
-            },
+            topBar = {},
             bottomBar = {
                 val showBanner = subscriptionState.entitlement is SubscriptionEntitlement.Free
                 if (showBanner) {
@@ -178,13 +158,42 @@ fun MyPageScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+                    modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
+                    contentPadding = PaddingValues(top = 20.dp, bottom = 140.dp)
                 ) {
                 item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 4.dp)
+                ) {
+                    Text(
+                        text = "SETTINGS",
+                        style = LoorveTypography.labelSmall.copy(
+                            fontSize = 12.sp,
+                            letterSpacing = 1.5.sp
+                        ),
+                        color = Primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "설정",
+                        style = LoorveTypography.titleLarge.copy(
+                            fontSize = 26.sp,
+                            letterSpacing = (-0.6).sp
+                        ),
+                        color = Color(0xFF0F172A),
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+                }
+                item {
                     SectionTitle(stringResource(R.string.settings_account))
-                    LoorveCard(Modifier.fillMaxWidth()) {
+                    LoorveCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = Color.White
+                    ) {
                         Row(
                             Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -268,7 +277,10 @@ fun MyPageScreen(
 
                 item {
                     SectionTitle(stringResource(R.string.settings_notifications))
-                    LoorveCard(Modifier.fillMaxWidth()) {
+                    LoorveCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = Color.White
+                    ) {
                         SettingsSwitchRow(
                             title = stringResource(R.string.settings_enable_notifications),
                             checked = uiState.notificationsEnabled,
@@ -298,7 +310,10 @@ fun MyPageScreen(
 
                 item {
                     SectionTitle(stringResource(R.string.settings_data))
-                    LoorveCard(Modifier.fillMaxWidth()) {
+                    LoorveCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = Color.White
+                    ) {
                         SettingsRow(
                             icon = Icons.Default.Cloud,
                             title = stringResource(R.string.settings_sync_status),
@@ -316,7 +331,10 @@ fun MyPageScreen(
 
                 item {
                     SectionTitle(stringResource(R.string.settings_app_information))
-                    LoorveCard(Modifier.fillMaxWidth()) {
+                    LoorveCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = Color.White
+                    ) {
                         SettingsRow(
                             icon = Icons.Default.Info,
                             title = stringResource(R.string.settings_app_information),
@@ -392,33 +410,50 @@ fun MyPageScreen(
 @Composable
 private fun SectionTitle(text: String) {
     Text(
-        text = text.uppercase(),
-        style = LoorveTypography.labelMedium,
-        color = OnSurfaceVariant,
+        text = text,
+        fontSize = 12.sp,
+        color = Color(0xFF64748B),
         fontWeight = FontWeight.Bold,
-        letterSpacing = 1.1.sp,
-        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 2.dp)
     )
 }
 
 @Composable
 private fun SettingsAmbientAura() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(start = 250.dp, top = 12.dp)
-            .size(150.dp)
-            .blur(70.dp)
-            .background(Color.White, CircleShape)
-    )
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(end = 220.dp, top = 380.dp)
-            .size(200.dp)
-            .blur(76.dp)
-            .background(Color.White, CircleShape)
-    )
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        fun aura(center: Offset, radius: Float, color: Color) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(color.copy(alpha = 0.24f), color.copy(alpha = 0.09f), Color.Transparent),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center
+            )
+        }
+
+        aura(
+            center = Offset(size.width * 0.06f, size.height * 0.08f),
+            radius = size.minDimension * 0.72f,
+            color = Color(0xFF38BDF8)
+        )
+        aura(
+            center = Offset(size.width * 0.96f, size.height * 0.36f),
+            radius = size.minDimension * 0.80f,
+            color = Color(0xFF6366F1)
+        )
+        aura(
+            center = Offset(size.width * 0.12f, size.height * 0.78f),
+            radius = size.minDimension * 0.74f,
+            color = Color(0xFFC084FC)
+        )
+        aura(
+            center = Offset(size.width * 0.94f, size.height * 0.92f),
+            radius = size.minDimension * 0.64f,
+            color = Color(0xFFF472B6)
+        )
+    }
 }
 
 @Composable

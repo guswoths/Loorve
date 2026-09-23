@@ -11,11 +11,17 @@ object ReviewBlockAccessPolicy {
             return blocks.mapNotNull { it.blockId.takeIf(String::isNotBlank) }.toSet()
         }
 
-        val newest = blocks.maxWithOrNull(
-            compareBy<ReviewBlock> { it.createdAt.takeIf { value -> value > 0L } ?: it.prepStartDate }
-                .thenBy { it.blockId }
+        val earliestExam = blocks.minWithOrNull(
+            compareBy<ReviewBlock> {
+                it.examDate.takeIf { value -> value > 0L }
+                    ?: runCatching { java.time.LocalDate.parse(it.date)
+                        .atStartOfDay(java.time.ZoneId.of("Asia/Seoul"))
+                        .toInstant()
+                        .toEpochMilli()
+                    }.getOrDefault(Long.MAX_VALUE)
+            }.thenBy { it.blockId }
         )
-        return newest?.blockId?.takeIf(String::isNotBlank)?.let(::setOf).orEmpty()
+        return earliestExam?.blockId?.takeIf(String::isNotBlank)?.let(::setOf).orEmpty()
     }
 
     fun canCreate(blocks: List<ReviewBlock>, entitlement: SubscriptionEntitlement): Boolean {

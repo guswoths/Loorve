@@ -1,9 +1,17 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.loorve.presentation.reviewblock
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,12 +39,15 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -52,6 +63,7 @@ import com.loorve.presentation.home.HomeViewModel
 import com.loorve.presentation.subscription.ProPaywallDialog
 import com.loorve.presentation.subscription.SubscriptionViewModel
 import com.loorve.ui.component.LoorveCard
+import com.loorve.ui.component.BannerAdView
 import com.loorve.ui.theme.*
 import java.text.SimpleDateFormat
 import java.time.Instant
@@ -63,6 +75,497 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewBlockDetailScreen(
+    blockId: String,
+    block: ReviewBlock?,
+    onNavigateBack: () -> Unit,
+    viewModel: ReviewBlockDetailViewModel = hiltViewModel(),
+    homeViewModel: HomeViewModel = hiltViewModel(),
+    subscriptionViewModel: SubscriptionViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val selectedTab by viewModel.selectedTab.collectAsState()
+    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showProDialog by remember { mutableStateOf(false) }
+    var selectedStudyRecord by remember { mutableStateOf<StudyRecord?>(null) }
+    var selectedReviewSchedule by remember { mutableStateOf<ReviewScheduleItem?>(null) }
+
+    LaunchedEffect(blockId) {
+        viewModel.loadBlockData(uid, blockId, externalBlock = block)
+    }
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearErrorMessage()
+        }
+    }
+    LaunchedEffect(uiState.requiresPro) {
+        if (uiState.requiresPro) showProDialog = true
+    }
+    LaunchedEffect(uiState.deleteSuccess) {
+        if (uiState.deleteSuccess) {
+            viewModel.resetDeleteSuccess()
+            onNavigateBack()
+        }
+    }
+
+    val resolvedBlock = uiState.reviewBlock
+    val title = resolvedBlock?.examName?.ifBlank { resolvedBlock.title }
+        ?: resolvedBlock?.title
+        ?: blockId
+    val totalReviews = uiState.reviewScheduleRecords.size
+    val completedReviews = uiState.reviewScheduleRecords.count {
+        it.status == ReviewStatus.COMPLETED
+    }
+    val completionRate = if (totalReviews == 0) 0f
+    else (completedReviews.toFloat() / totalReviews).coerceIn(0f, 1f)
+    val dDay = resolvedBlock?.examDate?.let { millis ->
+        if (millis == 0L) "D-?" else {
+            val examDate = Instant.ofEpochMilli(millis)
+                .atZone(ZoneId.of("Asia/Seoul")).toLocalDate()
+            val days = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), examDate)
+            when {
+                days > 0 -> "D-$days"
+                days == 0L -> "D-Day"
+                else -> "D+${-days}"
+            }
+        }
+    } ?: ""
+
+    if (showProDialog) {
+        ProPaywallDialog(
+            viewModel = subscriptionViewModel,
+            onDismiss = {
+                showProDialog = false
+                onNavigateBack()
+            }
+        )
+    }
+    if (uiState.showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { viewModel.setShowDeleteConfirm(false) },
+            title = { Text("블록 삭제") },
+            text = { Text("이 복습 블록과 모든 학습 기록, 복습 일정이 삭제됩니다. 계속할까요?") },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.deleteBlock(uid, blockId) },
+                    enabled = !uiState.isLoading
+                ) {
+                    Text("삭제", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.setShowDeleteConfirm(false) }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+    uiState.recordToDelete?.let { record ->
+        AlertDialog(
+            onDismissRequest = { viewModel.setRecordToDelete(null) },
+            title = { Text("학습기록 삭제") },
+            text = { Text("\"${record.title.ifBlank { "이 학습기록" }}\"을 삭제할까요?") },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.deleteStudyRecord(uid, blockId, record) },
+                    enabled = !uiState.isLoading
+                ) {
+                    Text("삭제", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.setRecordToDelete(null) }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+    selectedStudyRecord?.let {
+        StudyRecordDetailDialog(it) { selectedStudyRecord = null }
+    }
+    selectedReviewSchedule?.let {
+        ReviewScheduleDetailDialog(it) { selectedReviewSchedule = null }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFCF9F8))
+    ) {
+        DetailSpecAmbientMesh()
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            containerColor = Color.Transparent
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(bottom = 96.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Outlined.ArrowBack, "뒤로가기", tint = Color(0xFF334155))
+                        }
+                        Text(
+                            title,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        IconButton(
+                            onClick = { viewModel.setShowDeleteConfirm(true) },
+                            enabled = !uiState.isLoading
+                        ) {
+                            Icon(Icons.Default.Delete, "블록 삭제", tint = Color(0xFFEF4444))
+                        }
+                    }
+                }
+                item {
+                    SpecGlassCard {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text(
+                                title,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF0F172A)
+                            )
+                            SpecBadge("• $dDay")
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 14.dp, bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            Text(
+                                "${(completionRate * 100).toInt()}%",
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF0F172A)
+                            )
+                            Text(
+                                "복습 완료율",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF64748B)
+                            )
+                        }
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(12.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFF1F5F9))
+                        ) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth(completionRate)
+                                    .fillMaxHeight()
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(Color(0xFF3B82F6), Color(0xFFA855F7))
+                                        )
+                                    )
+                            )
+                        }
+                        Text(
+                            "• $completedReviews / $totalReviews 복습 일정 완료",
+                            modifier = Modifier.padding(top = 10.dp),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF4F46E5)
+                        )
+                    }
+                }
+                item {
+                    SpecGlassCard {
+                        StudyProgressInputSection(
+                            onSave = { date, recordTitle, content ->
+                                viewModel.saveProgress(
+                                    uid = uid,
+                                    blockId = blockId,
+                                    examId = resolvedBlock?.blockId ?: blockId,
+                                    title = recordTitle,
+                                    content = content,
+                                    learningDateMillis = date,
+                                    dailyCap = resolvedBlock?.dailyCap ?: 5
+                                )
+                            },
+                            isLoading = uiState.isLoading,
+                            isSaveEnabled = resolvedBlock?.examDate != 0L,
+                            modifier = Modifier
+                        )
+                    }
+                }
+                item {
+                    SpecRecordTabs(
+                        selectedTab = selectedTab,
+                        onTabSelected = { viewModel.selectTab(it, uid, blockId) }
+                    )
+                }
+                if (selectedTab == ReviewBlockTab.STUDY_RECORD) {
+                    item {
+                        StudyRecordListSection(
+                            records = uiState.studyRecords,
+                            reviewSchedules = uiState.reviewScheduleRecords,
+                            isLoading = uiState.isLoading,
+                            onDeleteRecord = viewModel::setRecordToDelete,
+                            onRecordClick = { selectedStudyRecord = it }
+                        )
+                    }
+                } else {
+                    item {
+                        ReviewRecordListSection(
+                            scheduleItems = uiState.reviewScheduleRecords,
+                            defaultAlarmTime = uiState.defaultAlarmTime,
+                            onTimeSave = { item, hour, minute ->
+                                viewModel.saveCustomAlarmTime(uid, item, hour, minute)
+                            },
+                            onCheckedChange = { item, checked ->
+                                viewModel.toggleReviewCompletion(uid, item, checked)
+                            },
+                            onScheduleClick = { selectedReviewSchedule = it },
+                            isLoading = uiState.isLoading
+                        )
+                    }
+                }
+            }
+        }
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.dp)
+                .width(320.dp)
+                .height(50.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = Color.White.copy(alpha = 0.95f),
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            shadowElevation = 6.dp
+        ) {
+            BannerAdView(modifier = Modifier.fillMaxSize())
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SpecGlassCard(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.85f)),
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content
+        )
+    }
+}
+
+@Composable
+private fun SpecBadge(text: String) {
+    val pulseTransition = rememberInfiniteTransition(label = "dDayBadgePulse")
+    val pulse by pulseTransition.animateFloat(
+        initialValue = 0.8f,
+        targetValue = 1.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dDayBadgePulseScale"
+    )
+    val dotAlpha by pulseTransition.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dDayBadgePulseAlpha"
+    )
+    Surface(
+        color = Color(0xFFEFF6FF),
+        shape = CircleShape
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .graphicsLayer {
+                        scaleX = pulse
+                        scaleY = pulse
+                        alpha = dotAlpha
+                    }
+                    .clip(CircleShape)
+                    .background(Color(0xFF2563EB))
+            )
+            Text(
+                text.removePrefix("• ").trim(),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF2563EB)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpecRecordTabs(
+    selectedTab: ReviewBlockTab,
+    onTabSelected: (ReviewBlockTab) -> Unit
+) {
+    Surface(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFE2E8F0).copy(alpha = 0.6f)
+    ) {
+        Row(Modifier.padding(4.dp)) {
+            SpecTab(
+                text = "학습 기록",
+                selected = selectedTab == ReviewBlockTab.STUDY_RECORD,
+                modifier = Modifier.weight(1f),
+                onClick = { onTabSelected(ReviewBlockTab.STUDY_RECORD) }
+            )
+            SpecTab(
+                text = "복습 일정",
+                selected = selectedTab == ReviewBlockTab.REVIEW_RECORD,
+                modifier = Modifier.weight(1f),
+                onClick = { onTabSelected(ReviewBlockTab.REVIEW_RECORD) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpecTab(
+    text: String,
+    selected: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier
+            .height(40.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) Color.White else Color.Transparent,
+        shadowElevation = if (selected) 2.dp else 0.dp
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text,
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (selected) Color(0xFF0F172A) else Color(0xFF64748B)
+                )
+                if (selected) {
+                    Spacer(Modifier.width(6.dp))
+                    Box(
+                        Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF2563EB))
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailSpecAmbientMesh() {
+    val transition = rememberInfiniteTransition(label = "detailAmbientMesh")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(20000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "detailAmbientPhase"
+    )
+    Canvas(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {}
+    ) {
+        drawAmbientOrb(
+            centerX = size.width * (-0.05f + phase * 0.08f),
+            centerY = size.height * (0.04f + phase * 0.08f),
+            radius = 170.dp.toPx(),
+            color = Color(0xFF2563EB),
+            alpha = 0.22f
+        )
+        drawAmbientOrb(
+            centerX = size.width * (1.05f - phase * 0.08f),
+            centerY = size.height * (0.42f - phase * 0.04f),
+            radius = 160.dp.toPx(),
+            color = Color(0xFF9333EA),
+            alpha = 0.18f
+        )
+        drawAmbientOrb(
+            centerX = size.width * (0.02f + phase * 0.08f),
+            centerY = size.height * (0.82f - phase * 0.06f),
+            radius = 150.dp.toPx(),
+            color = Color(0xFF38BDF8),
+            alpha = 0.20f
+        )
+        drawAmbientOrb(
+            centerX = size.width * (0.88f - phase * 0.06f),
+            centerY = size.height * (1.02f - phase * 0.04f),
+            radius = 140.dp.toPx(),
+            color = Color(0xFFEC4899),
+            alpha = 0.15f
+        )
+    }
+}
+
+private fun DrawScope.drawAmbientOrb(
+    centerX: Float,
+    centerY: Float,
+    radius: Float,
+    color: Color,
+    alpha: Float
+) {
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(color.copy(alpha = alpha), color.copy(alpha = 0f)),
+            center = androidx.compose.ui.geometry.Offset(centerX, centerY),
+            radius = radius
+        ),
+        radius = radius,
+        center = androidx.compose.ui.geometry.Offset(centerX, centerY)
+    )
+}
+
+@Composable
+private fun LegacyReviewBlockDetailScreen(
     blockId: String,
     block: ReviewBlock?,
     onNavigateBack: () -> Unit,

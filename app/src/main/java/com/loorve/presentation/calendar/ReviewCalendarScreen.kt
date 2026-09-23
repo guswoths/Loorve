@@ -57,7 +57,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -103,6 +106,7 @@ import com.loorve.ui.theme.TertiaryText
 import com.loorve.ui.theme.Warning
 import com.loorve.ui.theme.WarningContainer
 import java.time.LocalDate
+import java.time.DayOfWeek
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -119,6 +123,33 @@ fun ReviewCalendarScreen(
 ) {
     val uiState by reviewCalendarViewModel.uiState.collectAsState()
     var showProDialog by remember { mutableStateOf(false) }
+    val today = remember { LocalDate.now(ZoneId.of("Asia/Seoul")) }
+    val sortedReviewBlocks = remember(
+        uiState.reviewBlocks,
+        uiState.delayedBlockIds,
+        today
+    ) {
+        uiState.reviewBlocks.sortedWith(
+            compareBy<ReviewBlock> { block ->
+                val ended = block.reviewBlockEndDate() < today
+                when {
+                    ended -> 2
+                    block.blockId in uiState.delayedBlockIds -> 0
+                    else -> 1
+                }
+            }.thenComparator { left, right ->
+                val leftDate = left.reviewBlockEndDate()
+                val rightDate = right.reviewBlockEndDate()
+                val leftEnded = leftDate < today
+                val rightEnded = rightDate < today
+                if (leftEnded && rightEnded) {
+                    rightDate.compareTo(leftDate)
+                } else {
+                    leftDate.compareTo(rightDate)
+                }
+            }.thenBy { it.createdAt }
+        )
+    }
 
     LaunchedEffect(Unit) {
         reviewCalendarViewModel.refreshUid()
@@ -218,8 +249,10 @@ fun ReviewCalendarScreen(
                             .weight(1f),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            horizontal = 16.dp,
-                            vertical = 8.dp
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 20.dp,
+                            bottom = 8.dp
                         )
                     ) {
                     item {
@@ -310,7 +343,7 @@ fun ReviewCalendarScreen(
                         }
                     } else {
                         items(
-                            items = uiState.reviewBlocks,
+                            items = sortedReviewBlocks,
                             key = { it.blockId }
                         ) { block ->
                             ReviewBlockCard(
@@ -633,6 +666,7 @@ private fun ReviewWorkloadBar(
     } else 0f
     val isToday = stat.date == latestDate
     val isPeak = stat.date == peakDate
+    val isTuesday = stat.date.dayOfWeek == DayOfWeek.TUESDAY
     val label = stat.date.chartDateLabel(latestDate)
     val description = if (stat.dueCount <= 0) {
         "$label, 복습 일정 없음"
@@ -651,7 +685,7 @@ private fun ReviewWorkloadBar(
     )
     Column(
         modifier = modifier
-            .defaultMinSize(minWidth = 34.dp)
+            .defaultMinSize(minWidth = 26.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(if (selected) NoticeContainer else Color.Transparent)
             .clickable(onClick = onClick)
@@ -661,45 +695,17 @@ private fun ReviewWorkloadBar(
         verticalArrangement = Arrangement.Bottom
     ) {
         Column(
-            modifier = Modifier.height(126.dp),
+            modifier = Modifier.height(168.dp),
             verticalArrangement = Arrangement.Bottom,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (stat.dueCount > 0) {
-                Box(
-                    modifier = Modifier
-                        .width(if (isToday || selected) 24.dp else 20.dp)
-                        .height(barHeight)
-                        .clip(CircleShape)
-                        .background(Color(0xFFF1F5F9))
-                        .graphicsLayer {
-                            scaleX = pulse
-                            scaleY = pulse
-                        },
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    if (completedCount > 0) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(barHeight * completionRate)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color(0xFF8B5CF6),
-                                            Color(0xFF6D28D9),
-                                            Color(0xFF4C1D95),
-                                            Color(0xFF6D28D9),
-                                            Color(0xFF8B5CF6)
-                                        )
-                                    )
-                                ),
-                            contentAlignment = Alignment.TopCenter
-                        ) {
-                        }
-                    }
-                }
+                LiquidGradientBar(
+                    barHeight = barHeight,
+                    completionRate = completionRate,
+                    selected = selected,
+                    pulse = pulse
+                )
             }
         }
         Text(
@@ -765,146 +771,262 @@ private fun ReviewSchedule.toReviewScheduleItem(): ReviewScheduleItem =
     )
 
 @Composable
+private fun LiquidGradientBar(
+    barHeight: Dp,
+    completionRate: Float,
+    selected: Boolean,
+    pulse: Float
+) {
+    val completedHeight = (barHeight * completionRate).coerceAtLeast(0.dp)
+    val lightPulseAlpha = if (selected) {
+        0.12f + ((pulse - 0.96f) / 0.08f).coerceIn(0f, 1f) * 0.18f
+    } else {
+        0f
+    }
+
+    Box(
+        modifier = Modifier
+            .width(28.dp)
+            .height(barHeight)
+            .clip(CircleShape)
+            .graphicsLayer {
+                scaleX = if (selected) pulse else 1f
+                scaleY = if (selected) pulse else 1f
+            }
+            .background(Color(0xFFF1F5F9))
+            .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape)
+            .shadow(
+                elevation = 10.dp,
+                shape = CircleShape,
+                ambientColor = Color(0xFF4F46E5).copy(alpha = 0.35f),
+                spotColor = Color(0xFF4F46E5).copy(alpha = 0.35f)
+            ),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        if (completedHeight > 0.dp) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(completedHeight)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFF9333EA),
+                                Color(0xFF6366F1),
+                                Color(0xFF1D4ED8)
+                            )
+                        )
+                    )
+            ) {
+                if (selected) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Color.White.copy(alpha = lightPulseAlpha),
+                                CircleShape
+                            )
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ReviewBlockCard(
     block: ReviewBlock,
     isDelayed: Boolean = false,
     locked: Boolean = false,
     onClick: () -> Unit
 ) {
+    val isEnded = block.reviewBlockEndDate() < LocalDate.now(ZoneId.of("Asia/Seoul"))
+    val statusText = when {
+        isEnded -> "종료됨"
+        isDelayed -> "지연됨"
+        else -> "진행 중"
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.92f)
+                containerColor = Color.White
         ),
         shape = RoundedCornerShape(24.dp),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            Color.Black.copy(alpha = 0.06f)
+            Color.White.copy(alpha = 0.70f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Box {
+        Box(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier
+                    .alpha(if (locked) 0.38f else 1f)
+                    .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = block.title.ifBlank { block.examName },
-                        style = LoorveTypography.titleSmall.copy(fontSize = 16.sp),
-                        fontWeight = FontWeight.Bold,
-                        color = OnBackground
-                    )
-                    if (block.date.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(3.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "시험 종료일: ${block.date}",
-                            style = LoorveTypography.bodySmall.copy(fontSize = 12.5.sp),
-                            color = OnSurfaceVariant
+                            text = block.title.ifBlank { block.examName },
+                            style = LoorveTypography.titleSmall.copy(fontSize = 16.sp),
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        if (block.date.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = "시험 종료일: ${block.date}",
+                                style = LoorveTypography.bodySmall.copy(fontSize = 12.sp),
+                                color = Color(0xFF64748B)
+                            )
+                        }
+                    }
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFFE2E8F0)
+                    ) {
+                        Text(
+                            text = statusText,
+                            style = LoorveTypography.labelSmall,
+                            color = when {
+                                isEnded -> Color(0xFF64748B)
+                                isDelayed -> Color(0xFFEF4444)
+                                else -> Color(0xFF16A34A)
+                            },
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                         )
                     }
                 }
-                val isEnded = runCatching {
-                    LocalDate.now(ZoneId.of("Asia/Seoul")).isAfter(LocalDate.parse(block.date))
-                }.getOrDefault(false)
-                val badgeColor = when {
-                    isEnded -> SurfaceVariant
-                    isDelayed -> WarningContainer
-                    else -> NoticeContainer
-                }
-                val badgeTextColor = when {
-                    isEnded -> OnSurfaceVariant
-                    isDelayed -> Error
-                    else -> Primary
-                }
-                Surface(
-                    shape = CircleShape,
-                    color = badgeColor
-                ) {
-                    Text(
-                        text = when {
-                            isEnded -> "종료"
-                            isDelayed -> "지연됨"
-                            else -> "진행 중"
-                        },
-                        style = LoorveTypography.labelSmall,
-                        color = badgeTextColor,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                }
-            }
-            if (block.description.isNotBlank()) {
+
                 Text(
-                    text = block.description,
-                    style = LoorveTypography.bodySmall,
-                    color = OnSurfaceVariant,
-                    maxLines = 2
+                    text = if (block.customIntervalDays != null) {
+                        "↻  직접 세팅 복습 주기"
+                    } else {
+                        "↻  에빙하우스 복습 주기"
+                    },
+                    style = LoorveTypography.labelMedium.copy(fontSize = 12.sp),
+                    color = Color(0xFF475569),
+                    fontWeight = FontWeight.Medium
                 )
-            }
-            Text(
-                text = if (block.customIntervalDays != null) {
-                    "직접 세팅 복습 주기"
-                } else {
-                    "에빙하우스 복습 주기"
-                },
-                style = LoorveTypography.labelMedium.copy(fontSize = 12.5.sp),
-                color = if (block.customIntervalDays != null) {
-                    OnSurfaceVariant
-                } else {
-                    Color(0xFF4F46E5)
-                },
-                fontWeight = FontWeight.SemiBold
-            )
-            if (locked) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFFFDF2F8),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        Color(0xFFFCE7F3)
-                    )
-                ) {
-                    Text(
-                        text = "Pro에서 전체 복습 블록을 이용할 수 있습니다.",
-                        style = LoorveTypography.bodySmall.copy(fontSize = 12.sp),
-                        color = Color(0xFFDB2777),
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
-            } else {
-                Text(
-                    text = "탭하여 복습 기록과 일정을 확인하세요",
-                    style = LoorveTypography.bodySmall,
-                    color = TertiaryText
-                )
-                }
+
                 if (locked) {
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.22f)),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                            .border(
+                                width = 1.dp,
+                                color = Color(0xFFCBD5E1),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "Pro 전용 복습 블록",
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+                        Text(
+                            text = "누적 복습 4회차",
+                            style = LoorveTypography.labelSmall.copy(fontSize = 11.5.sp),
+                            color = Color(0xFF64748B)
                         )
+                        Text(
+                            text = "다음 복습: D-2",
+                            style = LoorveTypography.labelSmall.copy(fontSize = 11.5.sp),
+                            color = Color(0xFF64748B)
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "탭하여 복습 기록과 일정을 확인하세요",
+                        style = LoorveTypography.bodySmall,
+                        color = TertiaryText
+                    )
+                }
+            }
+
+            if (locked) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF0F172A).copy(alpha = 0.48f))
+                        .blur(2.5.dp)
+                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(44.dp),
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.18f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                Color.White.copy(alpha = 0.35f)
+                            ),
+                            shadowElevation = 4.dp
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Pro 전용 복습 블록",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Pro에서 전체 복습 블록을 이용할 수 있습니다.",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = ">",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.90f)
+                            )
+                        }
                     }
                 }
             }
         }
     }
+}
+
+private fun ReviewBlock.reviewBlockEndDate(): LocalDate {
+    if (examDate > 0L) {
+        return java.time.Instant.ofEpochMilli(examDate)
+            .atZone(ZoneId.of("Asia/Seoul"))
+            .toLocalDate()
+    }
+    return runCatching {
+        LocalDate.parse(date)
+    }.getOrDefault(LocalDate.MAX)
 }
 
 @Composable
