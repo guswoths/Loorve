@@ -4,6 +4,8 @@ import android.app.Activity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -45,18 +48,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.loorve.R
 import com.loorve.domain.subscription.SubscriptionEntitlement
 import com.loorve.domain.subscription.SubscriptionState
+import com.loorve.domain.subscription.LOORVE_PRO_ANNUAL_BASE_PLAN_ID
+import com.loorve.domain.subscription.LOORVE_PRO_MONTHLY_BASE_PLAN_ID
+import com.loorve.ui.component.LoorveBrandMark
 
 private val MidnightCanvas = Brush.verticalGradient(
     colors = listOf(
-        Color(0xFF0D0A22),
-        Color(0xFF170D38),
-        Color(0xFF0A0C1E)
+        Color(0xFF150F2E),
+        Color(0xFF0A0B1E),
+        Color(0xFF090A16)
     )
 )
 private val CtaGradient = Brush.linearGradient(
@@ -70,6 +77,30 @@ private val SaleGradient = Brush.linearGradient(
 )
 
 @Composable
+private fun PaywallAmbientBackground() {
+    Canvas(modifier = Modifier.fillMaxWidth().height(680.dp)) {
+        fun aura(center: Offset, radius: Float, color: Color) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        color.copy(alpha = 0.18f),
+                        color.copy(alpha = 0.06f),
+                        Color.Transparent
+                    ),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center
+            )
+        }
+        aura(Offset(size.width * 0.04f, size.height * 0.04f), size.minDimension * 0.82f, Color(0xFF6D28D9))
+        aura(Offset(size.width * 0.98f, size.height * 0.42f), size.minDimension * 0.86f, Color(0xFFC026D3))
+        aura(Offset(size.width * 0.40f, size.height * 0.98f), size.minDimension * 0.78f, Color(0xFF312E81))
+    }
+}
+
+@Composable
 fun ProPaywallDialog(
     viewModel: SubscriptionViewModel,
     onDismiss: () -> Unit
@@ -77,6 +108,7 @@ fun ProPaywallDialog(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var legalContent by remember { mutableStateOf<LegalContent?>(null) }
+    var selectedBasePlanId by remember { mutableStateOf(LOORVE_PRO_ANNUAL_BASE_PLAN_ID) }
 
     LaunchedEffect(Unit) {
         viewModel.querySubscriptionDetails()
@@ -89,26 +121,31 @@ fun ProPaywallDialog(
     ) {
         Box(
             modifier = Modifier
-                .widthIn(min = 320.dp, max = 440.dp)
-                .heightIn(max = 720.dp)
-                .background(MidnightCanvas)
+                .widthIn(min = 300.dp, max = 390.dp)
+                .heightIn(max = 680.dp)
+                .background(Color(0xFF0A0B1E))
                 .navigationBarsPadding()
         ) {
+            PaywallAmbientBackground()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp)
+                    .padding(horizontal = 16.dp)
             ) {
                 TopBar(onDismiss = onDismiss)
                 HeroHeader()
                 SubscriptionContent(state)
-                PlanSelector()
+                PlanSelector(
+                    selectedBasePlanId = selectedBasePlanId,
+                    onPlanSelected = { selectedBasePlanId = it }
+                )
                 Spacer(Modifier.height(18.dp))
                 PrimaryAction(
                     state = state,
                     context = context,
                     viewModel = viewModel,
+                    selectedBasePlanId = selectedBasePlanId,
                     onDismiss = onDismiss
                 )
                 LegalFooter(
@@ -171,22 +208,16 @@ private fun TopBar(onDismiss: () -> Unit) {
                 .background(Color.White.copy(alpha = 0.08f)),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
         ) {
-            Text("✕", color = Color.White, fontWeight = FontWeight.Bold)
+            Text("×", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
         }
         Text(
-            text = "Loorve Pro",
-            color = Color.White,
-            fontWeight = FontWeight.Bold
+            text = "PREMIUM UPGRADE",
+            color = Color(0xFFC4B5FD),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.1.sp
         )
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.08f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("👤", fontSize = androidx.compose.ui.unit.TextUnit.Unspecified)
-        }
+        Spacer(modifier = Modifier.width(40.dp))
     }
 }
 
@@ -198,33 +229,43 @@ private fun HeroHeader() {
             .padding(top = 20.dp, bottom = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "✦ LOORVE PRO MEMBERSHIP",
-            color = Color(0xFFC084FC),
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(18.dp))
+        LoorveBrandMark(size = 76.dp)
+        Spacer(Modifier.height(14.dp))
         Box(
             modifier = Modifier
-                .size(78.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(ProGradient)
-                .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(24.dp)),
-            contentAlignment = Alignment.Center
+                .clip(CircleShape)
+                .background(Color(0xFF8B5CF6).copy(alpha = 0.20f))
+                .border(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.30f), CircleShape)
+                .padding(horizontal = 12.dp, vertical = 5.dp)
         ) {
-            Text("✦", color = Color.White, fontWeight = FontWeight.ExtraBold)
+            Text(
+                text = "LOORVE PRO MEMBERSHIP",
+                color = Color(0xFFC4B5FD),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.2.sp
+            )
         }
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(14.dp))
         Text(
-            text = "한계를 뛰어넘는\n초개인화 AI 학습",
+            text = "효율을 극대화하는",
             color = Color.White,
+            fontSize = 23.sp,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = "최적의 맞춤 복습",
+            color = Color(0xFFE879F9),
+            fontSize = 23.sp,
             fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "에빙하우스 망각곡선 엔진과 Gemini Pro 취약점 진단으로\n당신에게 꼭 맞는 학습 루틴을 완성하세요.",
-            color = Color.White.copy(alpha = 0.75f),
+            text = "에빙하우스 망각곡선 엔진으로 복습 효율을 높이세요.",
+            color = Color(0xFF94A3B8),
+            fontSize = 12.5.sp,
             textAlign = TextAlign.Center
         )
     }
@@ -252,8 +293,8 @@ private fun SubscriptionContent(state: SubscriptionState) {
         ) {
             ComparisonHeader()
             HorizontalDivider(color = Color.White.copy(alpha = 0.14f))
-            ComparisonRow("복습 블록 생성", "최대 5개", "무제한 생성")
-            ComparisonRow("광고 노출", "광고 있음", "100% 클린")
+            ComparisonRow("복습 블록 생성", "최대 1개", "무제한 생성", "시험/목표별 생성 개수")
+            ComparisonRow("광고 노출", "광고 노출됨", "완전 제거", "하단 배너 및 팝업 광고")
         }
         when (val entitlement = state.entitlement) {
             SubscriptionEntitlement.Loading -> CircularProgressIndicator(
@@ -284,8 +325,8 @@ private fun ComparisonHeader() {
         modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("핵심 기능", modifier = Modifier.weight(1.4f), color = Color.White.copy(alpha = 0.75f))
-        Text("Basic 무료", modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.45f), textAlign = TextAlign.Center)
+        Text("기능 및 혜택 비교", modifier = Modifier.weight(1.4f), color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+        Text("Basic", modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.45f), textAlign = TextAlign.Center, fontSize = 12.sp)
         Box(
             modifier = Modifier
                 .weight(1.2f)
@@ -294,18 +335,26 @@ private fun ComparisonHeader() {
                 .padding(horizontal = 7.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text("✪ Loorve Pro", color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            Text("Pro", color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, fontSize = 12.sp)
         }
     }
 }
 
 @Composable
-private fun ComparisonRow(feature: String, basic: String, pro: String) {
+private fun ComparisonRow(
+    feature: String,
+    basic: String,
+    pro: String,
+    description: String
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(feature, modifier = Modifier.weight(1.4f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Column(modifier = Modifier.weight(1.4f)) {
+            Text(feature, color = Color(0xFFE2E8F0), fontWeight = FontWeight.Medium)
+            Text(description, color = Color(0xFF94A3B8), fontSize = 10.sp)
+        }
         Text(basic, modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.55f), textAlign = TextAlign.Center)
         Box(
             modifier = Modifier
@@ -322,7 +371,10 @@ private fun ComparisonRow(feature: String, basic: String, pro: String) {
 }
 
 @Composable
-private fun PlanSelector() {
+private fun PlanSelector(
+    selectedBasePlanId: String,
+    onPlanSelected: (String) -> Unit
+) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -333,21 +385,22 @@ private fun PlanSelector() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("플랜 선택", color = Color.White, fontWeight = FontWeight.Bold)
-            Text("언제든지 해지 가능", color = Color.White.copy(alpha = 0.45f))
         }
         PlanCard(
-            badge = "🔥 BEST 45% 할인",
-            title = "연간 플랜",
-            subtitle = "20% 할인",
-            price = "27,840원 / 년",
-            active = true
+            badge = null,
+            title = "연간 정기 결제",
+            subtitle = "16% 할인",
+            price = "₩29,000/년",
+            active = selectedBasePlanId == LOORVE_PRO_ANNUAL_BASE_PLAN_ID,
+            onClick = { onPlanSelected(LOORVE_PRO_ANNUAL_BASE_PLAN_ID) }
         )
         PlanCard(
             badge = null,
-            title = "월간 플랜",
-            subtitle = "정기 결제",
-            price = "2,900원 / 월",
-            active = false
+            title = "월간 정기 결제",
+            subtitle = "",
+            price = "₩2,900/월",
+            active = selectedBasePlanId == LOORVE_PRO_MONTHLY_BASE_PLAN_ID,
+            onClick = { onPlanSelected(LOORVE_PRO_MONTHLY_BASE_PLAN_ID) }
         )
     }
 }
@@ -358,7 +411,8 @@ private fun PlanCard(
     title: String,
     subtitle: String,
     price: String,
-    active: Boolean
+    active: Boolean,
+    onClick: () -> Unit
 ) {
     Box {
         Column(
@@ -379,6 +433,7 @@ private fun PlanCard(
                     ),
                     RoundedCornerShape(18.dp)
                 )
+                .clickable(onClick = onClick)
                 .padding(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -395,7 +450,9 @@ private fun PlanCard(
                 Spacer(Modifier.width(11.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(title, color = Color.White, fontWeight = FontWeight.Bold)
-                    Text(subtitle, color = Color.White.copy(alpha = 0.55f))
+                    if (subtitle.isNotBlank()) {
+                        Text(subtitle, color = Color(0xFFC4B5FD), fontSize = 11.sp)
+                    }
                 }
                 Text(price, color = Color.White, fontWeight = FontWeight.ExtraBold)
             }
@@ -421,6 +478,7 @@ private fun PrimaryAction(
     state: SubscriptionState,
     context: android.content.Context,
     viewModel: SubscriptionViewModel,
+    selectedBasePlanId: String,
     onDismiss: () -> Unit
 ) {
     when (state.entitlement) {
@@ -435,7 +493,8 @@ private fun PrimaryAction(
         }
         else -> {
             val productReady = state.isBillingReady &&
-                state.productDetails?.subscriptionOfferDetails?.isNotEmpty() == true
+                state.productDetails?.subscriptionOfferDetails
+                    ?.any { it.basePlanId == selectedBasePlanId } == true
             Button(
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
@@ -443,7 +502,7 @@ private fun PrimaryAction(
                 onClick = {
                     val productDetails = state.productDetails ?: return@Button
                     val offerToken = productDetails.subscriptionOfferDetails
-                        ?.firstOrNull()
+                        ?.firstOrNull { it.basePlanId == selectedBasePlanId }
                         ?.offerToken
                         ?: return@Button
                     (context as? Activity)?.let { activity ->
@@ -464,7 +523,12 @@ private fun PrimaryAction(
                         .background(CtaGradient),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("구독 시작하기", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "구독하기",
+                        color = Color.White,
+                        fontSize = 15.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -477,22 +541,24 @@ private fun LegalFooter(
     onTerms: () -> Unit,
     onPrivacy: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp, bottom = 16.dp),
-        horizontalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Row(horizontalArrangement = Arrangement.Center) {
         TextButton(onClick = onRestore) {
-            Text("구매 내역 복원", color = Color.White.copy(alpha = 0.65f))
+            Text("구매 내역 복원", color = Color(0xFF64748B), fontSize = 10.5.sp)
         }
-        Text("•", modifier = Modifier.padding(top = 12.dp), color = Color.White.copy(alpha = 0.3f))
+        Text("•", modifier = Modifier.padding(top = 12.dp), color = Color(0xFF64748B))
         TextButton(onClick = onTerms) {
-            Text("이용약관", color = Color.White.copy(alpha = 0.65f))
+            Text("이용약관", color = Color(0xFF64748B), fontSize = 10.5.sp)
         }
-        Text("•", modifier = Modifier.padding(top = 12.dp), color = Color.White.copy(alpha = 0.3f))
+        Text("•", modifier = Modifier.padding(top = 12.dp), color = Color(0xFF64748B))
         TextButton(onClick = onPrivacy) {
-            Text("개인정보처리방침", color = Color.White.copy(alpha = 0.65f))
+            Text("개인정보처리방침", color = Color(0xFF64748B), fontSize = 10.5.sp)
+        }
         }
     }
 }

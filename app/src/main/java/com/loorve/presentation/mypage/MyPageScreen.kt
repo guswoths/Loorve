@@ -2,8 +2,14 @@ package com.loorve.presentation.mypage
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +39,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,6 +55,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -227,32 +236,20 @@ fun MyPageScreen(
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Spacer(Modifier.width(6.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(CircleShape)
-                                            .background(
-                                                if (subscriptionState.entitlement is SubscriptionEntitlement.Pro) {
-                                                    Active
-                                                } else {
-                                                    SurfaceVariant
-                                                }
+                                    if (subscriptionState.entitlement is SubscriptionEntitlement.Pro) {
+                                        SettingsProBadgeLiquid()
+                                    } else {
+                                        Surface(shape = CircleShape, color = Color(0xFFF1F5F9)) {
+                                            Text(
+                                                text = "BASIC",
+                                                style = LoorveTypography.labelSmall.copy(
+                                                    fontSize = 10.sp,
+                                                    letterSpacing = 0.8.sp
+                                                ),
+                                                color = Color(0xFF94A3B8),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                             )
-                                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                                    ) {
-                                        Text(
-                                            text = if (subscriptionState.entitlement is SubscriptionEntitlement.Pro) {
-                                                "Pro"
-                                            } else {
-                                                "Basic"
-                                            },
-                                            style = LoorveTypography.labelSmall,
-                                            color = if (subscriptionState.entitlement is SubscriptionEntitlement.Pro) {
-                                                Color.White
-                                            } else {
-                                                OnSurfaceVariant
-                                            },
-                                            fontWeight = FontWeight.SemiBold
-                                        )
+                                        }
                                     }
                                 }
                                 Text(
@@ -325,6 +322,7 @@ fun MyPageScreen(
 
                 item {
                     ProShowcaseBanner(
+                        isProSubscribed = subscriptionState.entitlement is SubscriptionEntitlement.Pro,
                         onClick = { showProDialog = true }
                     )
                 }
@@ -457,7 +455,20 @@ private fun SettingsAmbientAura() {
 }
 
 @Composable
-private fun ProShowcaseBanner(onClick: () -> Unit) {
+private fun ProShowcaseBanner(
+    isProSubscribed: Boolean,
+    onClick: () -> Unit
+) {
+    val transition = rememberInfiniteTransition(label = "settingsProBlock")
+    val shift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(6000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "settingsProBlockShift"
+    )
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -465,12 +476,33 @@ private fun ProShowcaseBanner(onClick: () -> Unit) {
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        Color(0xFF18113C),
-                        Color(0xFF2E1A5A),
-                        Color(0xFF0D0F28)
-                    )
+                        Color(0xFF4338CA),
+                        Color(0xFF6D28D9),
+                        Color(0xFFA21CAF)
+                    ),
+                    start = Offset(shift * 80f, 0f),
+                    end = Offset(420f + shift * 80f, 220f)
                 )
             )
+            .drawWithCache {
+                val sheenX = size.width * (-0.8f + shift * 2.4f)
+                onDrawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = 0.10f),
+                                Color.White.copy(alpha = 0.34f),
+                                Color.White.copy(alpha = 0.10f),
+                                Color.Transparent
+                            ),
+                            start = Offset(sheenX - size.width, 0f),
+                            end = Offset(sheenX, size.height)
+                        )
+                    )
+                }
+            }
             .clickable(onClick = onClick)
             .padding(20.dp)
     ) {
@@ -495,22 +527,91 @@ private fun ProShowcaseBanner(onClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(AuroraBlue, AuroraViolet, Color(0xFFD946EF))
-                        )
-                    )
+                    .background(Color(0xFF0F172A).copy(alpha = 0.26f))
+                    .border(1.dp, Color.White.copy(alpha = 0.42f), CircleShape)
                     .clickable(onClick = onClick)
-                    .padding(horizontal = 18.dp, vertical = 10.dp)
+                    .padding(2.dp)
             ) {
-                Text(
-                    text = stringResource(R.string.settings_loorve_pro_open),
-                    style = LoorveTypography.labelLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    Color(0xFF6366F1),
+                                    Color(0xFF8B5CF6),
+                                    Color(0xFFD946EF)
+                                )
+                            )
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (isProSubscribed) "구독 중" else "구독",
+                        style = LoorveTypography.labelLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsProBadgeLiquid() {
+    val transition = rememberInfiniteTransition(label = "settingsProBadge")
+    val shift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(6000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "settingsProBadgeShift"
+    )
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(Color(0xFF4F46E5), Color(0xFF7C3AED), Color(0xFFC026D3)),
+                    start = Offset(shift * 80f, 0f),
+                    end = Offset(120f + shift * 80f, 40f)
+                )
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+            .drawWithCache {
+                val sheenX = size.width * (-0.8f + shift * 2.4f)
+                onDrawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = 0.14f),
+                                Color.White.copy(alpha = 0.5f),
+                                Color.White.copy(alpha = 0.14f),
+                                Color.Transparent
+                            ),
+                            start = Offset(sheenX - size.width, 0f),
+                            end = Offset(sheenX, size.height)
+                        )
+                    )
+                }
+            }
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = "PRO",
+            style = LoorveTypography.labelSmall.copy(
+                fontSize = 10.5.sp,
+                letterSpacing = 0.8.sp
+            ),
+            color = Color.White,
+            fontWeight = FontWeight.ExtraBold
+        )
     }
 }
 

@@ -56,6 +56,7 @@ import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -63,6 +64,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.firebase.auth.FirebaseAuth
+import com.loorve.presentation.auth.SplashDestination
+import com.loorve.presentation.auth.SplashViewModel
 import com.loorve.presentation.calendar.AddReviewBlockScreen
 import com.loorve.presentation.calendar.ReviewCalendarScreen
 import com.loorve.presentation.exam.ExamSettingScreen
@@ -340,30 +343,26 @@ private fun SplashAmbientOrbs() {
 
 @Composable
 fun LoorveNavHost(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    splashViewModel: SplashViewModel = hiltViewModel()
 ) {
+    val destination by splashViewModel.destination.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        splashViewModel.resolveDestination()
+    }
+
+    val startDestination = when (destination) {
+        SplashDestination.Home -> Screen.Home.route
+        SplashDestination.Login -> Screen.Login.route
+        SplashDestination.Onboarding -> Screen.Onboarding.route
+        SplashDestination.Loading -> return
+    }
+
     NavHost(
         navController = navController,
-        startDestination = Screen.Splash.route
+        startDestination = startDestination
     ) {
-        composable(Screen.Splash.route) {
-            SplashScreen(
-                onSplashComplete = { isLoggedIn ->
-                    val destination = if (isLoggedIn) {
-                        Screen.Home.route
-                    } else {
-                        Screen.Login.route
-                    }
-
-                    navController.navigate(destination) {
-                        popUpTo(Screen.Splash.route) {
-                            inclusive = true
-                        }
-                    }
-                }
-            )
-        }
-
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = { isNewUser ->

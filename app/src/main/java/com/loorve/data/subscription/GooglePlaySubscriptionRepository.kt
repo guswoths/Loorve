@@ -176,10 +176,13 @@ class GooglePlaySubscriptionRepository @Inject constructor(
         return result.responseCode == BillingClient.BillingResponseCode.OK
     }
 
-    override fun launchPurchase(activity: Activity): Boolean {
+    override fun launchPurchase(
+        activity: Activity,
+        basePlanId: String
+    ): Boolean {
         val product = _state.value.productDetails ?: return false
         val offerToken = product.subscriptionOfferDetails
-            ?.firstOrNull()
+            ?.firstOrNull { it.basePlanId == basePlanId }
             ?.offerToken
             ?: return false
         return launchBillingFlow(activity, product, offerToken)

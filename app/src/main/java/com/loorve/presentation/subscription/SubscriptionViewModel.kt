@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.android.billingclient.api.ProductDetails
 import com.loorve.domain.subscription.SubscriptionRepository
 import com.loorve.domain.subscription.SubscriptionState
+import com.loorve.domain.subscription.LOORVE_PRO_MONTHLY_BASE_PLAN_ID
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.StateFlow
@@ -26,8 +27,11 @@ class SubscriptionViewModel @Inject constructor(
         repository.refresh()
     }
 
-    fun launchPurchase(activity: Activity): Boolean {
-        return repository.launchPurchase(activity)
+    fun launchPurchase(
+        activity: Activity,
+        basePlanId: String = LOORVE_PRO_MONTHLY_BASE_PLAN_ID
+    ): Boolean {
+        return repository.launchPurchase(activity, basePlanId)
     }
 
     fun querySubscriptionDetails(productId: String = "loorve_pro_monthly") {

@@ -6,9 +6,11 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Must exactly match the Google Play Console subscription product ID.
- * Configure its auto-renewing base plan in Play Console at KRW 2,900/month.
+ * Configure the monthly-plan and annual-plan auto-renewing base plans in Play Console.
  */
 const val LOORVE_PRO_MONTHLY_PRODUCT_ID = "loorve_pro_monthly"
+const val LOORVE_PRO_MONTHLY_BASE_PLAN_ID = "monthly-plan"
+const val LOORVE_PRO_ANNUAL_BASE_PLAN_ID = "annual-plan"
 
 class SubscriptionRequiredException : IllegalStateException("Loorve Pro 구독이 필요합니다.")
 
@@ -45,5 +47,8 @@ interface SubscriptionRepository {
         offerToken: String
     ): Boolean
 
-    fun launchPurchase(activity: Activity): Boolean
+    fun launchPurchase(
+        activity: Activity,
+        basePlanId: String = LOORVE_PRO_MONTHLY_BASE_PLAN_ID
+    ): Boolean
 }
