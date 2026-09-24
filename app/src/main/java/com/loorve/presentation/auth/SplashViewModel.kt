@@ -32,10 +32,16 @@ class SplashViewModel @Inject constructor(
             val isLoggedIn = FirebaseAuth.getInstance().currentUser != null
 
             _destination.value = when {
-                !isOnboardingComplete -> SplashDestination.Onboarding  // 최초 유저
-                isLoggedIn -> SplashDestination.Home                   // 기존 유저, 로그인됨
-                else -> SplashDestination.Login                        // 기존 유저, 재로그인 필요
+                !isLoggedIn -> SplashDestination.Login
+                !isOnboardingComplete -> SplashDestination.Onboarding
+                else -> SplashDestination.Home
             }
+        }
+    }
+
+    fun completeOnboarding() {
+        viewModelScope.launch {
+            onboardingPreferences.setOnboardingComplete(true)
         }
     }
 }

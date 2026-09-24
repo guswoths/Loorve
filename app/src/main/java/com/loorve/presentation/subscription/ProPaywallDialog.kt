@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,7 +59,6 @@ import com.loorve.domain.subscription.SubscriptionEntitlement
 import com.loorve.domain.subscription.SubscriptionState
 import com.loorve.domain.subscription.LOORVE_PRO_ANNUAL_BASE_PLAN_ID
 import com.loorve.domain.subscription.LOORVE_PRO_MONTHLY_BASE_PLAN_ID
-import com.loorve.ui.component.LoorveBrandMark
 
 private val MidnightCanvas = Brush.verticalGradient(
     colors = listOf(
@@ -122,9 +123,17 @@ fun ProPaywallDialog(
         Box(
             modifier = Modifier
                 .widthIn(min = 300.dp, max = 390.dp)
-                .heightIn(max = 680.dp)
-                .background(Color(0xFF0A0B1E))
-                .navigationBarsPadding()
+            .heightIn(max = 760.dp)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF140B2E),
+                        Color(0xFF1A0F3D),
+                        Color(0xFF0C081E)
+                    )
+                )
+            )
+            .navigationBarsPadding()
         ) {
             PaywallAmbientBackground()
             Column(
@@ -210,13 +219,7 @@ private fun TopBar(onDismiss: () -> Unit) {
         ) {
             Text("×", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
         }
-        Text(
-            text = "PREMIUM UPGRADE",
-            color = Color(0xFFC4B5FD),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.1.sp
-        )
+        Spacer(modifier = Modifier.width(40.dp))
         Spacer(modifier = Modifier.width(40.dp))
     }
 }
@@ -226,48 +229,53 @@ private fun HeroHeader() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 20.dp, bottom = 24.dp),
+        .padding(top = 4.dp, bottom = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        LoorveBrandMark(size = 76.dp)
-        Spacer(Modifier.height(14.dp))
-        Box(
-            modifier = Modifier
-                .clip(CircleShape)
-                .background(Color(0xFF8B5CF6).copy(alpha = 0.20f))
-                .border(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.30f), CircleShape)
-                .padding(horizontal = 12.dp, vertical = 5.dp)
-        ) {
-            Text(
-                text = "LOORVE PRO MEMBERSHIP",
-                color = Color(0xFFC4B5FD),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 1.2.sp
-            )
-        }
-        Spacer(Modifier.height(14.dp))
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(Color(0xFF351B75).copy(alpha = 0.60f))
+            .padding(horizontal = 12.dp, vertical = 5.dp)
+    ) {
         Text(
-            text = "효율을 극대화하는",
-            color = Color.White,
-            fontSize = 23.sp,
-            fontWeight = FontWeight.ExtraBold,
-            textAlign = TextAlign.Center
+            text = "LOORVE PRO MEMBERSHIP",
+            color = Color(0xFFD2BBFF),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.3.sp
         )
-        Text(
-            text = "최적의 맞춤 복습",
-            color = Color(0xFFE879F9),
-            fontSize = 23.sp,
-            fontWeight = FontWeight.ExtraBold,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "에빙하우스 망각곡선 엔진으로 복습 효율을 높이세요.",
-            color = Color(0xFF94A3B8),
-            fontSize = 12.5.sp,
-            textAlign = TextAlign.Center
-        )
+    }
+    Spacer(Modifier.height(14.dp))
+    Image(
+        painter = painterResource(com.loorve.R.mipmap.ic_launcher),
+        contentDescription = "Loorve app icon",
+        modifier = Modifier
+            .size(80.dp)
+            .clip(RoundedCornerShape(24.dp))
+    )
+    Spacer(Modifier.height(14.dp))
+    Text(
+        text = "효율을 극대화하는",
+        color = Color.White,
+        fontSize = 28.sp,
+        fontWeight = FontWeight.ExtraBold,
+        textAlign = TextAlign.Center
+    )
+    Text(
+        text = "최적의 맞춤 복습",
+        color = Color(0xFFD2BBFF),
+        fontSize = 28.sp,
+        fontWeight = FontWeight.ExtraBold,
+        textAlign = TextAlign.Center
+    )
+    Spacer(Modifier.height(8.dp))
+    Text(
+        text = "에빙하우스 망각곡선 엔진으로 복습 효율을 높이세요.",
+        color = Color(0xFFC1C6D6),
+        fontSize = 13.sp,
+        textAlign = TextAlign.Center
+    )
     }
 }
 
@@ -285,10 +293,9 @@ private fun SubscriptionContent(state: SubscriptionState) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(22.dp))
-                .background(Color.White.copy(alpha = 0.04f))
-                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(22.dp))
-                .padding(12.dp),
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF1B103C).copy(alpha = 0.70f))
+                .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             ComparisonHeader()
@@ -325,17 +332,17 @@ private fun ComparisonHeader() {
         modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("기능 및 혜택 비교", modifier = Modifier.weight(1.4f), color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-        Text("Basic", modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.45f), textAlign = TextAlign.Center, fontSize = 12.sp)
+        Text("핵심 기능", modifier = Modifier.weight(1.4f), color = Color(0xFFC1C6D6), fontSize = 12.sp)
+        Text("Basic 무료", modifier = Modifier.weight(1f), color = Color(0xFFC1C6D6), textAlign = TextAlign.Center, fontSize = 11.sp)
         Box(
             modifier = Modifier
                 .weight(1.2f)
                 .clip(CircleShape)
-                .background(ProGradient)
+                .background(CtaGradient)
                 .padding(horizontal = 7.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text("Pro", color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, fontSize = 12.sp)
+            Text("Loorve Pro", color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, fontSize = 11.sp)
         }
     }
 }
@@ -376,8 +383,8 @@ private fun PlanSelector(
     onPlanSelected: (String) -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -387,17 +394,17 @@ private fun PlanSelector(
             Text("플랜 선택", color = Color.White, fontWeight = FontWeight.Bold)
         }
         PlanCard(
-            badge = null,
-            title = "연간 정기 결제",
-            subtitle = "16% 할인",
+            badge = "BEST 16% 할인",
+            title = "연간 플랜",
+            subtitle = "1년 권장",
             price = "₩29,000/년",
             active = selectedBasePlanId == LOORVE_PRO_ANNUAL_BASE_PLAN_ID,
             onClick = { onPlanSelected(LOORVE_PRO_ANNUAL_BASE_PLAN_ID) }
         )
         PlanCard(
             badge = null,
-            title = "월간 정기 결제",
-            subtitle = "",
+            title = "월간 플랜",
+            subtitle = "정기 결제",
             price = "₩2,900/월",
             active = selectedBasePlanId == LOORVE_PRO_MONTHLY_BASE_PLAN_ID,
             onClick = { onPlanSelected(LOORVE_PRO_MONTHLY_BASE_PLAN_ID) }
@@ -418,7 +425,7 @@ private fun PlanCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(16.dp))
                 .background(
                     if (active) Brush.linearGradient(
                         listOf(Color(0x297C3AED), Color(0x142563EB))
@@ -431,15 +438,15 @@ private fun PlanCard(
                         if (active) 1.5.dp else 1.dp,
                         if (active) Color(0xFFA855F7) else Color.White.copy(alpha = 0.08f)
                     ),
-                    RoundedCornerShape(18.dp)
+                    RoundedCornerShape(16.dp)
                 )
                 .clickable(onClick = onClick)
-                .padding(16.dp)
+                .padding(14.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(22.dp)
+                        .size(20.dp)
                         .clip(CircleShape)
                         .background(if (active) Color(0xFFA855F7) else Color.Transparent)
                         .border(2.dp, if (active) Color(0xFFA855F7) else Color.White.copy(alpha = 0.2f), CircleShape),
@@ -447,14 +454,14 @@ private fun PlanCard(
                 ) {
                     if (active) Text("✓", color = Color.White, fontWeight = FontWeight.Bold)
                 }
-                Spacer(Modifier.width(11.dp))
+                Spacer(Modifier.width(9.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(title, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     if (subtitle.isNotBlank()) {
-                        Text(subtitle, color = Color(0xFFC4B5FD), fontSize = 11.sp)
+                        Text(subtitle, color = Color(0xFFC4B5FD), fontSize = 10.sp)
                     }
                 }
-                Text(price, color = Color.White, fontWeight = FontWeight.ExtraBold)
+                Text(price, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
             }
         }
         if (badge != null) {
@@ -465,9 +472,10 @@ private fun PlanCard(
                     .offset(y = (-11).dp)
                     .clip(CircleShape)
                     .background(SaleGradient)
-                    .padding(horizontal = 11.dp, vertical = 5.dp),
+                    .padding(horizontal = 9.dp, vertical = 4.dp),
                 color = Color.White,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp
             )
         }
     }

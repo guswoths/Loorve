@@ -721,7 +721,7 @@ private fun ReviewBlockCount(
                     .drawBehind {
                         if (isOngoing) {
                             drawCircle(
-                                color = Color(0xFF8B5CF6).copy(alpha = 0.22f * dotAlpha),
+                                color = Color(0xFF2563EB).copy(alpha = 0.22f * dotAlpha),
                                 radius = size.minDimension * 0.48f * dotScale
                             )
                         }
@@ -733,7 +733,7 @@ private fun ReviewBlockCount(
                         .size(8.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isOngoing) Color(0xFF8B5CF6) else Color(0xFF3B82F6)
+                            if (isOngoing) Color(0xFF2563EB) else Color(0xFF8B5CF6)
                         )
                 )
             }
@@ -750,13 +750,13 @@ private fun ReviewBlockCount(
             Text(
                 text = count.toString(),
                 style = LoorveTypography.titleMedium.copy(fontSize = 20.sp, lineHeight = 20.sp),
-                color = if (isOngoing) Color(0xFF9333EA) else Color(0xFF0F172A),
+                color = if (isOngoing) Color(0xFF1D4ED8) else Color(0xFF0F172A),
                 fontWeight = FontWeight.Black
             )
             Text(
                 text = "개",
                 style = LoorveTypography.labelSmall.copy(fontSize = 12.sp, letterSpacing = 0.sp),
-                color = if (isOngoing) Color(0xFF9333EA) else Color(0xFF475569),
+                color = if (isOngoing) Color(0xFF1D4ED8) else Color(0xFF475569),
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(start = 4.dp)
             )
@@ -1381,7 +1381,7 @@ private fun HomeMiniCalendar(
                                 if (hasSchedule) {
                                     Spacer(Modifier.height(2.dp))
                                     val isCompleted = completedDates.contains(date)
-                                    val dotColor = if (isSelected) OnGradient else Active
+                                    val dotColor = if (isSelected) Color(0xFF93C5FD) else Color(0xFF2563EB)
                                     if (isCompleted) {
                                         Box(
                                             modifier = Modifier
@@ -1435,12 +1435,12 @@ private fun HomeScheduleCard(
                     .size(24.dp)
                     .clip(CircleShape)
                     .background(
-                        if (checked) Active else Color.Transparent
+                        if (checked) Color(0xFF2563EB) else Color.Transparent
                     )
                     .border(
                         BorderStroke(
                             width = 1.5.dp,
-                            color = if (checked) Active else TertiaryText
+                            color = if (checked) Color(0xFF2563EB) else Color(0xFF60A5FA)
                         ),
                         CircleShape
                     )
@@ -1466,14 +1466,14 @@ private fun HomeScheduleCard(
                 Text(
                     text = headerTitle,
                     style = LoorveTypography.labelMedium,
-                    color = Active,
+                    color = Color(0xFF2563EB),
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = content,
                     style = LoorveTypography.bodyMedium,
-                    color = OnBackground,
+                    color = Color(0xFF1D4ED8),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     textDecoration = if (checked) {

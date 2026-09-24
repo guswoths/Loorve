@@ -1501,7 +1501,7 @@ fun ReviewRecordMiniCard(
                         Text(
                             text = dateText,
                             style = LoorveTypography.labelSmall,
-                            color = Active
+                            color = Color(0xFF2563EB)
                         )
                     }
 
@@ -1512,7 +1512,7 @@ fun ReviewRecordMiniCard(
                             text = item.title,
                             style = LoorveTypography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = OnBackground,
+                            color = Color(0xFF1D4ED8),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1580,12 +1580,12 @@ fun ReviewRecordMiniCard(
                                 .size(24.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (isCompleted) Active else Color.Transparent
+                                    if (isCompleted) Color(0xFF2563EB) else Color.Transparent
                                 )
                                 .border(
                                     BorderStroke(
                                         width = 1.5.dp,
-                                        color = if (isCompleted) Active else TertiaryText
+                                        color = if (isCompleted) Color(0xFF2563EB) else Color(0xFF60A5FA)
                                     ),
                                     CircleShape
                                 )

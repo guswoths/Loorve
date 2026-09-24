@@ -7,6 +7,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -64,6 +65,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.firebase.auth.FirebaseAuth
+import com.loorve.R
 import com.loorve.presentation.auth.SplashDestination
 import com.loorve.presentation.auth.SplashViewModel
 import com.loorve.presentation.calendar.AddReviewBlockScreen
@@ -131,17 +133,6 @@ private val bottomNavItems = listOf(
 private fun SplashScreen(
     onSplashComplete: (isLoggedIn: Boolean) -> Unit
 ) {
-    var triggered by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(2.seconds)
-        if (!triggered) {
-            triggered = true
-            val isLoggedIn = FirebaseAuth.getInstance().currentUser != null
-            onSplashComplete(isLoggedIn)
-        }
-    }
-
     val view = LocalView.current
     DisposableEffect(view) {
         val controller = WindowCompat.getInsetsController(
@@ -177,18 +168,12 @@ private fun SplashScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
             ) {
-                Text(
-                    text = "Loorve",
-                    style = TextStyle(
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 44.sp,
-                        lineHeight = 44.sp,
-                        letterSpacing = (-1.2).sp,
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(AuroraBlue, AuroraViolet, AuroraPink)
-                        )
-                    ),
-                    textAlign = TextAlign.Center
+                Image(
+                    painter = androidx.compose.ui.res.painterResource(R.drawable.loorve_wordmark),
+                    contentDescription = "Loorve",
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .width(260.dp)
                 )
                 Text(
                     text = "시험일 기반 자동 복습 스케줄러",
@@ -349,14 +334,20 @@ fun LoorveNavHost(
     val destination by splashViewModel.destination.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
+        delay(2.seconds)
         splashViewModel.resolveDestination()
+    }
+
+    if (destination == SplashDestination.Loading) {
+        SplashScreen(onSplashComplete = {})
+        return
     }
 
     val startDestination = when (destination) {
         SplashDestination.Home -> Screen.Home.route
         SplashDestination.Login -> Screen.Login.route
         SplashDestination.Onboarding -> Screen.Onboarding.route
-        SplashDestination.Loading -> return
+        SplashDestination.Loading -> error("Loading destination must be rendered above")
     }
 
     NavHost(
@@ -384,6 +375,7 @@ fun LoorveNavHost(
         composable(Screen.Onboarding.route) {
             OnboardingScreen(
                 onFinished = {
+                    splashViewModel.completeOnboarding()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Onboarding.route) {
                             inclusive = true

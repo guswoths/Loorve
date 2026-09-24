@@ -10,6 +10,13 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Warning  // ✅ BatteryAlert → Warning
@@ -20,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -176,44 +184,89 @@ fun BatteryOptimizationGuideScreen(
     val manufacturer = remember { detectManufacturer() }
     val guideInfo = remember(manufacturer) { getBatteryGuideInfo(manufacturer) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("배터리 최적화 설정") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "뒤로가기"
-                        )
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Warning,  // ✅ BatteryAlert → Warning
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(64.dp)
-            )
-
-            if (isIgnoring) {
-                AlreadyExemptCard(onNavigateBack = onNavigateBack)
-            } else {
-                GuideContent(
-                    guideInfo = guideInfo,
-                    onLaunchSettings = { launchBatteryOptimizationSettings(context) },
-                    onSkip = onSkip
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFDCEBFF),
+                        Color(0xFFEDE9FF),
+                        Color(0xFFF8FAFC)
+                    )
                 )
+            )
+            .padding(horizontal = 16.dp, vertical = 48.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    text = "배터리 최적화 권한 설정",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.88f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "배터리 최적화",
+                        tint = Color(0xFF2563EB),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                BatteryGuideCard(
+                    isIgnoring = isIgnoring,
+                    guideInfo = guideInfo
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        if (isIgnoring) onNavigateBack()
+                        else launchBatteryOptimizationSettings(context)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2563EB),
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                ) {
+                    Text(
+                        if (isIgnoring) "확인" else "배터리 최적화 제외 허용하기",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+                OutlinedButton(
+                    onClick = onSkip,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF2563EB)
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        Color(0xFFE2E8F0)
+                    )
+                ) {
+                    Text("나중에", fontSize = 12.sp)
+                }
             }
         }
     }
@@ -297,6 +350,7 @@ private fun GuideContent(
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
+
                 }
             }
         }
@@ -313,6 +367,55 @@ private fun GuideContent(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("나중에")
+            }
+        }
+
+    }
+}
+
+@Composable
+private fun BatteryGuideCard(
+    isIgnoring: Boolean,
+    guideInfo: BatteryGuideInfo
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.94f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = if (isIgnoring) {
+                    "배터리 최적화 예외가 이미 등록되어 있습니다."
+                } else {
+                    "복습 알림을 제시간에 받으려면 배터리 최적화 권한이 필요합니다."
+                },
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                color = Color(0xFF475569)
+            )
+            HorizontalDivider(color = Color(0xFFE2E8F0))
+            Text(
+                text = if (isIgnoring) {
+                    "Loorve 알림이 정상적으로 동작합니다."
+                } else {
+                    "배터리 최적화가 활성화되어 있으면 복습 알림이 차단될 수 있습니다."
+                },
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                color = Color(0xFF64748B)
+            )
+            if (!isIgnoring) {
+                Text(
+                    text = "현재 기기: ${guideInfo.title}\n${guideInfo.steps.take(3).joinToString("  ·  ")}",
+                    fontSize = 11.sp,
+                    lineHeight = 17.sp,
+                    color = Color(0xFF64748B)
+                )
             }
         }
     }

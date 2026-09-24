@@ -57,6 +57,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -673,7 +674,7 @@ private fun ReviewWorkloadBar(
     } else {
         "$label, 예정 ${stat.dueCount}개, 완료 ${completedCount}개, 미완료 ${remainingCount}개"
     }
-    val pulseTransition = rememberInfiniteTransition(label = "purpleBarPulse")
+    val pulseTransition = rememberInfiniteTransition(label = "blueBarPulse")
     val pulse by pulseTransition.animateFloat(
         initialValue = if (selected) 0.96f else 1f,
         targetValue = if (selected) 1.04f else 1f,
@@ -681,7 +682,7 @@ private fun ReviewWorkloadBar(
             animation = tween(1800),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "purpleBarPulseValue"
+        label = "blueBarPulseValue"
     )
     Column(
         modifier = modifier
@@ -713,7 +714,7 @@ private fun ReviewWorkloadBar(
             style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
             ),
-            color = if (selected) Color(0xFF7C3AED) else Color(0xFF0F172A),
+            color = if (selected) Color(0xFF1D4ED8) else Color(0xFF0F172A),
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 4.dp)
         )
@@ -793,13 +794,13 @@ private fun LiquidGradientBar(
                 scaleX = if (selected) pulse else 1f
                 scaleY = if (selected) pulse else 1f
             }
-            .background(Color(0xFFF1F5F9))
-            .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape)
+            .background(Color(0xFFE8EEF6))
+            .border(1.dp, Color.White.copy(alpha = 0.70f), CircleShape)
             .shadow(
                 elevation = 10.dp,
                 shape = CircleShape,
-                ambientColor = Color(0xFF4F46E5).copy(alpha = 0.35f),
-                spotColor = Color(0xFF4F46E5).copy(alpha = 0.35f)
+                ambientColor = Color(0xFF1A73E8).copy(alpha = if (selected) 0.50f else 0.18f),
+                spotColor = Color(0xFF2563EB).copy(alpha = if (selected) 0.50f else 0.18f)
             ),
         contentAlignment = Alignment.BottomCenter
     ) {
@@ -812,9 +813,9 @@ private fun LiquidGradientBar(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color(0xFF9333EA),
-                                Color(0xFF6366F1),
-                                Color(0xFF1D4ED8)
+                                Color(0xFF38BDF8),
+                                Color(0xFF2563EB),
+                                Color(0xFF1E3A8A)
                             )
                         )
                     )
@@ -859,7 +860,7 @@ private fun ReviewBlockCard(
             .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-                containerColor = Color.White
+                containerColor = if (locked) Color(0xFF9E9E9E) else Color.White
         ),
         shape = RoundedCornerShape(24.dp),
         border = androidx.compose.foundation.BorderStroke(
@@ -898,14 +899,18 @@ private fun ReviewBlockCard(
                     }
                     Surface(
                         shape = CircleShape,
-                        color = Color(0xFFE2E8F0)
+                        color = when {
+                            isEnded -> Color(0xFFE5E7EB)
+                            isDelayed -> Color(0xFFFFE4E6)
+                            else -> Color(0xFFDCFCE7)
+                        }
                     ) {
                         Text(
                             text = statusText,
                             style = LoorveTypography.labelSmall,
                             color = when {
-                                isEnded -> Color(0xFF64748B)
-                                isDelayed -> Color(0xFFEF4444)
+                                isEnded -> Color(0xFF111827)
+                                isDelayed -> Color(0xFFDC2626)
                                 else -> Color(0xFF16A34A)
                             },
                             fontWeight = FontWeight.Bold,
@@ -925,31 +930,7 @@ private fun ReviewBlockCard(
                     fontWeight = FontWeight.Medium
                 )
 
-                if (locked) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp)
-                            .border(
-                                width = 1.dp,
-                                color = Color(0xFFCBD5E1),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .padding(top = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "누적 복습 4회차",
-                            style = LoorveTypography.labelSmall.copy(fontSize = 11.5.sp),
-                            color = Color(0xFF64748B)
-                        )
-                        Text(
-                            text = "다음 복습: D-2",
-                            style = LoorveTypography.labelSmall.copy(fontSize = 11.5.sp),
-                            color = Color(0xFF64748B)
-                        )
-                    }
-                } else {
+                if (!locked) {
                     Text(
                         text = "탭하여 복습 기록과 일정을 확인하세요",
                         style = LoorveTypography.bodySmall,
@@ -962,53 +943,35 @@ private fun ReviewBlockCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFF0F172A).copy(alpha = 0.48f))
-                        .blur(2.5.dp)
+                        .background(Color(0xFF5F6368).copy(alpha = 0.28f))
+                        .blur(1.5.dp)
                 )
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
+                        modifier = Modifier.offset(y = 20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Surface(
-                            modifier = Modifier.size(44.dp),
-                            shape = CircleShape,
-                            color = Color.White.copy(alpha = 0.18f),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                Color.White.copy(alpha = 0.35f)
-                            ),
-                            shadowElevation = 4.dp
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Lock,
-                                    contentDescription = "Pro 전용 복습 블록",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Pro 전용 복습 블록",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
                                 text = "Pro에서 전체 복습 블록을 이용할 수 있습니다.",
-                                fontSize = 13.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
                                 textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = ">",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White.copy(alpha = 0.90f)
                             )
                         }
                     }
