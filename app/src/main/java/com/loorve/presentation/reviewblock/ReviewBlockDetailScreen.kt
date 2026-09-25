@@ -191,9 +191,8 @@ fun ReviewBlockDetailScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFCF9F8))
+            .background(Color.White)
     ) {
-        DetailSpecAmbientMesh()
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = Color.Transparent
@@ -498,6 +497,7 @@ private fun SpecTab(
     }
 }
 
+@Suppress("unused")
 @Composable
 private fun DetailSpecAmbientMesh() {
     val transition = rememberInfiniteTransition(label = "detailAmbientMesh")
@@ -519,14 +519,14 @@ private fun DetailSpecAmbientMesh() {
             centerX = size.width * (-0.05f + phase * 0.08f),
             centerY = size.height * (0.04f + phase * 0.08f),
             radius = 170.dp.toPx(),
-            color = Color(0xFF2563EB),
+            color = Color(0xFF0284C7),
             alpha = 0.22f
         )
         drawAmbientOrb(
             centerX = size.width * (1.05f - phase * 0.08f),
             centerY = size.height * (0.42f - phase * 0.04f),
             radius = 160.dp.toPx(),
-            color = Color(0xFF9333EA),
+            color = Color(0xFF7DD3FC),
             alpha = 0.18f
         )
         drawAmbientOrb(
@@ -540,7 +540,7 @@ private fun DetailSpecAmbientMesh() {
             centerX = size.width * (0.88f - phase * 0.06f),
             centerY = size.height * (1.02f - phase * 0.04f),
             radius = 140.dp.toPx(),
-            color = Color(0xFFEC4899),
+            color = Color(0xFFBAE6FD),
             alpha = 0.15f
         )
     }
@@ -742,13 +742,8 @@ private fun LegacyReviewBlockDetailScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Background, CanvasWarm)
-                )
-            )
+            .background(Color.White)
     ) {
-        DetailAmbientAura()
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
@@ -988,6 +983,7 @@ private fun LegacyReviewBlockDetailScreen(
     }
 }
 
+@Suppress("unused")
 @Composable
 private fun DetailAmbientAura() {
     Box(

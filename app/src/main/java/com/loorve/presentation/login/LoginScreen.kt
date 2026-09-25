@@ -19,6 +19,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -44,6 +46,7 @@ import androidx.core.view.WindowInsetsCompat
 import com.loorve.presentation.auth.AuthUiState
 import com.loorve.presentation.auth.AuthViewModel
 import com.loorve.ui.theme.*
+import com.loorve.R
 
 @Composable
 fun LoginScreen(
@@ -116,18 +119,10 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = "Loorve",
-                    style = androidx.compose.ui.text.TextStyle(
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 44.sp,
-                        lineHeight = 44.sp,
-                        letterSpacing = (-1.2).sp,
-                        brush = Brush.horizontalGradient(
-                            listOf(AuroraBlue, AuroraViolet, Color(0xFFC026D3))
-                        )
-                    ),
-                    textAlign = TextAlign.Center
+                Image(
+                    painter = painterResource(R.drawable.loorve_wordmark),
+                    contentDescription = "Loorve",
+                    modifier = Modifier.width(240.dp)
                 )
                 Text(
                     text = "구글 계정으로 바로 시작",
@@ -165,7 +160,7 @@ fun LoginScreen(
                     onClick = { viewModel.launchGoogleSignIn(context) }
                 )
                 Text(
-                    text = "로그인 후 처음 사용자에게만 온보딩이 표시됩니다.",
+                    text = "Google 로그인 후 온보딩에서 Loorve 사용법을 확인할 수 있습니다.",
                     modifier = Modifier.padding(top = 16.dp),
                     style = androidx.compose.ui.text.TextStyle(
                         fontWeight = FontWeight.Normal,
@@ -246,22 +241,22 @@ private fun LoginAmbientBackground() {
         drawOrb(
             Offset((-64 + 25 * orb1).dp.toPx() + r1, (-84 + 40 * orb1).dp.toPx() + r1),
             r1,
-            Color(0x3D2563EB)
+            Color(0x3D1E3A8A)
         )
         drawOrb(
             Offset(size.width + (80 - 35 * orb2).dp.toPx() - r2, size.height * .32f + (-25 * orb2).dp.toPx()),
             r2,
-            Color(0x339333EA)
+            Color(0x332563EB)
         )
         drawOrb(
             Offset((-45 + 30 * orb3).dp.toPx() + r3, size.height * .88f + (-35 * orb3).dp.toPx()),
             r3,
-            Color(0x3856BDF8)
+            Color(0x3838BDF8)
         )
         drawOrb(
             Offset(size.width - 14.dp.toPx() - r4, size.height + (-42 + 30 * orb4).dp.toPx() - r4),
             r4,
-            Color(0x29EC4899)
+            Color(0x297DD3FC)
         )
     }
 }
@@ -304,10 +299,10 @@ private fun SplashLoadingScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Text(
-                text = "Loorve",
-                style = LoorveTypography.displayLarge,
-                color = Primary
+            Image(
+                painter = painterResource(R.drawable.loorve_wordmark),
+                contentDescription = "Loorve",
+                modifier = Modifier.width(190.dp)
             )
             Text(
                 text = "계정과 복습 블록을 불러오는 중",
@@ -340,7 +335,7 @@ private fun GoogleSignInButton(
     onClick: () -> Unit
 ) {
     val gradientBorder = Brush.linearGradient(
-        colors = listOf(Color(0xFF3B82F6), Color(0xFF6366F1), Color(0xFFEC4899)),
+        colors = listOf(Color(0xFF1E3A8A), Color(0xFF2563EB), Color(0xFF38BDF8)),
         start = Offset(0f, 0f),
         end = Offset(Float.POSITIVE_INFINITY, 0f)
     )

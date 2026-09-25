@@ -62,19 +62,19 @@ import com.loorve.domain.subscription.LOORVE_PRO_MONTHLY_BASE_PLAN_ID
 
 private val MidnightCanvas = Brush.verticalGradient(
     colors = listOf(
-        Color(0xFF150F2E),
-        Color(0xFF0A0B1E),
-        Color(0xFF090A16)
+        Color(0xFF0B1930),
+        Color(0xFF0F172A),
+        Color(0xFF020617)
     )
 )
 private val CtaGradient = Brush.linearGradient(
-    colors = listOf(Color(0xFF2563EB), Color(0xFF7C3AED), Color(0xFFC026D3))
+    colors = listOf(Color(0xFF0B1930), Color(0xFF1E3A8A), Color(0xFF2563EB), Color(0xFF38BDF8))
 )
 private val ProGradient = Brush.linearGradient(
-    colors = listOf(Color(0xFF6366F1), Color(0xFFA855F7))
+    colors = listOf(Color(0xFF1E3A8A), Color(0xFF38BDF8))
 )
 private val SaleGradient = Brush.linearGradient(
-    colors = listOf(Color(0xFFEC4899), Color(0xFF8B5CF6))
+    colors = listOf(Color(0xFF2563EB), Color(0xFF7DD3FC))
 )
 
 @Composable
@@ -95,9 +95,9 @@ private fun PaywallAmbientBackground() {
                 center = center
             )
         }
-        aura(Offset(size.width * 0.04f, size.height * 0.04f), size.minDimension * 0.82f, Color(0xFF6D28D9))
-        aura(Offset(size.width * 0.98f, size.height * 0.42f), size.minDimension * 0.86f, Color(0xFFC026D3))
-        aura(Offset(size.width * 0.40f, size.height * 0.98f), size.minDimension * 0.78f, Color(0xFF312E81))
+        aura(Offset(size.width * 0.04f, size.height * 0.04f), size.minDimension * 0.82f, Color(0xFF0B1930))
+        aura(Offset(size.width * 0.98f, size.height * 0.42f), size.minDimension * 0.86f, Color(0xFF1E3A8A))
+        aura(Offset(size.width * 0.40f, size.height * 0.98f), size.minDimension * 0.78f, Color(0xFF38BDF8))
     }
 }
 
@@ -127,9 +127,9 @@ fun ProPaywallDialog(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF140B2E),
-                        Color(0xFF1A0F3D),
-                        Color(0xFF0C081E)
+                        Color(0xFF0B1930),
+                        Color(0xFF0F172A),
+                        Color(0xFF020617)
                     )
                 )
             )
@@ -235,15 +235,23 @@ private fun HeroHeader() {
     Box(
         modifier = Modifier
             .clip(CircleShape)
-            .background(Color(0xFF351B75).copy(alpha = 0.60f))
+            .background(Color(0xFF0B1930).copy(alpha = 0.85f))
+            .border(1.dp, Color(0xFF1E3A8A).copy(alpha = 0.6f), CircleShape)
             .padding(horizontal = 12.dp, vertical = 5.dp)
     ) {
         Text(
             text = "LOORVE PRO MEMBERSHIP",
-            color = Color(0xFFD2BBFF),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.3.sp
+            style = androidx.compose.ui.text.TextStyle(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color(0xFF38BDF8),
+                        Color(0xFF7DD3FC)
+                    )
+                ),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.4.sp
+            )
         )
     }
     Spacer(Modifier.height(14.dp))
@@ -264,10 +272,18 @@ private fun HeroHeader() {
     )
     Text(
         text = "최적의 맞춤 복습",
-        color = Color(0xFFD2BBFF),
-        fontSize = 28.sp,
-        fontWeight = FontWeight.ExtraBold,
-        textAlign = TextAlign.Center
+        style = androidx.compose.ui.text.TextStyle(
+            brush = Brush.horizontalGradient(
+                colors = listOf(
+                    Color(0xFF2563EB),
+                    Color(0xFF38BDF8),
+                    Color(0xFF7DD3FC)
+                )
+            ),
+            fontSize = 28.sp,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center
+        )
     )
     Spacer(Modifier.height(8.dp))
     Text(
@@ -294,7 +310,8 @@ private fun SubscriptionContent(state: SubscriptionState) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF1B103C).copy(alpha = 0.70f))
+                .background(Color(0xFF0B1930).copy(alpha = 0.85f))
+                .border(1.dp, Color(0xFF1E3A8A).copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -305,12 +322,12 @@ private fun SubscriptionContent(state: SubscriptionState) {
         }
         when (val entitlement = state.entitlement) {
             SubscriptionEntitlement.Loading -> CircularProgressIndicator(
-                color = Color(0xFFC084FC),
+                color = Color(0xFF38BDF8),
                 modifier = Modifier.size(22.dp)
             )
             SubscriptionEntitlement.Pro -> Text(
                 stringResource(R.string.pro_active),
-                color = Color(0xFFC084FC),
+                color = Color(0xFF7DD3FC),
                 fontWeight = FontWeight.SemiBold
             )
             SubscriptionEntitlement.Pending -> Text(
@@ -338,7 +355,11 @@ private fun ComparisonHeader() {
             modifier = Modifier
                 .weight(1.2f)
                 .clip(CircleShape)
-                .background(CtaGradient)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(Color(0xFF1E3A8A), Color(0xFF2563EB), Color(0xFF38BDF8))
+                    )
+                )
                 .padding(horizontal = 7.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -367,12 +388,12 @@ private fun ComparisonRow(
             modifier = Modifier
                 .weight(1.2f)
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color(0x387C3AED))
-                .border(1.dp, Color(0x4DC084FC), RoundedCornerShape(10.dp))
+                .background(Color(0x292563EB))
+                .border(1.dp, Color(0x6638BDF8), RoundedCornerShape(10.dp))
                 .padding(horizontal = 5.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text("✓ $pro", color = Color(0xFFE9D5FF), fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+            Text("✓ $pro", color = Color(0xFF7DD3FC), fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
         }
     }
 }
@@ -428,7 +449,7 @@ private fun PlanCard(
                 .clip(RoundedCornerShape(16.dp))
                 .background(
                     if (active) Brush.linearGradient(
-                        listOf(Color(0x297C3AED), Color(0x142563EB))
+                        listOf(Color(0x331E3A8A), Color(0x242563EB))
                     ) else Brush.linearGradient(
                         listOf(Color.White.copy(alpha = 0.02f), Color.White.copy(alpha = 0.02f))
                     )
@@ -436,7 +457,7 @@ private fun PlanCard(
                 .border(
                     BorderStroke(
                         if (active) 1.5.dp else 1.dp,
-                        if (active) Color(0xFFA855F7) else Color.White.copy(alpha = 0.08f)
+                        if (active) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.08f)
                     ),
                     RoundedCornerShape(16.dp)
                 )
@@ -448,8 +469,8 @@ private fun PlanCard(
                     modifier = Modifier
                         .size(20.dp)
                         .clip(CircleShape)
-                        .background(if (active) Color(0xFFA855F7) else Color.Transparent)
-                        .border(2.dp, if (active) Color(0xFFA855F7) else Color.White.copy(alpha = 0.2f), CircleShape),
+                        .background(if (active) Color(0xFF2563EB) else Color.Transparent)
+                        .border(2.dp, if (active) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.2f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     if (active) Text("✓", color = Color.White, fontWeight = FontWeight.Bold)
@@ -458,7 +479,7 @@ private fun PlanCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     if (subtitle.isNotBlank()) {
-                        Text(subtitle, color = Color(0xFFC4B5FD), fontSize = 10.sp)
+                        Text(subtitle, color = Color(0xFF7DD3FC), fontSize = 10.sp)
                     }
                 }
                 Text(price, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)

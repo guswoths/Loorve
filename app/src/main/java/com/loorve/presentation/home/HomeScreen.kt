@@ -144,10 +144,8 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFCF9F8))
+            .background(Color.White)
     ) {
-        HomeAmbientBackground()
-
         Scaffold(
             snackbarHost = {
                 SnackbarHost(snackbarHostState) { snackbarData ->
@@ -787,7 +785,7 @@ private fun ProBadgeLiquid() {
             .clip(CircleShape)
             .background(
                 Brush.linearGradient(
-                    colors = listOf(Color(0xFF4F46E5), Color(0xFF7C3AED), Color(0xFFC026D3)),
+                    colors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8), Color(0xFF7DD3FC)),
                     start = androidx.compose.ui.geometry.Offset(shift * 80f, 0f),
                     end = androidx.compose.ui.geometry.Offset(120f + shift * 80f, 40f)
                 )
@@ -825,6 +823,7 @@ private fun ProBadgeLiquid() {
     }
 }
 
+@Suppress("unused")
 @Composable
 private fun HomeAmbientBackground() {
     val transition = rememberInfiniteTransition(label = "homeAmbient")
@@ -846,22 +845,33 @@ private fun HomeAmbientBackground() {
                 center = center
             )
         }
-        val blue = 170.dp.toPx()
-        val violet = 160.dp.toPx()
+        val r1 = 180.dp.toPx()
+        val r2 = 170.dp.toPx()
+        val r3 = 160.dp.toPx()
+        val r4 = 150.dp.toPx()
+        // 02 Vivid Sky Blue (Top Left)
         orb(
-            androidx.compose.ui.geometry.Offset((-70 + 30 * drift).dp.toPx() + blue, -40.dp.toPx() + blue),
-            blue,
-            Color(0x332563EB)
+            androidx.compose.ui.geometry.Offset((-70 + 30 * drift).dp.toPx() + r1, -40.dp.toPx() + r1),
+            r1,
+            Color(0x3838BDF8)
         )
+        // 03 Aero Cyan Tint (Right Mid)
         orb(
-            androidx.compose.ui.geometry.Offset(size.width + 70.dp.toPx() - violet, size.height * .38f),
-            violet,
-            Color(0x299333EA)
+            androidx.compose.ui.geometry.Offset(size.width + 70.dp.toPx() - r2, size.height * .36f),
+            r2,
+            Color(0x337DD3FC)
         )
+        // 01 Electric Sky Azure (Bottom Left)
         orb(
-            androidx.compose.ui.geometry.Offset(20.dp.toPx() + blue, size.height - 40.dp.toPx()),
-            blue,
-            Color(0x2E38BDF8)
+            androidx.compose.ui.geometry.Offset((-30 + 25 * drift).dp.toPx() + r3, size.height - 40.dp.toPx()),
+            r3,
+            Color(0x2E0284C7)
+        )
+        // 04 Glacier Ice Mist (Bottom Right)
+        orb(
+            androidx.compose.ui.geometry.Offset(size.width - 20.dp.toPx() - r4, size.height * 0.82f),
+            r4,
+            Color(0x3DBAE6FD)
         )
     }
 }

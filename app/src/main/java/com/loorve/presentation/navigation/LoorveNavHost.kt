@@ -297,7 +297,7 @@ private fun SplashAmbientOrbs() {
                 y = (-84 + 45 * orb1).dp.toPx() + orb1Radius
             ),
             radius = orb1Radius,
-            color = Color(0x3D2563EB)
+            color = Color(0x3D1E3A8A)
         )
         drawOrb(
             center = Offset(
@@ -305,7 +305,7 @@ private fun SplashAmbientOrbs() {
                 y = size.height / 2f + (-12 - 30 * orb2).dp.toPx()
             ),
             radius = orb2Radius,
-            color = Color(0x339333EA)
+            color = Color(0x332563EB)
         )
         drawOrb(
             center = Offset(
@@ -313,7 +313,7 @@ private fun SplashAmbientOrbs() {
                 y = size.height + (30 - 40 * orb3).dp.toPx() - orb3Radius
             ),
             radius = orb3Radius,
-            color = Color(0x3856BDF8)
+            color = Color(0x3838BDF8)
         )
         drawOrb(
             center = Offset(
@@ -321,7 +321,7 @@ private fun SplashAmbientOrbs() {
                 y = size.height + (-68 + 35 * orb4).dp.toPx() - orb4Radius
             ),
             radius = orb4Radius,
-            color = Color(0x29EC4899)
+            color = Color(0x297DD3FC)
         )
     }
 }
@@ -448,7 +448,7 @@ fun LoorveNavHost(
             }
 
             Scaffold(
-                containerColor = Color.Transparent,
+                containerColor = Color.White,
                 bottomBar = {
                     BottomNavBar(
                         currentRoute = when (selectedTabIndex) {
@@ -469,6 +469,7 @@ fun LoorveNavHost(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .background(Color.White)
                         .padding(innerPadding)
                 ) {
                     when (selectedTabIndex) {

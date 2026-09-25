@@ -127,28 +127,11 @@ fun ReviewCalendarScreen(
     val today = remember { LocalDate.now(ZoneId.of("Asia/Seoul")) }
     val sortedReviewBlocks = remember(
         uiState.reviewBlocks,
-        uiState.delayedBlockIds,
         today
     ) {
-        uiState.reviewBlocks.sortedWith(
-            compareBy<ReviewBlock> { block ->
-                val ended = block.reviewBlockEndDate() < today
-                when {
-                    ended -> 2
-                    block.blockId in uiState.delayedBlockIds -> 0
-                    else -> 1
-                }
-            }.thenComparator { left, right ->
-                val leftDate = left.reviewBlockEndDate()
-                val rightDate = right.reviewBlockEndDate()
-                val leftEnded = leftDate < today
-                val rightEnded = rightDate < today
-                if (leftEnded && rightEnded) {
-                    rightDate.compareTo(leftDate)
-                } else {
-                    leftDate.compareTo(rightDate)
-                }
-            }.thenBy { it.createdAt }
+        ReviewBlockAccessPolicy.sortBlocks(
+            blocks = uiState.reviewBlocks,
+            today = today
         )
     }
 
@@ -173,9 +156,8 @@ fun ReviewCalendarScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFCF9F8))
+            .background(Color.White)
     ) {
-        ReviewDashboardAura()
         Scaffold(
             topBar = {},
             floatingActionButton = {
@@ -184,7 +166,7 @@ fun ReviewCalendarScreen(
                         .clip(CircleShape)
                         .background(
                             Brush.linearGradient(
-                                colors = listOf(GradientStart, GradientMiddle, Active)
+                                colors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8))
                             )
                         ),
                     shape = CircleShape,
@@ -410,6 +392,7 @@ fun ReviewCalendarScreen(
     // ✅ ReviewBlockDetailBottomSheet 제거 — ReviewBlockDetailScreen으로 대체
 }
 
+@Suppress("unused")
 @Composable
 private fun ReviewDashboardAura() {
     val transition = rememberInfiniteTransition(label = "reviewAmbientOrbs")
@@ -441,7 +424,15 @@ private fun ReviewDashboardAura() {
     Canvas(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFCF9F8))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFF0F9FF),
+                        Color(0xFFF8FAFD),
+                        Color(0xFFFCF9F8)
+                    )
+                )
+            )
     ) {
         fun orb(
             center: Offset,
@@ -464,37 +455,41 @@ private fun ReviewDashboardAura() {
         val cyanRadius = 300.dp.toPx()
         val magentaRadius = 280.dp.toPx()
 
+        // 01 Electric Sky Azure (Top Left)
         orb(
             center = Offset(
                 x = (-0.25f * size.width) + (30.dp.toPx() * blueDrift),
                 y = (-0.05f * size.height) + (40.dp.toPx() * blueDrift)
             ),
             radius = blueRadius,
-            color = Color(0xFF2563EB).copy(alpha = 0.22f)
+            color = Color(0xFF0284C7).copy(alpha = 0.20f)
         )
+        // 03 Aero Cyan Tint (Top Right - previously purple)
         orb(
             center = Offset(
                 x = size.width + (0.25f * size.width) - (35.dp.toPx() * violetDrift),
                 y = (0.35f * size.height) - (30.dp.toPx() * violetDrift)
             ),
             radius = violetRadius,
-            color = Color(0xFF9333EA).copy(alpha = 0.18f)
+            color = Color(0xFF7DD3FC).copy(alpha = 0.25f)
         )
+        // 02 Vivid Sky Blue (Bottom Left)
         orb(
             center = Offset(
                 x = (-0.20f * size.width) + (35.dp.toPx() * cyanDrift),
                 y = size.height * 0.85f - (35.dp.toPx() * cyanDrift)
             ),
             radius = cyanRadius,
-            color = Color(0xFF38BDF8).copy(alpha = 0.20f)
+            color = Color(0xFF38BDF8).copy(alpha = 0.22f)
         )
+        // 04 Glacier Ice Mist (Bottom Right - previously pink)
         orb(
             center = Offset(
                 x = size.width * 0.88f - (30.dp.toPx() * magentaDrift),
                 y = size.height * 1.05f - (25.dp.toPx() * magentaDrift)
             ),
             radius = magentaRadius,
-            color = Color(0xFFEC4899).copy(alpha = 0.15f)
+            color = Color(0xFFBAE6FD).copy(alpha = 0.32f)
         )
     }
 }

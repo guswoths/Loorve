@@ -141,9 +141,8 @@ fun MyPageScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFCF9F8))
+            .background(Color.White)
     ) {
-        SettingsAmbientAura()
         Scaffold(
             topBar = {},
             bottomBar = {
@@ -416,6 +415,7 @@ private fun SectionTitle(text: String) {
     )
 }
 
+@Suppress("unused")
 @Composable
 private fun SettingsAmbientAura() {
     Canvas(modifier = Modifier.fillMaxSize()) {
@@ -439,17 +439,17 @@ private fun SettingsAmbientAura() {
         aura(
             center = Offset(size.width * 0.96f, size.height * 0.36f),
             radius = size.minDimension * 0.80f,
-            color = Color(0xFF6366F1)
+            color = Color(0xFF0284C7)
         )
         aura(
             center = Offset(size.width * 0.12f, size.height * 0.78f),
             radius = size.minDimension * 0.74f,
-            color = Color(0xFFC084FC)
+            color = Color(0xFF7DD3FC)
         )
         aura(
             center = Offset(size.width * 0.94f, size.height * 0.92f),
             radius = size.minDimension * 0.64f,
-            color = Color(0xFFF472B6)
+            color = Color(0xFFBAE6FD)
         )
     }
 }
@@ -476,9 +476,9 @@ private fun ProShowcaseBanner(
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        Color(0xFF4338CA),
-                        Color(0xFF6D28D9),
-                        Color(0xFFA21CAF)
+                        Color(0xFF0B1930),
+                        Color(0xFF1E3A8A),
+                        Color(0xFF0284C7)
                     ),
                     start = Offset(shift * 80f, 0f),
                     end = Offset(420f + shift * 80f, 220f)
@@ -510,7 +510,7 @@ private fun ProShowcaseBanner(
             Text(
                 text = "LOORVE PRO",
                 style = LoorveTypography.labelSmall,
-                color = Color(0xFFC4B5FD),
+                color = Color(0xFF7DD3FC),
                 fontWeight = FontWeight.Bold
             )
             Text(
@@ -522,7 +522,7 @@ private fun ProShowcaseBanner(
             Text(
                 text = stringResource(R.string.settings_loorve_pro_subtitle),
                 style = LoorveTypography.bodySmall,
-                color = Color(0xFFD8D5E8)
+                color = Color(0xFFBAE6FD)
             )
             Box(
                 modifier = Modifier
@@ -538,9 +538,9 @@ private fun ProShowcaseBanner(
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(
-                                    Color(0xFF6366F1),
-                                    Color(0xFF8B5CF6),
-                                    Color(0xFFD946EF)
+                                    Color(0xFF0284C7),
+                                    Color(0xFF38BDF8),
+                                    Color(0xFF7DD3FC)
                                 )
                             )
                         )

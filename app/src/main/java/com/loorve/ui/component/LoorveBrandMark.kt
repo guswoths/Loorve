@@ -19,10 +19,11 @@ fun LoorveWordmark(
     modifier: Modifier = Modifier,
     fontSize: TextUnit = 120.sp,
     textColor: List<Color> = listOf(
+        Color(0xFF0B1930),
+        Color(0xFF1E3A8A),
         Color(0xFF2563EB),
-        Color(0xFF4F46E5),
-        Color(0xFF7C3AED),
-        Color(0xFFC026D3)
+        Color(0xFF38BDF8),
+        Color(0xFF7DD3FC)
     )
 ) {
     Text(

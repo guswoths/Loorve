@@ -1,5 +1,6 @@
 package com.loorve.ui.theme
 
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // ── Canvas & surfaces ──
@@ -23,6 +24,27 @@ val Tertiary         = Color(0xFF059669)
 val AuroraBlue       = Color(0xFF2563EB)
 val AuroraViolet     = Color(0xFF7C3AED)
 val AuroraPink       = Color(0xFFDB2777)
+
+// ── Stitch Deep Blue - Light Blue Showcase Palette ──
+val DeepBlueAbyss    = Color(0xFF0B1930)
+val DeepBlueNavy     = Color(0xFF1E3A8A)
+val ElectricSapphire = Color(0xFF2563EB)
+val SkyAquaLight     = Color(0xFF38BDF8)
+val GlacierLightAura = Color(0xFF7DD3FC)
+
+// ── Stitch Light Blue - Sky Blue Showcase Palette ──
+val ElectricSkyAzure = Color(0xFF0284C7) // 01 주조 하이라이트 & 텍스트 고대비
+val VividSkyBlue     = Color(0xFF38BDF8) // 02 메인 브랜드 액센트 & 인터랙션
+val AeroCyanTint     = Color(0xFF7DD3FC) // 03 액티브 상태 & 호버 글로우
+val GlacierIceMist   = Color(0xFFBAE6FD) // 04 서피스 컨테이너 & 뱃지 필
+val CrystalPureAura  = Color(0xFFF0F9FF) // 05 은은한 배경 앰비언트 베이스 레이어
+val SkyBackgroundGradient = Brush.verticalGradient(
+    colors = listOf(
+        Color(0xFFF0F9FF),
+        Color(0xFFF8FAFD),
+        Color(0xFFFCF9F8)
+    )
+)
 
 // ── Text ──
 val OnBackground     = Color(0xFF1F1F1F)
