@@ -302,8 +302,7 @@ class HomeViewModel @Inject constructor(
                 )
                 schedule.copy(
                     isCompleted = completionOverrides[schedule.scheduleId]
-                        ?: legacyCompletionByIdentity[identity]
-                        ?: schedule.isCompleted
+                        ?: (schedule.isCompleted || legacyCompletionByIdentity[identity] == true)
                 )
             } + filteredLegacyUiModels
                 .map { schedule ->

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_item_row"
+    android:layout_width="match_parent"
+    android:layout_height="38dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="4dp"
+    android:paddingVertical="2dp">
+
+    <ImageView
+        android:id="@+id/widget_item_check"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:padding="2dp"
+        android:src="@drawable/widget_checkbox_unchecked" />
+
+    <TextView
+        android:id="@+id/widget_item_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="복습 항목"
+        android:textColor="#0F172A"
+        android:textSize="12.5sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_item_order"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/widget_badge_bg"
+        android:paddingHorizontal="4dp"
+        android:paddingVertical="1.5dp"
+        android:text="1회차"
+        android:textColor="#0284C7"
+        android:textSize="9.5sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

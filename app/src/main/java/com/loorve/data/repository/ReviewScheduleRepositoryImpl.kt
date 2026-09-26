@@ -1,9 +1,11 @@
 package com.loorve.data.repository
 
 import android.util.Log
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.loorve.domain.model.ReviewSchedule
+import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.repository.ReviewScheduleRepository
 import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
@@ -192,16 +194,59 @@ class ReviewScheduleRepositoryImpl @Inject constructor(
         return runCatching {
             require(uid.isNotBlank()) { "사용자 ID가 비어 있습니다." }
             require(scheduleId.isNotBlank()) { "복습 일정 ID가 비어 있습니다." }
-            firestore
+            val legacyDocRef = firestore
                 .collection("users")
                 .document(uid)
                 .collection("reviewSchedules")
                 .document(scheduleId)
-                .update(mapOf(
+            val legacyDoc = legacyDocRef.get().await()
+            if (legacyDoc.exists()) {
+                legacyDocRef.update(mapOf(
                     "isCompleted" to isCompleted,
                     "updatedAt"   to System.currentTimeMillis()
-                ))
-                .await()
+                )).await()
+
+                val blockId = legacyDoc.getString("blockId").orEmpty()
+                val reviewOrder = legacyDoc.getLong("reviewOrder")?.toInt()
+                if (blockId.isNotBlank() && reviewOrder != null) {
+                    runCatching {
+                        val matchingItems = firestore.collection("users").document(uid).collection("reviewScheduleItems")
+                            .whereEqualTo("blockId", blockId)
+                            .whereEqualTo("reviewOrder", reviewOrder)
+                            .get().await()
+                        for (item in matchingItems.documents) {
+                            val updates = mutableMapOf<String, Any>(
+                                "status" to if (isCompleted) ReviewStatus.COMPLETED.name else ReviewStatus.PENDING.name,
+                                "isCompleted" to isCompleted,
+                                "updatedAt" to FieldValue.serverTimestamp()
+                            )
+                            if (isCompleted) {
+                                updates["completedAt"] = System.currentTimeMillis()
+                            } else {
+                                updates["completedAt"] = FieldValue.delete()
+                            }
+                            item.reference.update(updates).await()
+                        }
+                    }
+                }
+            } else {
+                // If not in reviewSchedules, check reviewScheduleItems
+                val itemRef = firestore.collection("users").document(uid).collection("reviewScheduleItems").document(scheduleId)
+                val itemDoc = itemRef.get().await()
+                if (itemDoc.exists()) {
+                    val updates = mutableMapOf<String, Any>(
+                        "status" to if (isCompleted) ReviewStatus.COMPLETED.name else ReviewStatus.PENDING.name,
+                        "isCompleted" to isCompleted,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                    if (isCompleted) {
+                        updates["completedAt"] = System.currentTimeMillis()
+                    } else {
+                        updates["completedAt"] = FieldValue.delete()
+                    }
+                    itemRef.update(updates).await()
+                }
+            }
         }
     }
 

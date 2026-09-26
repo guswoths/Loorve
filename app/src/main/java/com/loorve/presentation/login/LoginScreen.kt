@@ -97,7 +97,7 @@ fun LoginScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFCF9F8))
+            .background(SkyBackgroundGradient)
             .clip(RoundedCornerShape(0.dp))
     ) {
         LoginAmbientBackground()
@@ -241,22 +241,22 @@ private fun LoginAmbientBackground() {
         drawOrb(
             Offset((-64 + 25 * orb1).dp.toPx() + r1, (-84 + 40 * orb1).dp.toPx() + r1),
             r1,
-            Color(0x3D1E3A8A)
+            Color(0x107DD3FC)
         )
         drawOrb(
             Offset(size.width + (80 - 35 * orb2).dp.toPx() - r2, size.height * .32f + (-25 * orb2).dp.toPx()),
             r2,
-            Color(0x332563EB)
+            Color(0x0E38BDF8)
         )
         drawOrb(
             Offset((-45 + 30 * orb3).dp.toPx() + r3, size.height * .88f + (-35 * orb3).dp.toPx()),
             r3,
-            Color(0x3838BDF8)
+            Color(0x12BAE6FD)
         )
         drawOrb(
             Offset(size.width - 14.dp.toPx() - r4, size.height + (-42 + 30 * orb4).dp.toPx() - r4),
             r4,
-            Color(0x297DD3FC)
+            Color(0x0D7DD3FC)
         )
     }
 }
@@ -292,9 +292,11 @@ private fun SplashLoadingScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Background),
+            .background(SkyBackgroundGradient),
         contentAlignment = Alignment.Center
     ) {
+        LoginAmbientBackground()
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)

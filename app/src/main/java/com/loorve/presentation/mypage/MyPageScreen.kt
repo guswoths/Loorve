@@ -576,7 +576,12 @@ private fun SettingsProBadgeLiquid() {
             .clip(CircleShape)
             .background(
                 Brush.linearGradient(
-                    colors = listOf(Color(0xFF4F46E5), Color(0xFF7C3AED), Color(0xFFC026D3)),
+                    colors = listOf(
+                        Color(0xFF0B1930),
+                        Color(0xFF1E3A8A),
+                        Color(0xFF2563EB),
+                        Color(0xFF38BDF8)
+                    ),
                     start = Offset(shift * 80f, 0f),
                     end = Offset(120f + shift * 80f, 40f)
                 )
@@ -638,7 +643,7 @@ private fun SettingsSwitchRow(
         Icon(
             Icons.Default.Notifications,
             contentDescription = null,
-            tint = Active,
+            tint = Color(0xFF2563EB),
             modifier = Modifier.size(22.dp)
         )
         Spacer(Modifier.width(14.dp))
@@ -654,8 +659,8 @@ private fun SettingsSwitchRow(
             onCheckedChange = onCheckedChange,
             colors = androidx.compose.material3.SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = Active,
-                checkedBorderColor = Active,
+                checkedTrackColor = Color(0xFF2563EB),
+                checkedBorderColor = Color(0xFF2563EB),
                 uncheckedThumbColor = Color.White,
                 uncheckedTrackColor = SurfaceVariant,
                 uncheckedBorderColor = Divider

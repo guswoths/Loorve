@@ -187,7 +187,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
 
             val records = studyRecordRepository.getStudyRecords(uid, blockId)
                 .getOrDefault(emptyList())
-                .sortedByDescending { it.learningDate }
+                .sortedWith(compareBy<StudyRecord> { it.learningDate }.thenBy { it.createdAt })
 
             val allSchedules = records.flatMap { record ->
                 scheduleRepository.getSchedulesByStudyRecord(uid, record.id)

@@ -66,6 +66,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.firebase.auth.FirebaseAuth
 import com.loorve.R
+import com.loorve.ui.theme.SkyBackgroundGradient
 import com.loorve.presentation.auth.SplashDestination
 import com.loorve.presentation.auth.SplashViewModel
 import com.loorve.presentation.calendar.AddReviewBlockScreen
@@ -148,7 +149,7 @@ private fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFCF9F8))
+            .background(SkyBackgroundGradient)
     ) {
         SplashAmbientOrbs()
 
@@ -297,7 +298,7 @@ private fun SplashAmbientOrbs() {
                 y = (-84 + 45 * orb1).dp.toPx() + orb1Radius
             ),
             radius = orb1Radius,
-            color = Color(0x3D1E3A8A)
+            color = Color(0x107DD3FC)
         )
         drawOrb(
             center = Offset(
@@ -305,7 +306,7 @@ private fun SplashAmbientOrbs() {
                 y = size.height / 2f + (-12 - 30 * orb2).dp.toPx()
             ),
             radius = orb2Radius,
-            color = Color(0x332563EB)
+            color = Color(0x0E38BDF8)
         )
         drawOrb(
             center = Offset(
@@ -313,7 +314,7 @@ private fun SplashAmbientOrbs() {
                 y = size.height + (30 - 40 * orb3).dp.toPx() - orb3Radius
             ),
             radius = orb3Radius,
-            color = Color(0x3838BDF8)
+            color = Color(0x12BAE6FD)
         )
         drawOrb(
             center = Offset(
@@ -321,7 +322,7 @@ private fun SplashAmbientOrbs() {
                 y = size.height + (-68 + 35 * orb4).dp.toPx() - orb4Radius
             ),
             radius = orb4Radius,
-            color = Color(0x297DD3FC)
+            color = Color(0x0D7DD3FC)
         )
     }
 }
@@ -356,14 +357,8 @@ fun LoorveNavHost(
     ) {
         composable(Screen.Login.route) {
             LoginScreen(
-                onLoginSuccess = { isNewUser ->
-                    val destination = if (isNewUser) {
-                        Screen.Onboarding.route
-                    } else {
-                        Screen.Home.route
-                    }
-
-                    navController.navigate(destination) {
+                onLoginSuccess = { _ ->
+                    navController.navigate(Screen.Onboarding.route) {
                         popUpTo(Screen.Login.route) {
                             inclusive = true
                         }
@@ -532,6 +527,7 @@ fun LoorveNavHost(
                                     }
                                 },
                                 onSignOut = {
+                                    splashViewModel.resetOnboarding()
                                     navController.navigate(Screen.Login.route) {
                                         popUpTo(0) { inclusive = true }
                                     }
@@ -630,6 +626,7 @@ fun LoorveNavHost(
                     }
                 },
                 onSignOut = {
+                    splashViewModel.resetOnboarding()
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
                     }

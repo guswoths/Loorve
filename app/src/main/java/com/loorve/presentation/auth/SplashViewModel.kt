@@ -44,4 +44,10 @@ class SplashViewModel @Inject constructor(
             onboardingPreferences.setOnboardingComplete(true)
         }
     }
+
+    fun resetOnboarding() {
+        viewModelScope.launch {
+            onboardingPreferences.setOnboardingComplete(false)
+        }
+    }
 }

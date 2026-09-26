@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import com.loorve.ui.theme.SkyBackgroundGradient
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -174,15 +175,7 @@ fun NotificationPermissionScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFFDCEBFF),
-                        Color(0xFFF1E9FF),
-                        Color(0xFFF8FAFC)
-                    )
-                )
-            )
+            .background(SkyBackgroundGradient)
     ) {
         Column(
             modifier = Modifier

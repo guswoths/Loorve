@@ -32,6 +32,7 @@ import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.loorve.ui.theme.SkyBackgroundGradient
 
 // ─── 제조사 분류 ─────────────────────────────────────────────────────────────
 
@@ -187,15 +188,7 @@ fun BatteryOptimizationGuideScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFFDCEBFF),
-                        Color(0xFFEDE9FF),
-                        Color(0xFFF8FAFC)
-                    )
-                )
-            )
+            .background(SkyBackgroundGradient)
             .padding(horizontal = 16.dp, vertical = 48.dp)
     ) {
         Column(

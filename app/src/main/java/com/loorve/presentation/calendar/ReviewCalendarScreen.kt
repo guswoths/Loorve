@@ -161,17 +161,21 @@ fun ReviewCalendarScreen(
         Scaffold(
             topBar = {},
             floatingActionButton = {
-                Surface(
+                Box(
                     modifier = Modifier
+                        .size(56.dp)
+                        .shadow(elevation = 8.dp, shape = CircleShape)
                         .clip(CircleShape)
                         .background(
                             Brush.linearGradient(
-                                colors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8))
+                                colors = listOf(
+                                    Color(0xFF0B1930),
+                                    Color(0xFF1E3A8A),
+                                    Color(0xFF2563EB),
+                                    Color(0xFF38BDF8)
+                                )
                             )
-                        ),
-                    shape = CircleShape,
-                    color = Color.Transparent,
-                    shadowElevation = 12.dp
+                        )
                 ) {
                     androidx.compose.material3.FloatingActionButton(
                         onClick = {
@@ -185,16 +189,22 @@ fun ReviewCalendarScreen(
                                 showProDialog = true
                             }
                         },
+                        modifier = Modifier.fillMaxSize(),
+                        shape = CircleShape,
                         containerColor = Color.Transparent,
                         contentColor = Color.White,
                         elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
                             defaultElevation = 0.dp,
-                            pressedElevation = 0.dp
+                            pressedElevation = 0.dp,
+                            focusedElevation = 0.dp,
+                            hoveredElevation = 0.dp
                         )
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "복습 블록 생성"
+                            contentDescription = "복습 블록 생성",
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                 }
@@ -366,6 +376,13 @@ fun ReviewCalendarScreen(
                                                 },
                                                 currentState = schedule.isCompleted
                                             )
+                                        },
+                                        onClick = {
+                                            if (block.blockId in uiState.lockedBlockIds) {
+                                                showProDialog = true
+                                            } else {
+                                                onNavigateToReviewBlockDetail(block.blockId)
+                                            }
                                         }
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
@@ -567,7 +584,7 @@ private fun ReviewWorkloadBarChart(
                             fontSize = 11.sp,
                             letterSpacing = 1.1.sp
                         ),
-                        color = Color(0xFF4F46E5),
+                        color = Color(0xFF2563EB),
                         fontWeight = FontWeight.ExtraBold
                     )
                     Text(
@@ -789,13 +806,13 @@ private fun LiquidGradientBar(
                 scaleX = if (selected) pulse else 1f
                 scaleY = if (selected) pulse else 1f
             }
-            .background(Color(0xFFE8EEF6))
+            .background(Color(0xFFE0F2FE).copy(alpha = 0.75f))
             .border(1.dp, Color.White.copy(alpha = 0.70f), CircleShape)
             .shadow(
                 elevation = 10.dp,
                 shape = CircleShape,
-                ambientColor = Color(0xFF1A73E8).copy(alpha = if (selected) 0.50f else 0.18f),
-                spotColor = Color(0xFF2563EB).copy(alpha = if (selected) 0.50f else 0.18f)
+                ambientColor = Color(0xFF1E3A8A).copy(alpha = if (selected) 0.45f else 0.18f),
+                spotColor = Color(0xFF2563EB).copy(alpha = if (selected) 0.50f else 0.20f)
             ),
         contentAlignment = Alignment.BottomCenter
     ) {
@@ -810,7 +827,8 @@ private fun LiquidGradientBar(
                             colors = listOf(
                                 Color(0xFF38BDF8),
                                 Color(0xFF2563EB),
-                                Color(0xFF1E3A8A)
+                                Color(0xFF1E3A8A),
+                                Color(0xFF0B1930)
                             )
                         )
                     )
@@ -852,17 +870,17 @@ private fun ReviewBlockCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-                containerColor = if (locked) Color(0xFF9E9E9E) else Color.White
+            containerColor = if (locked) Color(0xFF9E9E9E) else Color.White
         ),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(18.dp),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            Color.White.copy(alpha = 0.70f)
+            Color(0xFFBAE6FD).copy(alpha = 0.8f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             Column(

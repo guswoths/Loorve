@@ -317,7 +317,7 @@ private fun SubscriptionContent(state: SubscriptionState) {
         ) {
             ComparisonHeader()
             HorizontalDivider(color = Color.White.copy(alpha = 0.14f))
-            ComparisonRow("복습 블록 생성", "최대 1개", "무제한 생성", "시험/목표별 생성 개수")
+            ComparisonRow("복습 블록 생성", "1개", "무제한 생성", "시험/목표별 생성 개수")
             ComparisonRow("광고 노출", "광고 노출됨", "완전 제거", "하단 배너 및 팝업 광고")
         }
         when (val entitlement = state.entitlement) {
@@ -415,7 +415,7 @@ private fun PlanSelector(
             Text("플랜 선택", color = Color.White, fontWeight = FontWeight.Bold)
         }
         PlanCard(
-            badge = "BEST 16% 할인",
+            badge = "16% 할인",
             title = "연간 플랜",
             subtitle = "1년 권장",
             price = "₩29,000/년",
@@ -442,62 +442,69 @@ private fun PlanCard(
     active: Boolean,
     onClick: () -> Unit
 ) {
-    Box {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(
-                    if (active) Brush.linearGradient(
-                        listOf(Color(0x331E3A8A), Color(0x242563EB))
-                    ) else Brush.linearGradient(
-                        listOf(Color.White.copy(alpha = 0.02f), Color.White.copy(alpha = 0.02f))
-                    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                if (active) Brush.linearGradient(
+                    listOf(Color(0x331E3A8A), Color(0x242563EB))
+                ) else Brush.linearGradient(
+                    listOf(Color.White.copy(alpha = 0.02f), Color.White.copy(alpha = 0.02f))
                 )
-                .border(
-                    BorderStroke(
-                        if (active) 1.5.dp else 1.dp,
-                        if (active) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.08f)
-                    ),
-                    RoundedCornerShape(16.dp)
-                )
-                .clickable(onClick = onClick)
-                .padding(14.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .background(if (active) Color(0xFF2563EB) else Color.Transparent)
-                        .border(2.dp, if (active) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.2f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (active) Text("✓", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.width(9.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    if (subtitle.isNotBlank()) {
-                        Text(subtitle, color = Color(0xFF7DD3FC), fontSize = 10.sp)
+            )
+            .border(
+                BorderStroke(
+                    if (active) 1.5.dp else 1.dp,
+                    if (active) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.08f)
+                ),
+                RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(if (active) Color(0xFF2563EB) else Color.Transparent)
+                    .border(2.dp, if (active) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (active) Text("✓", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(9.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                if (subtitle.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        Text(subtitle, color = Color(0xFF7DD3FC), fontSize = 10.5.sp)
+                        if (badge != null) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(SaleGradient)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = badge,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 9.sp,
+                                    letterSpacing = (-0.2).sp
+                                )
+                            }
+                        }
                     }
                 }
-                Text(price, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
             }
-        }
-        if (badge != null) {
-            Text(
-                text = badge,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .offset(y = (-11).dp)
-                    .clip(CircleShape)
-                    .background(SaleGradient)
-                    .padding(horizontal = 9.dp, vertical = 4.dp),
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp
-            )
+            Text(price, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
         }
     }
 }
@@ -515,9 +522,24 @@ private fun PrimaryAction(
             Button(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
             ) {
-                Text(stringResource(R.string.pro_close), color = Color.White, fontWeight = FontWeight.Bold)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .clip(CircleShape)
+                        .background(CtaGradient),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.pro_close),
+                        color = Color.White,
+                        fontSize = 15.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
         else -> {

@@ -2,6 +2,7 @@ package com.loorve.domain.usecase
 
 import android.util.Log
 import com.loorve.data.local.NotificationTimePreferences
+import com.loorve.data.local.OnboardingPreferences
 import com.loorve.data.notification.ReviewAlarmScheduler
 import com.loorve.domain.repository.AuthRepository
 import com.loorve.domain.repository.ReviewScheduleRepository
@@ -15,7 +16,8 @@ class SignOutUseCase @Inject constructor(
     private val reviewScheduleItemRepository: ReviewScheduleItemRepository,
     private val notificationTimePreferences: NotificationTimePreferences,
     private val reviewAlarmScheduler: ReviewAlarmScheduler,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val onboardingPreferences: OnboardingPreferences
 ) {
     suspend operator fun invoke(): Result<Unit> {
         return try {
@@ -45,6 +47,9 @@ class SignOutUseCase @Inject constructor(
 
             if (uid != null) notificationTimePreferences.clearAll(uid)
             Log.d(TAG, "NotificationTimePreferences clearAll 완료")
+
+            onboardingPreferences.setOnboardingComplete(false)
+            Log.d(TAG, "OnboardingPreferences reset 완료")
 
             authRepository.signOut()
 

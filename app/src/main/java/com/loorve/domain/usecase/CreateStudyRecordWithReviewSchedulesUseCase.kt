@@ -114,7 +114,7 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
             )
         } else {
             ReviewSchedulingEngine.createReviewSchedules(
-                record, schedulerExam, today,
+                record, schedulerExam, request.studiedAt,
                 SchedulerConfig(finalReviewBufferDays = 0),
                 ReviewNotificationPlan(timezone = zone),
                 customIntervalDays = block.customIntervalDays
@@ -129,7 +129,7 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
             it.toScheduleItem(uid, request.blockId, zone, request.title.ifBlank { request.content.take(20) })
         }
         val futureGeneratedCount = generatedEntries.count {
-            it.reviewDate.toLocalDate(zone).isAfter(today)
+            it.reviewDate.toLocalDate(zone).isAfter(request.studiedAt)
         }
         if (generated.outcome == ScheduleGenerationOutcome.NOT_GENERATED ||
             futureGeneratedCount < 2
@@ -142,10 +142,15 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
         val existingItems = scheduleRepository.getAllScheduleItems(uid).getOrThrow()
             .filter { it.studyRecordId in existingRecordIds }
         val existingEntries = existingItems.map { it.toEntry(zone) }
+        val effectiveReviewStartDate = if (request.studiedAt.isAfter(today)) {
+            request.studiedAt.plusDays(1)
+        } else {
+            today.plusDays(1)
+        }
         val rebalanced = ReviewSchedulingEngine.rebalanceDailyLoad(
             schedules = existingEntries + generatedEntries.map { it.toEntry(zone) },
             exam = schedulerExam,
-            reviewStartDate = today.plusDays(1),
+            reviewStartDate = effectiveReviewStartDate,
             config = SchedulerConfig(finalReviewBufferDays = 0)
         )
         val finalItems = if (generatedEntries.isEmpty()) {

@@ -50,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
@@ -105,10 +106,22 @@ import com.loorve.ui.theme.TertiaryText
 import com.loorve.ui.theme.UrgentSurface
 import com.loorve.ui.theme.Warning
 import com.loorve.ui.theme.WarningContainer
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+
+private data class ExamDateItem(
+    val id: String,
+    val name: String,
+    val date: LocalDate
+)
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -122,6 +135,37 @@ fun HomeScreen(
     val subscriptionState by subscriptionViewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var examCompletedMap by remember { mutableStateOf(mapOf<String, Boolean>()) }
+    val seoulZone = remember { ZoneId.of("Asia/Seoul") }
+
+    val examDateItems = remember(uiState.reviewBlocks, uiState.exams) {
+        val items = mutableListOf<ExamDateItem>()
+        val seenIds = mutableSetOf<String>()
+
+        uiState.reviewBlocks.forEach { block ->
+            if (block.examDateMillis > 0L) {
+                val date = Instant.ofEpochMilli(block.examDateMillis).atZone(seoulZone).toLocalDate()
+                val name = block.examName.ifBlank { "시험" }
+                val id = block.blockId.ifBlank { "block_${block.examDateMillis}" }
+                items.add(ExamDateItem(id = id, name = name, date = date))
+                seenIds.add(id)
+            }
+        }
+        uiState.exams.forEach { exam ->
+            if (exam.examDate > 0L && exam.id !in seenIds) {
+                val date = Instant.ofEpochMilli(exam.examDate).atZone(seoulZone).toLocalDate()
+                val name = exam.subjectName.ifBlank { "시험" }
+                if (items.none { it.name == name && it.date == date }) {
+                    items.add(ExamDateItem(id = exam.id.ifBlank { "exam_${exam.examDate}" }, name = name, date = date))
+                }
+            }
+        }
+        items
+    }
+
+    val examDates = remember(examDateItems) {
+        examDateItems.map { it.date }.toSet()
+    }
 
     val completedDates = uiState.reviewSchedules
         .groupBy { it.reviewDate }
@@ -282,12 +326,49 @@ fun HomeScreen(
                                 selectedDate = selectedDate,
                                 scheduledDates = uiState.reviewScheduleDates,
                                 completedDates = completedDates,
+                                examDates = examDates,
                                 onDateSelected = { selectedDate = it }
                             )
 
                             Spacer(Modifier.height(16.dp))
                             HorizontalDivider(color = Divider, thickness = 1.dp)
                             Spacer(Modifier.height(16.dp))
+
+                            val todayExams = examDateItems.filter { it.date == selectedDate }
+
+                            if (todayExams.isNotEmpty()) {
+                                Text(
+                                    text = "${selectedDate.format(DateTimeFormatter.ofPattern("M월 d일"))} · 시험일정",
+                                    style = LoorveTypography.titleSmall,
+                                    color = OnBackground,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    todayExams.forEach { examItem ->
+                                        val isChecked = examCompletedMap[examItem.id] ?: false
+                                        HomeScheduleCard(
+                                            subjectName = examItem.name,
+                                            content = "시험 당일 (종료일)",
+                                            dateLabel = selectedDate.format(DateTimeFormatter.ofPattern("M월 d일")),
+                                            checked = isChecked,
+                                            onCheckedChange = { checked ->
+                                                examCompletedMap = examCompletedMap + (examItem.id to checked)
+                                            },
+                                            checkColor = Color(0xFFDC2626),
+                                            checkBorderColor = Color(0xFFF87171),
+                                            titleColor = Color(0xFF0F172A),
+                                            contentColor = Color(0xFF1E293B)
+                                        )
+                                    }
+                                }
+                            }
 
                             val todaySchedules = uiState.reviewSchedules
                                 .filter { it.reviewDate == selectedDate }
@@ -324,10 +405,15 @@ fun HomeScreen(
                                         HomeScheduleCard(
                                             subjectName = subjectName,
                                             content = schedule.content,
+                                            dateLabel = selectedDate.format(DateTimeFormatter.ofPattern("M월 d일")),
                                             checked = schedule.isCompleted,
                                             onCheckedChange = {
                                                 viewModel.toggleScheduleCompletion(scheduleKey, it)
-                                            }
+                                            },
+                                            checkColor = Color(0xFF2563EB),
+                                            checkBorderColor = Color(0xFF60A5FA),
+                                            titleColor = Color(0xFF0F172A),
+                                            contentColor = Color(0xFF1E293B)
                                         )
                                     }
                                 }
@@ -785,7 +871,12 @@ private fun ProBadgeLiquid() {
             .clip(CircleShape)
             .background(
                 Brush.linearGradient(
-                    colors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8), Color(0xFF7DD3FC)),
+                    colors = listOf(
+                        Color(0xFF0B1930),
+                        Color(0xFF1E3A8A),
+                        Color(0xFF2563EB),
+                        Color(0xFF38BDF8)
+                    ),
                     start = androidx.compose.ui.geometry.Offset(shift * 80f, 0f),
                     end = androidx.compose.ui.geometry.Offset(120f + shift * 80f, 40f)
                 )
@@ -1013,11 +1104,42 @@ private fun HomeHeroCard(
 
 @Composable
 private fun HomeMotivationHeader() {
+    val seoulZone = remember { ZoneId.of("Asia/Seoul") }
+    var today by remember { mutableStateOf(LocalDate.now(seoulZone)) }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                today = LocalDate.now(seoulZone)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            val now = ZonedDateTime.now(seoulZone)
+            val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay(seoulZone)
+            val delayMillis = Duration.between(now, nextMidnight).toMillis().coerceAtLeast(1000L)
+            delay(delayMillis)
+            today = LocalDate.now(seoulZone)
+        }
+    }
+
+    val quote = remember(today) {
+        val index = Math.floorMod(today.toEpochDay(), HOME_MOTIVATIONAL_QUOTES.size.toLong()).toInt()
+        HOME_MOTIVATIONAL_QUOTES[index]
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.8f)),
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
         shadowElevation = 4.dp
     ) {
         Row(
@@ -1039,7 +1161,7 @@ private fun HomeMotivationHeader() {
             }
             Column {
                 Text(
-                    text = "반복은 기억을 단단하게 다지는 망치질과 같다.",
+                    text = quote.text,
                     style = LoorveTypography.bodyLarge.copy(
                         fontSize = 14.5.sp,
                         lineHeight = 20.sp
@@ -1048,7 +1170,7 @@ private fun HomeMotivationHeader() {
                     color = Color(0xFF1E293B)
                 )
                 Text(
-                    text = "- 퀸틸리아누스",
+                    text = "- ${quote.author}",
                     style = LoorveTypography.labelMedium.copy(fontSize = 12.sp),
                     color = Color(0xFF94A3B8),
                     modifier = Modifier.padding(top = 4.dp)
@@ -1309,6 +1431,7 @@ private fun HomeMiniCalendar(
     selectedDate: LocalDate,
     scheduledDates: Set<LocalDate>,
     completedDates: Set<LocalDate>,
+    examDates: Set<LocalDate> = emptySet(),
     onDateSelected: (LocalDate) -> Unit
 ) {
     val today = LocalDate.now()
@@ -1356,6 +1479,7 @@ private fun HomeMiniCalendar(
                         val isSelected = date == selectedDate
                         val isToday = date == today
                         val hasSchedule = scheduledDates.contains(date)
+                        val hasExam = examDates.contains(date)
                         day++
                         Box(
                             modifier = Modifier
@@ -1388,26 +1512,42 @@ private fun HomeMiniCalendar(
                                         FontWeight.Normal
                                     }
                                 )
-                                if (hasSchedule) {
+                                if (hasExam || hasSchedule) {
                                     Spacer(Modifier.height(2.dp))
-                                    val isCompleted = completedDates.contains(date)
-                                    val dotColor = if (isSelected) Color(0xFF93C5FD) else Color(0xFF2563EB)
-                                    if (isCompleted) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(5.dp)
-                                                .clip(CircleShape)
-                                                .background(dotColor)
-                                        )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(6.dp)
-                                                .border(
-                                                    BorderStroke(1.5.dp, dotColor),
-                                                    CircleShape
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (hasExam) {
+                                            val redDotColor = if (isSelected) Color(0xFFFECACA) else Color(0xFFEF4444)
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(5.dp)
+                                                    .clip(CircleShape)
+                                                    .background(redDotColor)
+                                            )
+                                        }
+                                        if (hasSchedule) {
+                                            val isCompleted = completedDates.contains(date)
+                                            val blueDotColor = if (isSelected) Color(0xFF93C5FD) else Color(0xFF2563EB)
+                                            if (isCompleted) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(5.dp)
+                                                        .clip(CircleShape)
+                                                        .background(blueDotColor)
                                                 )
-                                        )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(if (hasExam) 5.dp else 6.dp)
+                                                        .border(
+                                                            BorderStroke(1.5.dp, blueDotColor),
+                                                            CircleShape
+                                                        )
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1426,7 +1566,11 @@ private fun HomeScheduleCard(
     content: String,
     dateLabel: String = "오늘",
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    checkColor: Color = Color(0xFF2563EB),
+    checkBorderColor: Color = Color(0xFF60A5FA),
+    titleColor: Color = Color(0xFF0F172A),
+    contentColor: Color = Color(0xFF1E293B)
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1445,12 +1589,12 @@ private fun HomeScheduleCard(
                     .size(24.dp)
                     .clip(CircleShape)
                     .background(
-                        if (checked) Color(0xFF2563EB) else Color.Transparent
+                        if (checked) checkColor else Color.Transparent
                     )
                     .border(
                         BorderStroke(
                             width = 1.5.dp,
-                            color = if (checked) Color(0xFF2563EB) else Color(0xFF60A5FA)
+                            color = if (checked) checkColor else checkBorderColor
                         ),
                         CircleShape
                     )
@@ -1476,14 +1620,14 @@ private fun HomeScheduleCard(
                 Text(
                     text = headerTitle,
                     style = LoorveTypography.labelMedium,
-                    color = Color(0xFF2563EB),
+                    color = if (checked) titleColor.copy(alpha = 0.5f) else titleColor,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = content,
                     style = LoorveTypography.bodyMedium,
-                    color = Color(0xFF1D4ED8),
+                    color = if (checked) contentColor.copy(alpha = 0.4f) else contentColor,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     textDecoration = if (checked) {

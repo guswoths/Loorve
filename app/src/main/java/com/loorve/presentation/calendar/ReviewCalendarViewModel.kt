@@ -103,6 +103,15 @@ class ReviewCalendarViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch {
+            calendarRefreshBus.refreshEvent.collect {
+                val uid = _currentUid.value
+                if (!uid.isNullOrBlank()) {
+                    loadSchedulesForMonth(_uiState.value.displayYearMonth)
+                    observeRecentCompletionSchedules(uid)
+                }
+            }
+        }
     }
 
     // ✅ init 블록 제거 — Screen의 LaunchedEffect에서 suspend refreshUid() 호출로 통일

@@ -57,4 +57,6 @@
     <string name="pro_subscribe_unavailable">구독하기</string>
     <string name="pro_refresh">복원/새로고침</string>
     <string name="pro_cancel">취소</string>
+    <string name="widget_4x2_name">오늘의 복습</string>
+    <string name="widget_4x2_description">오늘 예정된 복습 일정을 확인하고 체크합니다.</string>
 </resources>

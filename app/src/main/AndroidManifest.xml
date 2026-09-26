@@ -78,6 +78,26 @@
             </intent-filter>
         </receiver>
 
+        <!-- ── 오늘의 복습 위젯 4x2 ── -->
+        <receiver
+            android:name=".widget.TodayReviewWidgetProvider4x2"
+            android:exported="true"
+            android:label="@string/widget_4x2_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.loorve.widget.ACTION_ITEM_CLICK" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_today_review_4x2_info" />
+        </receiver>
+
+        <!-- ── 오늘의 복습 위젯 ListView 서비스 ── -->
+        <service
+            android:name=".widget.TodayReviewWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
     </application>
 
 </manifest>

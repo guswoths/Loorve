@@ -139,18 +139,68 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
     ): Result<Unit> = runCatching {
         validateAuth(uid)
         require(scheduleId.isNotBlank()) { "복습 일정 ID가 비어 있습니다." }
-        schedulesRef(uid).document(scheduleId)
-            .update(
-                mapOf(
-                    "status" to if (isCompleted) {
-                        ReviewStatus.COMPLETED.name
-                    } else {
-                        ReviewStatus.PENDING.name
-                    },
-                    "updatedAt" to FieldValue.serverTimestamp()
-                )
-            )
-            .await()
+
+        val updates = mutableMapOf<String, Any>(
+            "status" to if (isCompleted) ReviewStatus.COMPLETED.name else ReviewStatus.PENDING.name,
+            "isCompleted" to isCompleted,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        if (isCompleted) {
+            updates["completedAt"] = System.currentTimeMillis()
+        } else {
+            updates["completedAt"] = FieldValue.delete()
+        }
+
+        val docRef = schedulesRef(uid).document(scheduleId)
+        val docSnap = docRef.get().await()
+
+        if (docSnap.exists()) {
+            docRef.update(updates).await()
+
+            // Also synchronize corresponding legacy reviewSchedules document if present
+            val blockId = docSnap.getString("blockId").orEmpty()
+            val reviewOrder = docSnap.getLong("reviewOrder")?.toInt()
+            if (blockId.isNotBlank() && reviewOrder != null) {
+                runCatching {
+                    val legacyDocs = firestore.collection("users").document(uid).collection("reviewSchedules")
+                        .whereEqualTo("blockId", blockId)
+                        .whereEqualTo("reviewOrder", reviewOrder)
+                        .get().await()
+                    for (legacyDoc in legacyDocs.documents) {
+                        legacyDoc.reference.update(mapOf(
+                            "isCompleted" to isCompleted,
+                            "updatedAt" to System.currentTimeMillis()
+                        )).await()
+                    }
+                }
+            }
+        } else {
+            // scheduleId may be a legacy reviewSchedule ID directly
+            val legacyRef = firestore.collection("users").document(uid).collection("reviewSchedules").document(scheduleId)
+            val legacyDoc = legacyRef.get().await()
+            if (legacyDoc.exists()) {
+                legacyRef.update(mapOf(
+                    "isCompleted" to isCompleted,
+                    "updatedAt" to System.currentTimeMillis()
+                )).await()
+
+                val blockId = legacyDoc.getString("blockId").orEmpty()
+                val reviewOrder = legacyDoc.getLong("reviewOrder")?.toInt()
+                if (blockId.isNotBlank() && reviewOrder != null) {
+                    runCatching {
+                        val matchingItems = schedulesRef(uid)
+                            .whereEqualTo("blockId", blockId)
+                            .whereEqualTo("reviewOrder", reviewOrder)
+                            .get().await()
+                        for (item in matchingItems.documents) {
+                            item.reference.update(updates).await()
+                        }
+                    }
+                }
+            } else {
+                throw NoSuchElementException("복습 일정을 찾을 수 없습니다: $scheduleId")
+            }
+        }
     }
 
     override suspend fun batchUpdatePendingSchedules(

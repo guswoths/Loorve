@@ -1,49 +1,87 @@
+// 경로: app/src/main/java/com/loorve/presentation/reviewblock/ReviewBlockDetailScreen.kt
 @file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.loorve.presentation.reviewblock
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.outlined.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimeInput
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.alpha
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,40 +89,41 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.firebase.auth.FirebaseAuth
-import com.loorve.domain.model.CompletionResult
+import com.loorve.ui.theme.DeepBlueLightBlueGradient
 import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.model.ReviewScheduleItem
 import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.model.StudyRecord
-import com.loorve.domain.review.ReviewPlanStatus
-import com.loorve.domain.review.ScheduleGenerationOutcome
-import com.loorve.domain.usecase.CreateStudyRecordResult
+import com.loorve.domain.subscription.SubscriptionEntitlement
 import com.loorve.presentation.home.HomeViewModel
 import com.loorve.presentation.subscription.ProPaywallDialog
 import com.loorve.presentation.subscription.SubscriptionViewModel
-import com.loorve.ui.component.LoorveCard
 import com.loorve.ui.component.BannerAdView
-import com.loorve.ui.theme.*
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.util.*
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
+import java.util.Date
+import java.util.Locale
 
-// ── 메인 화면 ──────────────────────────────────────────────────
-@OptIn(ExperimentalMaterial3Api::class)
+// ──────────────────────────────────────────────────────────
+// Google Stitch MCP: "학습 진도 기입 및 복습 블록 (블루 테마)" 메인 화면
+// ──────────────────────────────────────────────────────────
 @Composable
 fun ReviewBlockDetailScreen(
     blockId: String,
     block: ReviewBlock?,
     onNavigateBack: () -> Unit,
     viewModel: ReviewBlockDetailViewModel = hiltViewModel(),
-    homeViewModel: HomeViewModel = hiltViewModel(),
+    @Suppress("UNUSED_PARAMETER") homeViewModel: HomeViewModel = hiltViewModel(),
     subscriptionViewModel: SubscriptionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
-    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    val subscriptionState by subscriptionViewModel.state.collectAsState()
+    val uid = remember { FirebaseAuth.getInstance().currentUser?.uid ?: "" }
     val snackbarHostState = remember { SnackbarHostState() }
     var showProDialog by remember { mutableStateOf(false) }
     var selectedStudyRecord by remember { mutableStateOf<StudyRecord?>(null) }
@@ -119,11 +158,12 @@ fun ReviewBlockDetailScreen(
     }
     val completionRate = if (totalReviews == 0) 0f
     else (completedReviews.toFloat() / totalReviews).coerceIn(0f, 1f)
+
     val dDay = resolvedBlock?.examDate?.let { millis ->
         if (millis == 0L) "D-?" else {
             val examDate = Instant.ofEpochMilli(millis)
                 .atZone(ZoneId.of("Asia/Seoul")).toLocalDate()
-            val days = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), examDate)
+            val days = ChronoUnit.DAYS.between(LocalDate.now(ZoneId.of("Asia/Seoul")), examDate)
             when {
                 days > 0 -> "D-$days"
                 days == 0L -> "D-Day"
@@ -141,10 +181,11 @@ fun ReviewBlockDetailScreen(
             }
         )
     }
+
     if (uiState.showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { viewModel.setShowDeleteConfirm(false) },
-            title = { Text("블록 삭제") },
+            title = { Text("블록 삭제", fontWeight = FontWeight.Bold) },
             text = { Text("이 복습 블록과 모든 학습 기록, 복습 일정이 삭제됩니다. 계속할까요?") },
             confirmButton = {
                 TextButton(
@@ -161,10 +202,11 @@ fun ReviewBlockDetailScreen(
             }
         )
     }
+
     uiState.recordToDelete?.let { record ->
         AlertDialog(
             onDismissRequest = { viewModel.setRecordToDelete(null) },
-            title = { Text("학습기록 삭제") },
+            title = { Text("학습기록 삭제", fontWeight = FontWeight.Bold) },
             text = { Text("\"${record.title.ifBlank { "이 학습기록" }}\"을 삭제할까요?") },
             confirmButton = {
                 TextButton(
@@ -181,6 +223,7 @@ fun ReviewBlockDetailScreen(
             }
         )
     }
+
     selectedStudyRecord?.let {
         StudyRecordDetailDialog(it) { selectedStudyRecord = null }
     }
@@ -188,756 +231,221 @@ fun ReviewBlockDetailScreen(
         ReviewScheduleDetailDialog(it) { selectedReviewSchedule = null }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
-        Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            containerColor = Color.Transparent
-        ) { padding ->
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, top = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Outlined.ArrowBack, "뒤로가기", tint = Color(0xFF334155))
-                        }
-                        Text(
-                            title,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A)
+    Scaffold(
+        containerColor = Color(0xFFF8FAFC),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = title,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "뒤로 가기",
+                            tint = Color(0xFF475569)
                         )
-                        IconButton(
-                            onClick = { viewModel.setShowDeleteConfirm(true) },
-                            enabled = !uiState.isLoading
-                        ) {
-                            Icon(Icons.Default.Delete, "블록 삭제", tint = Color(0xFFEF4444))
-                        }
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.setShowDeleteConfirm(true) },
+                        enabled = !uiState.isLoading
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "삭제",
+                            tint = Color(0xFF94A3B8)
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFF8FAFC)
+                )
+            )
+        },
+        bottomBar = {
+            val showBanner = subscriptionState.entitlement is SubscriptionEntitlement.Free
+            if (showBanner) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                ) {
+                    key(showBanner) {
+                        BannerAdView(modifier = Modifier.fillMaxWidth())
                     }
                 }
-                item {
-                    SpecGlassCard {
+            } else {
+                Spacer(modifier = Modifier.navigationBarsPadding())
+            }
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .imePadding(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // ──────────────────────────────────────────────────────────
+            // 1. ReviewProgressCard: 복습 블록 진행률 및 통계 카드
+            // ──────────────────────────────────────────────────────────
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFBAE6FD).copy(alpha = 0.8f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Title & D-Day Badge
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Top
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                title,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF0F172A)
+                                text = title,
+                                fontSize = 19.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0F172A),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
-                            SpecBadge("• $dDay")
+                            if (dDay.isNotBlank()) {
+                                StitchDDayBadge(dDay = dDay)
+                            }
                         }
+
+                        // Metric Display (33% 복습 완료율)
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 14.dp, bottom = 8.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.Bottom
                         ) {
-                            Text(
-                                "${(completionRate * 100).toInt()}%",
-                                fontSize = 32.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF0F172A)
-                            )
-                            Text(
-                                "복습 완료율",
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF64748B)
-                            )
-                        }
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(12.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFF1F5F9))
-                        ) {
-                            Box(
-                                Modifier
-                                    .fillMaxWidth(completionRate)
-                                    .fillMaxHeight()
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(Color(0xFF3B82F6), Color(0xFFA855F7))
-                                        )
-                                    )
-                            )
-                        }
-                        Text(
-                            "• $completedReviews / $totalReviews 복습 일정 완료",
-                            modifier = Modifier.padding(top = 10.dp),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF4F46E5)
-                        )
-                    }
-                }
-                item {
-                    SpecGlassCard {
-                        StudyProgressInputSection(
-                            onSave = { date, recordTitle, content ->
-                                viewModel.saveProgress(
-                                    uid = uid,
-                                    blockId = blockId,
-                                    examId = resolvedBlock?.blockId ?: blockId,
-                                    title = recordTitle,
-                                    content = content,
-                                    learningDateMillis = date,
-                                    dailyCap = resolvedBlock?.dailyCap ?: 5
-                                )
-                            },
-                            isLoading = uiState.isLoading,
-                            isSaveEnabled = resolvedBlock?.examDate != 0L,
-                            modifier = Modifier
-                        )
-                    }
-                }
-                item {
-                    SpecRecordTabs(
-                        selectedTab = selectedTab,
-                        onTabSelected = { viewModel.selectTab(it, uid, blockId) }
-                    )
-                }
-                if (selectedTab == ReviewBlockTab.STUDY_RECORD) {
-                    item {
-                        StudyRecordListSection(
-                            records = uiState.studyRecords,
-                            reviewSchedules = uiState.reviewScheduleRecords,
-                            isLoading = uiState.isLoading,
-                            onDeleteRecord = viewModel::setRecordToDelete,
-                            onRecordClick = { selectedStudyRecord = it }
-                        )
-                    }
-                } else {
-                    item {
-                        ReviewRecordListSection(
-                            scheduleItems = uiState.reviewScheduleRecords,
-                            defaultAlarmTime = uiState.defaultAlarmTime,
-                            onTimeSave = { item, hour, minute ->
-                                viewModel.saveCustomAlarmTime(uid, item, hour, minute)
-                            },
-                            onCheckedChange = { item, checked ->
-                                viewModel.toggleReviewCompletion(uid, item, checked)
-                            },
-                            onScheduleClick = { selectedReviewSchedule = it },
-                            isLoading = uiState.isLoading
-                        )
-                    }
-                }
-            }
-        }
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 8.dp)
-                .width(320.dp)
-                .height(50.dp),
-            shape = RoundedCornerShape(12.dp),
-            color = Color.White.copy(alpha = 0.95f),
-            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-            shadowElevation = 6.dp
-        ) {
-            BannerAdView(modifier = Modifier.fillMaxSize())
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SpecGlassCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.85f)),
-        shadowElevation = 8.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            content = content
-        )
-    }
-}
-
-@Composable
-private fun SpecBadge(text: String) {
-    val pulseTransition = rememberInfiniteTransition(label = "dDayBadgePulse")
-    val pulse by pulseTransition.animateFloat(
-        initialValue = 0.8f,
-        targetValue = 1.3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dDayBadgePulseScale"
-    )
-    val dotAlpha by pulseTransition.animateFloat(
-        initialValue = 0.55f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dDayBadgePulseAlpha"
-    )
-    Surface(
-        color = Color(0xFFEFF6FF),
-        shape = CircleShape
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .graphicsLayer {
-                        scaleX = pulse
-                        scaleY = pulse
-                        alpha = dotAlpha
-                    }
-                    .clip(CircleShape)
-                    .background(Color(0xFF2563EB))
-            )
-            Text(
-                text.removePrefix("• ").trim(),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF2563EB)
-            )
-        }
-    }
-}
-
-@Composable
-private fun SpecRecordTabs(
-    selectedTab: ReviewBlockTab,
-    onTabSelected: (ReviewBlockTab) -> Unit
-) {
-    Surface(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = Color(0xFFE2E8F0).copy(alpha = 0.6f)
-    ) {
-        Row(Modifier.padding(4.dp)) {
-            SpecTab(
-                text = "학습 기록",
-                selected = selectedTab == ReviewBlockTab.STUDY_RECORD,
-                modifier = Modifier.weight(1f),
-                onClick = { onTabSelected(ReviewBlockTab.STUDY_RECORD) }
-            )
-            SpecTab(
-                text = "복습 일정",
-                selected = selectedTab == ReviewBlockTab.REVIEW_RECORD,
-                modifier = Modifier.weight(1f),
-                onClick = { onTabSelected(ReviewBlockTab.REVIEW_RECORD) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun SpecTab(
-    text: String,
-    selected: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = modifier
-            .height(40.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = if (selected) Color.White else Color.Transparent,
-        shadowElevation = if (selected) 2.dp else 0.dp
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text,
-                    fontSize = 13.sp,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (selected) Color(0xFF0F172A) else Color(0xFF64748B)
-                )
-                if (selected) {
-                    Spacer(Modifier.width(6.dp))
-                    Box(
-                        Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF2563EB))
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Suppress("unused")
-@Composable
-private fun DetailSpecAmbientMesh() {
-    val transition = rememberInfiniteTransition(label = "detailAmbientMesh")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            tween(20000),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "detailAmbientPhase"
-    )
-    Canvas(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {}
-    ) {
-        drawAmbientOrb(
-            centerX = size.width * (-0.05f + phase * 0.08f),
-            centerY = size.height * (0.04f + phase * 0.08f),
-            radius = 170.dp.toPx(),
-            color = Color(0xFF0284C7),
-            alpha = 0.22f
-        )
-        drawAmbientOrb(
-            centerX = size.width * (1.05f - phase * 0.08f),
-            centerY = size.height * (0.42f - phase * 0.04f),
-            radius = 160.dp.toPx(),
-            color = Color(0xFF7DD3FC),
-            alpha = 0.18f
-        )
-        drawAmbientOrb(
-            centerX = size.width * (0.02f + phase * 0.08f),
-            centerY = size.height * (0.82f - phase * 0.06f),
-            radius = 150.dp.toPx(),
-            color = Color(0xFF38BDF8),
-            alpha = 0.20f
-        )
-        drawAmbientOrb(
-            centerX = size.width * (0.88f - phase * 0.06f),
-            centerY = size.height * (1.02f - phase * 0.04f),
-            radius = 140.dp.toPx(),
-            color = Color(0xFFBAE6FD),
-            alpha = 0.15f
-        )
-    }
-}
-
-private fun DrawScope.drawAmbientOrb(
-    centerX: Float,
-    centerY: Float,
-    radius: Float,
-    color: Color,
-    alpha: Float
-) {
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(color.copy(alpha = alpha), color.copy(alpha = 0f)),
-            center = androidx.compose.ui.geometry.Offset(centerX, centerY),
-            radius = radius
-        ),
-        radius = radius,
-        center = androidx.compose.ui.geometry.Offset(centerX, centerY)
-    )
-}
-
-@Composable
-private fun LegacyReviewBlockDetailScreen(
-    blockId: String,
-    block: ReviewBlock?,
-    onNavigateBack: () -> Unit,
-    viewModel: ReviewBlockDetailViewModel = hiltViewModel(),
-    homeViewModel: HomeViewModel = hiltViewModel(),          // ✅ [추가]
-    subscriptionViewModel: SubscriptionViewModel = hiltViewModel()
-) {
-    val uiState by viewModel.uiState.collectAsState()
-    val selectedTab by viewModel.selectedTab.collectAsState()
-    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-
-    val snackbarHostState = remember { SnackbarHostState() }
-    var showProDialog by remember { mutableStateOf(false) }
-    var selectedStudyRecord by remember { mutableStateOf<StudyRecord?>(null) }
-    var selectedReviewSchedule by remember { mutableStateOf<ReviewScheduleItem?>(null) }
-
-    LaunchedEffect(blockId) {
-        viewModel.loadBlockData(uid, blockId, externalBlock = block)
-    }
-
-    LaunchedEffect(uiState.errorMessage) {
-        uiState.errorMessage?.let { msg ->
-            snackbarHostState.showSnackbar(msg)
-            viewModel.clearErrorMessage()
-        }
-    }
-
-    LaunchedEffect(uiState.requiresPro) {
-        if (uiState.requiresPro) showProDialog = true
-    }
-
-    // 블록 삭제 성공 시 뒤로가기
-    LaunchedEffect(uiState.deleteSuccess) {
-        if (uiState.deleteSuccess) {
-            viewModel.resetDeleteSuccess()
-            onNavigateBack()
-        }
-    }
-
-    val resolvedBlock = uiState.reviewBlock
-    val examDateMillis = resolvedBlock?.examDate ?: 0L
-    val dailyCap = resolvedBlock?.dailyCap ?: 5
-    val examName = resolvedBlock?.examName?.ifBlank { resolvedBlock.title }
-        ?: resolvedBlock?.title
-        ?: blockId
-
-    if (showProDialog) {
-        ProPaywallDialog(
-            viewModel = subscriptionViewModel,
-            onDismiss = {
-                showProDialog = false
-                onNavigateBack()
-            }
-        )
-    }
-
-    val dDayText = when {
-        resolvedBlock == null -> ""
-        examDateMillis == 0L  -> "D-?"
-        else -> {
-            val examLocal = Instant.ofEpochMilli(examDateMillis)
-                .atZone(ZoneId.of("Asia/Seoul")).toLocalDate()
-            val days = java.time.temporal.ChronoUnit.DAYS
-                .between(LocalDate.now(), examLocal).toInt()
-            when {
-                days > 0  -> "D-$days"
-                days == 0 -> "D-Day"
-                else      -> "D+${-days}"
-            }
-        }
-    }
-    val totalReviewCount = uiState.reviewScheduleRecords.size
-    val completedReviewCount = uiState.reviewScheduleRecords.count {
-        it.status == ReviewStatus.COMPLETED
-    }
-    val completionRate = if (totalReviewCount > 0) {
-        (completedReviewCount.toFloat() / totalReviewCount.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-    val overdueRatio = if (totalReviewCount > 0) {
-        (uiState.overdueItems.size.toFloat() / totalReviewCount.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-    val reviewProgress = if (totalReviewCount == 0) {
-        0f
-    } else {
-        (1f - overdueRatio).coerceIn(0f, 1f)
-    }
-
-    // 블록 삭제 확인 AlertDialog
-    if (uiState.showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { viewModel.setShowDeleteConfirm(false) },
-            title = { Text("블록 삭제") },
-            text = {
-                Text("이 복습 블록과 모든 학습 기록, 복습 일정이 삭제됩니다. 계속할까요?")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { viewModel.deleteBlock(uid, blockId) },
-                    enabled = !uiState.isLoading
-                ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    } else {
-                        Text(
-                            "삭제",
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { viewModel.setShowDeleteConfirm(false) },
-                    enabled = !uiState.isLoading
-                ) {
-                    Text("취소")
-                }
-            }
-        )
-    }
-
-    // 개별 학습기록 삭제 확인 AlertDialog
-    uiState.recordToDelete?.let { record ->
-        AlertDialog(
-            onDismissRequest = { viewModel.setRecordToDelete(null) },
-            title = { Text("학습기록 삭제") },
-            text = { Text("\"${record.title.ifBlank { "이 학습기록" }}\"을 삭제할까요? 이 작업은 되돌릴 수 없습니다.") },
-            confirmButton = {
-                TextButton(
-                    onClick = { viewModel.deleteStudyRecord(uid, blockId, record) },
-                    enabled = !uiState.isLoading
-                ) {
-                    Text(
-                        "삭제",
-                        color = MaterialTheme.colorScheme.error,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { viewModel.setRecordToDelete(null) },
-                    enabled = !uiState.isLoading
-                ) {
-                    Text("취소")
-                }
-            }
-        )
-    }
-
-    selectedStudyRecord?.let { record ->
-        StudyRecordDetailDialog(
-            record = record,
-            onDismiss = { selectedStudyRecord = null }
-        )
-    }
-
-    selectedReviewSchedule?.let { item ->
-        ReviewScheduleDetailDialog(
-            item = item,
-            onDismiss = { selectedReviewSchedule = null }
-        )
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
-        Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            examName,
-                            style = LoorveTypography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = OnBackground
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(
-                                Icons.Outlined.ArrowBack,
-                                contentDescription = "뒤로",
-                                tint = OnBackground
-                            )
-                        }
-                    },
-                    actions = {
-                        IconButton(
-                            onClick = { viewModel.setShowDeleteConfirm(true) },
-                            enabled = !uiState.isLoading
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "블록 삭제",
-                                tint = Error
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent
-                    )
-                )
-            },
-            containerColor = Color.Transparent
-        ) { paddingValues ->
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-            // ── 블록 요약 정보 ──
-            item {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    color = Surface,
-                    border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
-                    shadowElevation = 8.dp
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.Bottom) {
                                 Text(
-                                    text = examName,
-                                    style = LoorveTypography.titleLarge,
+                                    text = "${(completionRate * 100).toInt()}",
+                                    fontSize = 36.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF0F172A)
+                                )
+                                Text(
+                                    text = "%",
+                                    fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = OnBackground
+                                    color = Color(0xFF0F172A),
+                                    modifier = Modifier.padding(bottom = 3.dp, start = 2.dp)
                                 )
                             }
-                            Surface(
-                                color = NoticeContainer,
-                                shape = CircleShape
-                            ) {
-                                Text(
-                                    text = dDayText,
-                                    modifier = Modifier.padding(
-                                        horizontal = 12.dp,
-                                        vertical = 7.dp
-                                    ),
-                                    style = LoorveTypography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Notice
-                                )
-                            }
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "${(completionRate * 100).toInt()}%",
-                                style = LoorveTypography.displayMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = OnBackground
-                            )
                             Text(
                                 text = "복습 완료율",
-                                style = LoorveTypography.labelMedium,
-                                color = OnSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 5.dp)
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF94A3B8),
+                                modifier = Modifier.padding(bottom = 6.dp)
                             )
                         }
+
+                        // Progress Bar Track & Fill
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(8.dp)
+                                .height(10.dp)
                                 .clip(CircleShape)
-                                .background(NoticeContainer)
+                                .background(Color(0xFFF1F5F9))
+                                .padding(1.5.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth(reviewProgress)
+                                    .fillMaxWidth(completionRate)
                                     .fillMaxSize()
                                     .clip(CircleShape)
                                     .background(
                                         Brush.horizontalGradient(
-                                            colors = listOf(Notice, Active)
+                                            listOf(
+                                                Color(0xFF2563EB),
+                                                Color(0xFF3B82F6),
+                                                Color(0xFF38BDF8)
+                                            )
                                         )
                                     )
                             )
                         }
-                        Text(
-                            text = "$completedReviewCount / $totalReviewCount 복습 일정 완료",
-                            style = LoorveTypography.bodySmall,
-                            color = OnSurfaceVariant
-                        )
+
+                        // Status Summary Note
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF2563EB))
+                            )
+                            Text(
+                                text = "$completedReviews / $totalReviews 복습 일정 완료",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF2563EB)
+                            )
+                        }
                     }
                 }
             }
 
-            // ── 에러 메시지 ──
-            uiState.errorMessage?.let { msg ->
-                item {
-                    Text(
-                        text = msg,
-                        color = Error,
-                        style = LoorveTypography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            if (uiState.isLoading && uiState.reviewBlock == null) {
-                item {
-                    Text(
-                        text = "⚠️ 블록 정보를 불러오는 중입니다...",
-                        style = LoorveTypography.bodySmall,
-                        color = OnSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            // ── 학습 진도 입력 섹션 ──
+            // ──────────────────────────────────────────────────────────
+            // 2. DailyStudyProgressForm: 오늘 학습 진도 기입 폼
+            // ──────────────────────────────────────────────────────────
             item {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    color = Surface,
-                    border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
-                    shadowElevation = 6.dp
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFBAE6FD).copy(alpha = 0.8f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
                     StudyProgressInputSection(
-                        onSave = { learningDateMillis, title, content ->
+                        onSave = { learningDateMillis, recordTitle, content ->
                             viewModel.saveProgress(
                                 uid = uid,
                                 blockId = blockId,
                                 examId = resolvedBlock?.blockId ?: blockId,
-                                title = title,
+                                title = recordTitle,
                                 content = content,
                                 learningDateMillis = learningDateMillis,
-                                dailyCap = dailyCap,
+                                dailyCap = resolvedBlock?.dailyCap ?: 5
                             )
                         },
                         isLoading = uiState.isLoading,
-                        isSaveEnabled = resolvedBlock != null && resolvedBlock.examDate != 0L,
-                        modifier = Modifier.padding(4.dp)
+                        isSaveEnabled = resolvedBlock != null && resolvedBlock.examDate != 0L
                     )
                 }
             }
 
-            // ── 학습기록 / 복습기록 탭 전환 UI ──
+            // ──────────────────────────────────────────────────────────
+            // 3. SegmentedTabNavigation: 학습 기록 / 복습 일정 탭 전환
+            // ──────────────────────────────────────────────────────────
             item {
-                RecordTabRow(
+                StitchSegmentedTabNavigation(
                     selectedTab = selectedTab,
                     onTabSelected = { tab ->
                         viewModel.selectTab(tab, uid = uid, blockId = blockId)
@@ -945,20 +453,20 @@ private fun LegacyReviewBlockDetailScreen(
                 )
             }
 
-            // ── 기록 리스트 (탭 조건 분기) ──
+            // ──────────────────────────────────────────────────────────
+            // 4. Records List Section (선택된 탭에 따라 분기)
+            // ──────────────────────────────────────────────────────────
             if (selectedTab == ReviewBlockTab.STUDY_RECORD) {
                 item {
                     StudyRecordListSection(
                         records = uiState.studyRecords,
                         reviewSchedules = uiState.reviewScheduleRecords,
                         isLoading = uiState.isLoading,
-                        onDeleteRecord = { record -> viewModel.setRecordToDelete(record) },
-                        onRecordClick = { record -> selectedStudyRecord = record }
+                        onDeleteRecord = viewModel::setRecordToDelete,
+                        onRecordClick = { selectedStudyRecord = it }
                     )
                 }
-            }
-
-            if (selectedTab == ReviewBlockTab.REVIEW_RECORD) {
+            } else {
                 item {
                     ReviewRecordListSection(
                         scheduleItems = uiState.reviewScheduleRecords,
@@ -967,168 +475,801 @@ private fun LegacyReviewBlockDetailScreen(
                             viewModel.saveCustomAlarmTime(uid, item, hour, minute)
                         },
                         onCheckedChange = { item, checked ->
-                            viewModel.toggleReviewCompletion(
-                                uid = uid,
-                                item = item,
-                                isCompleted = checked
-                            )
+                            viewModel.toggleReviewCompletion(uid, item, checked)
                         },
-                        onScheduleClick = { item -> selectedReviewSchedule = item },
-                        isLoading = uiState.isLoading
+                        onScheduleClick = { selectedReviewSchedule = it }
                     )
                 }
             }
         }
     }
-    }
 }
 
-@Suppress("unused")
+// ──────────────────────────────────────────────────────────
+// Stitch 앰비언트 펄스 D-Day 뱃지
+// ──────────────────────────────────────────────────────────
 @Composable
-private fun DetailAmbientAura() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(start = 220.dp, top = 8.dp)
-            .size(180.dp)
-            .blur(72.dp)
-            .background(
-                color = SkyTint.copy(alpha = 0.5f),
-                shape = CircleShape
-            )
+private fun StitchDDayBadge(dDay: String) {
+    val pulseTransition = rememberInfiniteTransition(label = "stitchDDayPulse")
+    val pulseScale by pulseTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dDayPulseScale"
     )
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(end = 220.dp, top = 360.dp)
-            .size(220.dp)
-            .blur(80.dp)
-            .background(
-                color = LavenderTint.copy(alpha = 0.46f),
-                shape = CircleShape
-            )
+    val pulseAlpha by pulseTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dDayPulseAlpha"
     )
-}
 
-// ── 학습기록 / 복습기록 탭 전환 UI ─────────────────────────────
-@Composable
-fun RecordTabRow(
-    selectedTab: ReviewBlockTab,
-    onTabSelected: (ReviewBlockTab) -> Unit,
-    modifier: Modifier = Modifier
-) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = CircleShape,
-        color = SurfaceVariant,
-        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.04f))
+        color = Color(0xFFEFF6FF),
+        shape = RoundedCornerShape(100.dp),
+        border = BorderStroke(1.dp, Color(0xFFBFDBFE).copy(alpha = 0.7f))
     ) {
         Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .graphicsLayer {
+                        scaleX = pulseScale
+                        scaleY = pulseScale
+                        alpha = pulseAlpha
+                    }
+                    .clip(CircleShape)
+                    .background(Color(0xFF2563EB))
+            )
+            Text(
+                text = dDay,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF2563EB)
+            )
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// DailyStudyProgressForm 입력 컴포넌트
+// ──────────────────────────────────────────────────────────
+@Composable
+fun StudyProgressInputSection(
+    onSave: (learningDateMillis: Long, title: String, content: String) -> Unit,
+    isLoading: Boolean,
+    isSaveEnabled: Boolean = true
+) {
+    var titleText by remember { mutableStateOf("") }
+    var contentText by remember { mutableStateOf("") }
+
+    val kstZone = remember { ZoneId.of("Asia/Seoul") }
+    val todayLocalDate = remember { LocalDate.now(kstZone) }
+    val todayMillis = remember {
+        todayLocalDate.atStartOfDay(kstZone).toInstant().toEpochMilli()
+    }
+    var selectedDateMillis by remember { mutableLongStateOf(todayMillis) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val selectedLocalDate = remember(selectedDateMillis) {
+        Instant.ofEpochMilli(selectedDateMillis).atZone(kstZone).toLocalDate()
+    }
+    val isToday = remember(selectedLocalDate, todayLocalDate) {
+        selectedLocalDate == todayLocalDate
+    }
+
+    val displayDateText = remember(selectedDateMillis) {
+        SimpleDateFormat("yyyy년 MM월 dd일 (E)", Locale.KOREA).format(Date(selectedDateMillis))
+    }
+
+    val canSave = (titleText.isNotBlank() || contentText.isNotBlank()) && !isLoading && isSaveEnabled
+
+    if (showDatePicker) {
+        val initialUtcMillis = remember(selectedLocalDate) {
+            selectedLocalDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        }
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialUtcMillis
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { utcMs ->
+                        val pickedLocalDate = Instant.ofEpochMilli(utcMs)
+                            .atZone(ZoneOffset.UTC).toLocalDate()
+                        selectedDateMillis = pickedLocalDate
+                            .atStartOfDay(kstZone)
+                            .toInstant()
+                            .toEpochMilli()
+                    }
+                    showDatePicker = false
+                }) { Text("확인") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("취소") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Section Header
+        Row(
             modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SegmentTab(
-                text = "학습 기록",
-                selected = selectedTab == ReviewBlockTab.STUDY_RECORD,
-                contentDescription = "학습기록 탭",
-                modifier = Modifier.weight(1f),
-                onClick = { onTabSelected(ReviewBlockTab.STUDY_RECORD) }
-            )
-            SegmentTab(
-                text = "복습 일정",
-                selected = selectedTab == ReviewBlockTab.REVIEW_RECORD,
-                contentDescription = "복습기록 탭",
-                modifier = Modifier.weight(1f),
-                onClick = { onTabSelected(ReviewBlockTab.REVIEW_RECORD) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun SegmentTab(
-    text: String,
-    selected: Boolean,
-    contentDescription: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = modifier
-            .heightIn(min = 44.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            )
-            .semantics { this.contentDescription = contentDescription },
-        shape = CircleShape,
-        color = if (selected) SurfaceSolid else Color.Transparent,
-        shadowElevation = if (selected) 2.dp else 0.dp
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
             Text(
-                text = text,
-                style = LoorveTypography.labelLarge,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) OnBackground else OnSurfaceVariant
+                text = if (isToday) "오늘 학습 진도" else "학습 진도 기입",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A)
             )
-        }
-    }
-}
-
-// ── 학습 기록 섹션 (헤더 + 목록) ──────────────────────────────
-@Composable
-fun StudyRecordListSection(
-    records: List<StudyRecord>,
-    reviewSchedules: List<ReviewScheduleItem> = emptyList(),
-    modifier: Modifier = Modifier,
-    isLoading: Boolean = false,
-    onDeleteRecord: (StudyRecord) -> Unit = {},
-    onRecordClick: (StudyRecord) -> Unit = {}
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        if (records.isEmpty()) {
-            Text(
-                text = "아직 기록된 학습이 없어요. 첫 학습을 입력해보세요!",
-                style = LoorveTypography.bodySmall,
-                color = OnSurfaceVariant,
-                modifier = Modifier.padding(vertical = 12.dp)
-            )
-        } else {
-            records.forEach { record ->
-                val associatedSchedules = reviewSchedules.filter {
-                    it.studyRecordId == record.id
+            if (!isToday) {
+                Surface(
+                    shape = RoundedCornerShape(100.dp),
+                    color = Color(0xFFEFF6FF),
+                    border = BorderStroke(1.dp, Color(0xFFBFDBFE))
+                ) {
+                    Text(
+                        text = "기록일: ${selectedLocalDate.monthValue}월 ${selectedLocalDate.dayOfMonth}일",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF2563EB),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
                 }
-                StudyRecordMiniCard(
-                    record = record,
-                    isResolved = associatedSchedules.isNotEmpty() &&
-                        associatedSchedules.all { it.status == ReviewStatus.COMPLETED },
-                    isLoading = isLoading,
-                    onDeleteClick = { onDeleteRecord(record) },
-                    onClick = { onRecordClick(record) }
+            }
+        }
+
+        // 1. Date Selector Display Button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (isToday) Color(0xFFF8FAFC) else Color(0xFFF0F9FF))
+                .border(
+                    1.dp,
+                    if (isToday) Color(0xFFE2E8F0) else Color(0xFF93C5FD),
+                    RoundedCornerShape(14.dp)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                .clickable(enabled = !isLoading) { showDatePicker = true }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CalendarToday,
+                contentDescription = "학습일자 선택",
+                tint = Color(0xFF2563EB),
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = displayDateText,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isToday) Color(0xFF334155) else Color(0xFF1D4ED8)
+            )
+            if (!isToday) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "(선택됨)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF2563EB)
+                )
+            }
+        }
+
+        // 2. Study Subject Title Input
+        BasicTextField(
+            value = titleText,
+            onValueChange = { titleText = it },
+            enabled = !isLoading,
+            singleLine = true,
+            textStyle = TextStyle(
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF1E293B)
+            ),
+            decorationBox = { innerTextField ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color.White)
+                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (titleText.isEmpty()) {
+                            Text(
+                                text = "학습 제목 (제목 또는 내용 중 하나 필수)",
+                                fontSize = 13.5.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                        }
+                        innerTextField()
+                    }
+                    if (titleText.isNotEmpty() && !isLoading) {
+                        IconButton(
+                            onClick = { titleText = "" },
+                            modifier = Modifier.size(18.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "제목 지우기",
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        )
+
+        // 3. Study Content Textarea
+        BasicTextField(
+            value = contentText,
+            onValueChange = { contentText = it },
+            enabled = !isLoading,
+            minLines = 3,
+            maxLines = 5,
+            textStyle = TextStyle(
+                fontSize = 14.sp,
+                color = Color(0xFF1E293B),
+                lineHeight = 20.sp
+            ),
+            decorationBox = { innerTextField ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color.White)
+                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    if (contentText.isEmpty()) {
+                        Text(
+                            text = "학습 내용",
+                            fontSize = 13.5.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                    innerTextField()
+                }
+            }
+        )
+
+        // 4. Submit / Action Button (Gradient)
+        Button(
+            onClick = {
+                if (canSave) {
+                    onSave(
+                        selectedDateMillis,
+                        titleText.trim(),
+                        contentText.trim()
+                    )
+                    titleText = ""
+                    contentText = ""
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            enabled = canSave,
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                disabledContainerColor = Color(0xFFE2E8F0)
+            ),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = if (canSave) {
+                            DeepBlueLightBlueGradient
+                        } else {
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFFCBD5E1), Color(0xFFE2E8F0))
+                            )
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = "학습 기록 및 복습 일정 생성",
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
             }
         }
     }
 }
 
-// ── StudyRecordMiniCard ─────────────────────────────────────────
+// ──────────────────────────────────────────────────────────
+// SegmentedTabNavigation (학습 기록 / 복습 일정 탭)
+// ──────────────────────────────────────────────────────────
+@Composable
+fun StitchSegmentedTabNavigation(
+    selectedTab: ReviewBlockTab,
+    onTabSelected: (ReviewBlockTab) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFE2E8F0).copy(alpha = 0.7f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val isStudyRecord = selectedTab == ReviewBlockTab.STUDY_RECORD
+            // 학습 기록 탭
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(42.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onTabSelected(ReviewBlockTab.STUDY_RECORD) }
+                    ),
+                shape = RoundedCornerShape(12.dp),
+                color = if (isStudyRecord) Color.White else Color.Transparent,
+                shadowElevation = if (isStudyRecord) 2.dp else 0.dp
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "학습 기록",
+                        fontSize = 13.5.sp,
+                        fontWeight = if (isStudyRecord) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isStudyRecord) Color(0xFF2563EB) else Color(0xFF64748B)
+                    )
+                    if (isStudyRecord) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF2563EB))
+                        )
+                    }
+                }
+            }
+
+            // 복습 일정 탭
+            val isReviewRecord = selectedTab == ReviewBlockTab.REVIEW_RECORD
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(42.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onTabSelected(ReviewBlockTab.REVIEW_RECORD) }
+                    ),
+                shape = RoundedCornerShape(12.dp),
+                color = if (isReviewRecord) Color.White else Color.Transparent,
+                shadowElevation = if (isReviewRecord) 2.dp else 0.dp
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "복습 일정",
+                        fontSize = 13.5.sp,
+                        fontWeight = if (isReviewRecord) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isReviewRecord) Color(0xFF2563EB) else Color(0xFF64748B)
+                    )
+                    if (isReviewRecord) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF2563EB))
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// ReviewRecordListSection (복습 일정 카드 리스트)
+// ──────────────────────────────────────────────────────────
+@Composable
+fun ReviewRecordListSection(
+    scheduleItems: List<ReviewScheduleItem>,
+    defaultAlarmTime: Pair<Int, Int> = 9 to 0,
+    onTimeSave: ((ReviewScheduleItem, Int, Int) -> Unit)? = null,
+    onCheckedChange: ((ReviewScheduleItem, Boolean) -> Unit)? = null,
+    onScheduleClick: (ReviewScheduleItem) -> Unit = {}
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        if (scheduleItems.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "아직 복습 일정이 없어요.\n상단에서 학습 진도를 기입해보세요!",
+                    fontSize = 13.5.sp,
+                    color = Color(0xFF94A3B8),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+            }
+        } else {
+            val timeMap = remember { mutableStateMapOf<String, String>() }
+            scheduleItems.forEach { item ->
+                val itemKey = item.id.ifBlank {
+                    "${item.reviewDate}_${item.blockId}_${item.reviewOrder}"
+                }
+                ReviewRecordMiniCard(
+                    item = item,
+                    savedTime = timeMap[itemKey] ?: item.customAlarmTime
+                        ?.let { (hour, minute) -> "%02d:%02d".format(hour, minute) }
+                        ?: "%02d:%02d".format(defaultAlarmTime.first, defaultAlarmTime.second),
+                    onTimeSave = { hour, minute ->
+                        timeMap[itemKey] = "%02d:%02d".format(hour, minute)
+                        onTimeSave?.invoke(item, hour, minute)
+                    },
+                    onCheckedChange = { checked ->
+                        onCheckedChange?.invoke(item, checked)
+                    },
+                    onClick = { onScheduleClick(item) }
+                )
+            }
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Stitch 스타일 복습 일정 개별 카드
+// ──────────────────────────────────────────────────────────
+@Composable
+fun ReviewRecordMiniCard(
+    item: ReviewScheduleItem,
+    savedTime: String? = null,
+    onTimeSave: ((Int, Int) -> Unit)? = null,
+    onCheckedChange: ((Boolean) -> Unit)? = null,
+    onClick: () -> Unit = {}
+) {
+    val dateText = remember(item.reviewDate) {
+        if (item.reviewDate > 0L)
+            SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(item.reviewDate))
+        else "-"
+    }
+    var showTimePicker by remember { mutableStateOf(false) }
+    val isCompleted = item.status == ReviewStatus.COMPLETED
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = "복습일정: ${item.title}, 날짜: $dateText, ${item.status}"
+            },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Color(0xFFBAE6FD).copy(alpha = 0.8f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+                // Header Row: Date & Title & Checkbox
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "$dateText (${item.reviewOrder}회차)",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isCompleted) Color(0xFF2563EB) else Color(0xFF64748B)
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = item.title.ifBlank { "복습 일정" },
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    // Round Toggle Checkbox Button
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(if (isCompleted) Color(0xFF2563EB) else Color.Transparent)
+                            .border(
+                                BorderStroke(
+                                    width = 1.5.dp,
+                                    color = if (isCompleted) Color(0xFF2563EB) else Color(0xFFCBD5E1)
+                                ),
+                                CircleShape
+                            )
+                            .clickable {
+                                onCheckedChange?.invoke(!isCompleted)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isCompleted) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "완료됨",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = "탭하여 상세정보 확인",
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8),
+                    fontWeight = FontWeight.Medium
+                )
+
+                // Footer Metadata Row: Status Badge & Alarm notice
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Status Badge
+                    val badgeBg: Color
+                    val badgeBorder: Color
+                    val badgeText: Color
+                    val label: String
+                    when (item.status) {
+                        ReviewStatus.COMPLETED -> {
+                            badgeBg = Color(0xFFECFDF5)
+                            badgeBorder = Color(0xFFA7F3D0)
+                            badgeText = Color(0xFF059669)
+                            label = "완료"
+                        }
+                        ReviewStatus.OVERDUE -> {
+                            badgeBg = Color(0xFFFEF2F2)
+                            badgeBorder = Color(0xFFFECACA)
+                            badgeText = Color(0xFFDC2626)
+                            label = "지연"
+                        }
+                        ReviewStatus.FINAL_URGENT_REVIEW -> {
+                            badgeBg = Color(0xFFFFFBEB)
+                            badgeBorder = Color(0xFFFDE68A)
+                            badgeText = Color(0xFFD97706)
+                            label = "최종 복습"
+                        }
+                        else -> {
+                            badgeBg = Color(0xFFEFF6FF)
+                            badgeBorder = Color(0xFFBFDBFE)
+                            badgeText = Color(0xFF2563EB)
+                            label = "진행 예정"
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = badgeBg,
+                        border = BorderStroke(1.dp, badgeBorder)
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = badgeText,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp)
+                        )
+                    }
+
+                    // Alarm Button
+                    Surface(
+                        modifier = Modifier.clickable { showTimePicker = true },
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFFF8FAFC)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(text = "🔔", fontSize = 11.sp)
+                            Text(
+                                text = "Alarm ${savedTime.orEmpty().ifBlank { "09:00" }}",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF64748B)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showTimePicker) {
+        val (initialHour, initialMinute) = savedTime.orEmpty()
+            .split(":")
+            .takeIf { it.size == 2 }
+            ?.let { parts ->
+                val hour = parts[0].toIntOrNull()
+                val minute = parts[1].toIntOrNull()
+                if (hour != null && minute != null && hour in 0..23 && minute in 0..59) {
+                    hour to minute
+                } else {
+                    9 to 0
+                }
+            } ?: (9 to 0)
+
+        val timePickerState = rememberTimePickerState(
+            initialHour = initialHour,
+            initialMinute = initialMinute
+        )
+
+        Dialog(onDismissRequest = { showTimePicker = false }) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "알림 시간 설정",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TimeInput(state = timePickerState)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showTimePicker = false }) {
+                            Text("취소")
+                        }
+                        TextButton(
+                            onClick = {
+                                onTimeSave?.invoke(timePickerState.hour, timePickerState.minute)
+                                showTimePicker = false
+                            }
+                        ) {
+                            Text("확인", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// StudyRecordListSection (학습 기록 카드 리스트)
+// ──────────────────────────────────────────────────────────
+@Composable
+fun StudyRecordListSection(
+    records: List<StudyRecord>,
+    reviewSchedules: List<ReviewScheduleItem> = emptyList(),
+    isLoading: Boolean = false,
+    onDeleteRecord: (StudyRecord) -> Unit = {},
+    onRecordClick: (StudyRecord) -> Unit = {}
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        if (records.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "아직 기록된 학습이 없어요.\n첫 학습 진도를 기입해보세요!",
+                    fontSize = 13.5.sp,
+                    color = Color(0xFF94A3B8),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+            }
+        } else {
+            val sortedRecords = remember(records) {
+                records.sortedWith(compareBy<StudyRecord> { it.learningDate }.thenBy { it.createdAt })
+            }
+            sortedRecords.forEach { record ->
+                val associated = reviewSchedules.filter { it.studyRecordId == record.id }
+                val isResolved = associated.isNotEmpty() &&
+                    associated.all { it.status == ReviewStatus.COMPLETED }
+                val completedCount = associated.count { it.status == ReviewStatus.COMPLETED }
+
+                StudyRecordMiniCard(
+                    record = record,
+                    isResolved = isResolved,
+                    completedCount = completedCount,
+                    totalCount = associated.size,
+                    isLoading = isLoading,
+                    onDeleteClick = { onDeleteRecord(record) },
+                    onClick = { onRecordClick(record) }
+                )
+            }
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Stitch 스타일 학습 기록 개별 카드
+// ──────────────────────────────────────────────────────────
 @Composable
 fun StudyRecordMiniCard(
     record: StudyRecord,
     isResolved: Boolean = false,
-    modifier: Modifier = Modifier,
+    completedCount: Int = 0,
+    totalCount: Int = 0,
     isLoading: Boolean = false,
     onDeleteClick: () -> Unit = {},
     onClick: () -> Unit = {}
@@ -1139,115 +1280,119 @@ fun StudyRecordMiniCard(
         else "-"
     }
 
-    Surface(
-        modifier = modifier
+    Card(
+        modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .alpha(if (isResolved) 0.62f else 1f)
             .clickable(onClick = onClick)
             .semantics {
                 contentDescription = "학습기록: ${record.title}, 날짜: $dateText"
             },
         shape = RoundedCornerShape(16.dp),
-        color = if (isResolved) SurfaceVariant else Surface,
-        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
-        shadowElevation = 4.dp
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Color(0xFFBAE6FD).copy(alpha = 0.8f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    if (isResolved) OnSurfaceVariant.copy(alpha = 0.14f) else SurfaceSolid,
-                    shape = RoundedCornerShape(16.dp)
-                ),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Left accent bar
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .fillMaxHeight()
-                    .background(Active, shape = RoundedCornerShape(16.dp))
-            )
-
-            Surface(
-                color = Color.Transparent,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                // Header: Date & Title & Delete Button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "📖 $dateText",
-                            style = LoorveTypography.labelSmall,
-                            color = OnSurfaceVariant
+                            text = dateText,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF2563EB)
                         )
-                        IconButton(
-                            onClick = {
-                                onDeleteClick()
-                            },
-                            enabled = !isLoading,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .pointerInput(Unit) {
-                                    awaitEachGesture {
-                                        awaitFirstDown(requireUnconsumed = false).consume()
-                                        waitForUpOrCancellation()?.consume()
-                                    }
-                                }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "학습기록 삭제",
-                                tint = OnSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    if (record.title.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = record.title,
-                            style = LoorveTypography.bodyMedium,
+                            text = record.title.ifBlank { "학습 기록" },
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OnBackground,
+                            color = Color(0xFF0F172A),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
                     }
 
-                    if (record.content.isNotBlank()) {
+                    IconButton(
+                        onClick = onDeleteClick,
+                        enabled = !isLoading,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "학습기록 삭제",
+                            tint = Color(0xFF94A3B8),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                // Content snippet
+                if (record.content.isNotBlank()) {
+                    Text(
+                        text = record.content,
+                        fontSize = 13.sp,
+                        color = Color(0xFF475569),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 18.sp
+                    )
+                }
+
+                Text(
+                    text = "탭하여 상세정보 확인",
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8),
+                    fontWeight = FontWeight.Medium
+                )
+
+                // Footer
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (isResolved) Color(0xFFECFDF5) else Color(0xFFEFF6FF),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isResolved) Color(0xFFA7F3D0) else Color(0xFFBFDBFE)
+                        )
+                    ) {
                         Text(
-                            text = record.content,
-                            style = LoorveTypography.bodySmall,
-                            color = OnSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                            text = if (isResolved) "완료" else "복습 진행 ($completedCount/$totalCount)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isResolved) Color(0xFF059669) else Color(0xFF2563EB),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp)
                         )
                     }
 
-                    if (record.title.isBlank() && record.content.isBlank()) {
-                        Text(
-                            text = "내용 없음",
-                            style = LoorveTypography.bodySmall,
-                            color = OnSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = "예정 복습: ${record.plannedReviewCount}회",
+                        fontSize = 11.5.sp,
+                        color = Color(0xFF64748B)
+                    )
                 }
             }
         }
     }
-}
 
+// ──────────────────────────────────────────────────────────
+// 상세 모달 다이얼로그 (학습 기록 상세 & 복습 일정 상세)
+// ──────────────────────────────────────────────────────────
 @Composable
 private fun StudyRecordDetailDialog(
     record: StudyRecord,
@@ -1256,24 +1401,24 @@ private fun StudyRecordDetailDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .heightIn(max = 620.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = SurfaceSolid,
-            border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.08f)),
-            shadowElevation = 12.dp
+                .fillMaxWidth(0.95f)
+                .heightIn(max = 600.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            shadowElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
-                    text = "학습기록",
-                    style = LoorveTypography.titleLarge,
+                    text = "학습 기록 상세",
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OnBackground
+                    color = Color(0xFF0F172A)
                 )
                 DetailTextBlock("제목", record.title.ifBlank { "제목 없음" })
                 DetailTextBlock("학습 내용 및 메모", record.content.ifBlank { "내용 없음" })
@@ -1292,7 +1437,7 @@ private fun StudyRecordDetailDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("닫기")
+                        Text("닫기", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1322,24 +1467,24 @@ private fun ReviewScheduleDetailDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .heightIn(max = 620.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = SurfaceSolid,
-            border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.08f)),
-            shadowElevation = 12.dp
+                .fillMaxWidth(0.95f)
+                .heightIn(max = 600.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            shadowElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
                     text = "복습 일정 ${item.reviewOrder}회차",
-                    style = LoorveTypography.titleLarge,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OnBackground
+                    color = Color(0xFF0F172A)
                 )
                 DetailTextBlock("학습 내용", item.title.ifBlank { "내용 없음" })
                 DetailTextBlock("복습 예정일", dateText)
@@ -1353,7 +1498,7 @@ private fun ReviewScheduleDetailDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("닫기")
+                        Text("닫기", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1366,17 +1511,18 @@ private fun DetailTextBlock(
     label: String,
     value: String
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = label,
-            style = LoorveTypography.labelMedium,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            color = OnSurfaceVariant
+            color = Color(0xFF64748B)
         )
         Text(
             text = value,
-            style = LoorveTypography.bodyMedium,
-            color = OnBackground
+            fontSize = 14.sp,
+            color = Color(0xFF0F172A),
+            lineHeight = 20.sp
         )
     }
 }
@@ -1388,733 +1534,4 @@ private fun ReviewStatus.detailLabel(): String = when (this) {
     ReviewStatus.FINAL_URGENT_REVIEW -> "최종 복습"
     ReviewStatus.CRAM_MODE_REQUIRED -> "압축 복습 필요"
     ReviewStatus.OVERLOADED_UNRESOLVED -> "일일 과부하 확인 필요"
-}
-
-// ── 복습 기록 섹션 (헤더 + 목록) ──────────────────────────────
-@Composable
-fun ReviewRecordListSection(
-    scheduleItems: List<ReviewScheduleItem>,
-    defaultAlarmTime: Pair<Int, Int> = 9 to 0,
-    onTimeSave: ((ReviewScheduleItem, Int, Int) -> Unit)? = null,
-    onCheckedChange: ((ReviewScheduleItem, Boolean) -> Unit)? = null,
-    onScheduleClick: (ReviewScheduleItem) -> Unit = {},
-    modifier: Modifier = Modifier,
-    isLoading: Boolean = false
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        if (scheduleItems.isEmpty()) {
-            Text(
-                text = "아직 복습 일정이 없어요.",
-                style = LoorveTypography.bodySmall,
-                color = OnSurfaceVariant,
-                modifier = Modifier.padding(vertical = 12.dp)
-            )
-        } else {
-            val timeMap = remember { mutableStateMapOf<String, String>() }
-            scheduleItems.forEach { item ->
-                val itemKey = item.id.ifBlank {
-                    "${item.reviewDate}_${item.blockId}_${item.reviewOrder}"
-                }
-                ReviewRecordMiniCard(
-                    item = item,
-                    savedTime = timeMap[itemKey] ?: item.customAlarmTime
-                        ?.let { (hour, minute) -> "%02d:%02d".format(hour, minute) }
-                        ?: "%02d:%02d".format(defaultAlarmTime.first, defaultAlarmTime.second),
-                    onTimeSave = { hour, minute ->
-                        timeMap[itemKey] = "%02d:%02d".format(hour, minute)
-                        onTimeSave?.invoke(item, hour, minute)
-                    },
-                    onCheckedChange = { checked ->
-                        onCheckedChange?.invoke(item, checked)
-                    },
-                    onClick = { onScheduleClick(item) }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
-    }
-}
-
-// ── ReviewRecordMiniCard ───────────────────────────────────────
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ReviewRecordMiniCard(
-    item: ReviewScheduleItem,
-    modifier: Modifier = Modifier,
-    savedTime: String? = null,
-    onTimeSave: ((Int, Int) -> Unit)? = null,
-    onCheckedChange: ((Boolean) -> Unit)? = null,
-    onClick: () -> Unit = {}
-) {
-    val dateText = remember(item.reviewDate) {
-        if (item.reviewDate > 0L)
-            SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(item.reviewDate))
-        else "-"
-    }
-    var showTimePicker by remember { mutableStateOf(false) }
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .semantics {
-                contentDescription = "복습기록: ${item.title}, 복습 ${item.reviewOrder}회차, ${item.status}, ${dateText}"
-            },
-        shape = RoundedCornerShape(16.dp),
-        color = Surface,
-        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
-        shadowElevation = 4.dp
-    ) {
-        Surface(
-            color = AiSurface,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // Top accent strip
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                colors = listOf(GradientStart, GradientMiddle, GradientEnd)
-                            )
-                        )
-                )
-
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = dateText,
-                            style = LoorveTypography.labelSmall,
-                            color = Color(0xFF2563EB)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    if (item.title.isNotBlank()) {
-                        Text(
-                            text = item.title,
-                            style = LoorveTypography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF1D4ED8),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            color = when (item.status) {
-                                ReviewStatus.COMPLETED -> SuccessContainer
-                                ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> WarningContainer
-                                else -> NoticeContainer
-                            },
-                            shape = CircleShape
-                        ) {
-                            Text(
-                                text = when (item.status) {
-                                    ReviewStatus.PENDING -> "대기 중"
-                                    ReviewStatus.COMPLETED -> "완료"
-                                    ReviewStatus.OVERDUE -> "지연"
-                                    ReviewStatus.FINAL_URGENT_REVIEW -> "최종"
-                                    ReviewStatus.CRAM_MODE_REQUIRED -> "압축 필요"
-                                    ReviewStatus.OVERLOADED_UNRESOLVED -> "과부하"
-                                },
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                style = LoorveTypography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = when (item.status) {
-                                    ReviewStatus.COMPLETED -> Success
-                                    ReviewStatus.OVERDUE, ReviewStatus.FINAL_URGENT_REVIEW -> Warning
-                                    else -> Notice
-                                }
-                            )
-                        }
-                        Spacer(modifier = Modifier.weight(1f))
-                        Surface(
-                            modifier = Modifier.clickable { showTimePicker = true },
-                            shape = CircleShape,
-                            color = SurfaceVariant
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "🔔 Alarm",
-                                    style = LoorveTypography.labelSmall,
-                                    color = OnSurfaceVariant
-                                )
-                                Text(
-                                    text = savedTime.orEmpty().ifBlank { "--:--" },
-                                    style = LoorveTypography.labelSmall,
-                                    color = OnSurfaceVariant
-                                )
-                            }
-                        }
-                        val isCompleted = item.status == ReviewStatus.COMPLETED
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isCompleted) Color(0xFF2563EB) else Color.Transparent
-                                )
-                                .border(
-                                    BorderStroke(
-                                        width = 1.5.dp,
-                                        color = if (isCompleted) Color(0xFF2563EB) else Color(0xFF60A5FA)
-                                    ),
-                                    CircleShape
-                                )
-                                .clickable {
-                                    onCheckedChange?.invoke(!isCompleted)
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isCompleted) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "완료됨",
-                                    tint = OnGradient,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (showTimePicker) {
-        val (initialHour, initialMinute) = savedTime.orEmpty()
-            .split(":")
-            .takeIf { it.size == 2 }
-            ?.let { parts ->
-                val hour = parts[0].toIntOrNull()
-                val minute = parts[1].toIntOrNull()
-                if (hour != null && minute != null && hour in 0..23 && minute in 0..59) {
-                    hour to minute
-                } else {
-                    0 to 0
-                }
-            }
-            ?: (0 to 0)
-        val timePickerState = rememberTimePickerState(
-            initialHour = initialHour,
-            initialMinute = initialMinute
-        )
-
-        Dialog(onDismissRequest = { showTimePicker = false }) {
-            Surface(
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surface
-            ) {
-                Column(modifier = Modifier.padding(24.dp)) {
-                    Text(
-                        text = "Alarm",
-                        style = LoorveTypography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = OnBackground
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    TimeInput(state = timePickerState)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { showTimePicker = false }) {
-                            Text("Cancel")
-                        }
-                        TextButton(
-                            onClick = {
-                                onTimeSave?.invoke(timePickerState.hour, timePickerState.minute)
-                                showTimePicker = false
-                            }
-                        ) {
-                            Text("OK")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── 1회독 권장일 카드 ─────────────────────────────────────────
-@Composable
-fun RecommendedCompletionCard(
-    recommendedDateMillis: Long,
-    deadlineBufferDays: Long,
-    modifier: Modifier = Modifier
-) {
-    val sdf = remember { SimpleDateFormat("yyyy년 MM월 dd일", Locale.KOREA) }
-    val dateText = remember(recommendedDateMillis) { sdf.format(Date(recommendedDateMillis)) }
-
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .semantics {
-                contentDescription =
-                    "시험 ${deadlineBufferDays}일 전까지 1회독 완료를 권장합니다. 권장 완료일: $dateText"
-            },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "📚 1회독 완료 권장일",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "시험 ${deadlineBufferDays}일 전까지 1회독 완료를 권장합니다.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Text(
-                text = "권장 완료일: $dateText",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        }
-    }
-}
-
-@Composable
-private fun ScheduleSummaryCard(
-    result: CreateStudyRecordResult,
-    examDateMillis: Long
-) {
-    val zone = ZoneId.of("Asia/Seoul")
-    val examDate = Instant.ofEpochMilli(examDateMillis).atZone(zone).toLocalDate()
-    val schedules = result.schedules.filter { it.reviewOrder > 0 }
-    val statusText = when (result.status) {
-        ReviewPlanStatus.SCHEDULED -> "정상"
-        ReviewPlanStatus.RESCHEDULED -> "일정 압축됨"
-        ReviewPlanStatus.CRAM_MODE_REQUIRED,
-        ReviewPlanStatus.INSUFFICIENT_WINDOW -> "벼락치기 모드 필요"
-        ReviewPlanStatus.OVERLOADED_UNRESOLVED -> "일일 과부하 확인 필요"
-        else -> result.status.name
-    }
-    val statusDescription = if (result.generationOutcome != ScheduleGenerationOutcome.FULL) {
-        result.userMessage
-    } else when (result.status) {
-        ReviewPlanStatus.CRAM_MODE_REQUIRED,
-        ReviewPlanStatus.INSUFFICIENT_WINDOW ->
-            "시험일까지 정규 분산복습 최소기간이 부족합니다. 가능한 복습 일정을 만들었지만, 핵심 개념을 먼저 인출하고 오답을 빠르게 보완하는 압축 학습이 필요합니다."
-        ReviewPlanStatus.RESCHEDULED ->
-            "시험일까지의 기간에 맞춰 복습 간격을 압축했습니다. 각 복습에서는 재독보다 문제풀이·퀴즈·빈 종이 회상처럼 기억을 직접 꺼내는 방식으로 점검해 보세요."
-        else -> result.userMessage
-    }
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = AiSurface,
-        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.06f)),
-        shadowElevation = 6.dp
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                if (result.generationOutcome != ScheduleGenerationOutcome.FULL) "학습기록이 저장되었습니다."
-                else "복습 일정 ${schedules.size}개가 생성되었습니다.",
-                style = LoorveTypography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = OnBackground)
-            Text(
-                "이 학습기록에 대해 복습 일정 ${schedules.size}개를 만들었습니다. " +
-                    "첫 복습은 ${schedules.minOfOrNull { it.reviewDate }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() } ?: "-"}, " +
-                    "마지막 복습은 ${schedules.maxOfOrNull { it.reviewDate }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() } ?: result.lastReviewDate}입니다.",
-                style = LoorveTypography.bodyMedium,
-                color = OnSurfaceVariant
-            )
-            Text(
-                "시험까지 ${java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(zone), examDate)}일 남았습니다.",
-                style = LoorveTypography.bodySmall,
-                color = OnSurfaceVariant
-            )
-            Surface(
-                color = if (result.generationOutcome == ScheduleGenerationOutcome.FULL) {
-                    SuccessContainer
-                } else {
-                    WarningContainer
-                },
-                shape = CircleShape
-            ) {
-                Text(
-                    "상태: $statusText",
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    style = LoorveTypography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (result.generationOutcome == ScheduleGenerationOutcome.FULL) {
-                        Success
-                    } else {
-                        Warning
-                    }
-                )
-            }
-            Text(
-                "일정 압축 여부: ${if (result.compressed) "압축됨" else "압축되지 않음"}",
-                style = LoorveTypography.bodySmall,
-                color = OnSurfaceVariant
-            )
-            Text(statusDescription, style = LoorveTypography.bodySmall, color = OnSurfaceVariant)
-            schedules.forEach { item ->
-                Text(
-                    "• ${Instant.ofEpochMilli(item.reviewDate).atZone(zone).toLocalDate()} · ${item.recommendedMethod.ifBlank { "인출 연습과 오답 점검" }}",
-                    style = LoorveTypography.bodySmall,
-                    color = OnSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-// ── 진도 입력 섹션 ──────────────────────────────────────────
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun StudyProgressInputSection(
-    onSave: (
-        learningDateMillis: Long,
-        title: String,
-        content: String
-    ) -> Unit,
-    isLoading: Boolean,
-    isSaveEnabled: Boolean = true,
-    modifier: Modifier = Modifier
-) {
-    var titleText by remember { mutableStateOf("") }
-    var contentText by remember { mutableStateOf("") }
-
-    val kstZone = remember { ZoneId.of("Asia/Seoul") }
-    val todayMillis = remember {
-        LocalDate.now(kstZone).atStartOfDay(kstZone).toInstant().toEpochMilli()
-    }
-    var selectedDateMillis by remember { mutableLongStateOf(todayMillis) }
-    var showDatePicker by remember { mutableStateOf(false) }
-
-    val displayDateText = remember(selectedDateMillis) {
-        SimpleDateFormat("yyyy년 MM월 dd일 (E)", Locale.KOREA).format(Date(selectedDateMillis))
-    }
-
-    val canSave = (titleText.isNotBlank() || contentText.isNotBlank()) && !isLoading && isSaveEnabled
-
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = selectedDateMillis
-        )
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { utcMs ->
-                        val localDate = Instant.ofEpochMilli(utcMs)
-                            .atZone(ZoneId.of("UTC")).toLocalDate()
-                        selectedDateMillis = localDate
-                            .atStartOfDay(kstZone)
-                            .toInstant()
-                            .toEpochMilli()
-                    }
-                    showDatePicker = false
-                }) { Text("확인") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("취소") }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
-
-    Column(modifier = modifier.padding(16.dp)) {
-        Text(
-            text = "오늘 학습 진도",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedButton(
-            onClick = { showDatePicker = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.08f)),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = SurfaceSolid,
-                contentColor = OnBackground
-            ),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            enabled = !isLoading
-        ) {
-            Icon(
-                imageVector = Icons.Default.CalendarMonth,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(text = displayDateText, style = MaterialTheme.typography.bodyMedium)
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedTextField(
-            value = titleText,
-            onValueChange = { titleText = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = "학습 제목 입력" },
-            label = { Text("학습 제목 (제목 또는 내용 중 하나 필수)") },
-            placeholder = { Text("예: 수학 미분 1단원") },
-            singleLine = true,
-            enabled = !isLoading,
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Active,
-                unfocusedBorderColor = Color.Black.copy(alpha = 0.08f),
-                focusedContainerColor = SurfaceSolid,
-                unfocusedContainerColor = SurfaceSolid
-            )
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedTextField(
-            value = contentText,
-            onValueChange = { contentText = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = "학습 내용 입력" },
-            label = { Text("학습 내용") },
-            placeholder = { Text("예: 미분의 정의, 극한 개념 복습 완료") },
-            maxLines = 4,
-            enabled = !isLoading,
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Active,
-                unfocusedBorderColor = Color.Black.copy(alpha = 0.08f),
-                focusedContainerColor = SurfaceSolid,
-                unfocusedContainerColor = SurfaceSolid
-            )
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        Button(
-            onClick = {
-                if (canSave) {
-                    onSave(
-                        selectedDateMillis,
-                        titleText.trim(),
-                        contentText.trim()
-                    )
-                    titleText = ""
-                    contentText = ""
-                }
-
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .semantics { contentDescription = "학습 진도 저장 버튼" },
-            enabled = canSave,
-            shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
-                disabledContainerColor = Color.Black.copy(alpha = 0.08f)
-            ),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        brush = if (canSave) {
-                            Brush.linearGradient(
-                                colors = listOf(GradientStart, GradientMiddle, GradientEnd)
-                            )
-                        } else {
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    Color(0xFFD1D5DB),
-                                    Color(0xFFE5E7EB)
-                                )
-                            )
-                        },
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = Color.White
-                    )
-                } else {
-                    Text(
-                        "학습 기록 및 복습 일정 생성",
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── 복습 일정 리스트 ──────────────────────────────────────────
-@Composable
-fun ReviewScheduleList(
-    items: List<ReviewScheduleItem>,
-    overdueItems: List<ReviewScheduleItem>,
-    reviewOverloadWarning: Boolean,
-    modifier: Modifier = Modifier,
-    onComplete: ((ReviewScheduleItem, CompletionResult) -> Unit)? = null
-) {
-    val sdf = remember { SimpleDateFormat("MM/dd (E)", Locale.KOREA) }
-
-    Column(modifier = modifier) {
-        if (reviewOverloadWarning) OverloadWarningBanner()
-
-        if (overdueItems.isNotEmpty()) {
-            Text(
-                text = "⚠️ 누락된 복습 (오래된 순)",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-            overdueItems.forEach { item ->
-                ReviewScheduleItemCard(
-                    item = item,
-                    dateText = sdf.format(Date(item.reviewDate))
-                )
-            }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-        }
-
-        val pendingItems = items.filter {
-            it.status == ReviewStatus.PENDING || it.status == ReviewStatus.FINAL_URGENT_REVIEW
-        }
-        pendingItems.forEach { item ->
-            ReviewScheduleItemCard(
-                item = item,
-                dateText = sdf.format(Date(item.reviewDate))
-            )
-        }
-    }
-}
-
-@Composable
-fun ReviewScheduleItemCard(
-    item: ReviewScheduleItem,
-    dateText: String
-) {
-    val (bgColor, statusLabel, statusDesc) = when (item.status) {
-        ReviewStatus.OVERDUE ->
-            Triple(Color(0xFFFFF3E0), "• 누락 ${item.overdueDays}일 경과", "누락된 복습 항목")
-        ReviewStatus.FINAL_URGENT_REVIEW ->
-            Triple(Color(0xFFFFEBEE), "🔴 긴급 복습", "시험 임박 긴급 복습 항목")
-        ReviewStatus.COMPLETED ->
-            Triple(Color(0xFFF1F8E9), "✅ 완료", "완료된 복습 항목")
-        else ->
-            Triple(MaterialTheme.colorScheme.surface, "", "예정된 복습 항목")
-    }
-
-    val isCompressed = item.compressedReview
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .semantics { contentDescription = "$statusDesc: ${item.title}, 날짜: $dateText" },
-        colors = CardDefaults.cardColors(containerColor = bgColor)
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = dateText, style = MaterialTheme.typography.labelSmall)
-                if (isCompressed) {
-                    Surface(
-                        color = Color(0xFF1565C0).copy(alpha = 0.12f),
-                        shape = MaterialTheme.shapes.extraSmall,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    ) {
-                        Text(
-                            text = "[압축 복습]",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF1565C0),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                if (statusLabel.isNotBlank()) {
-                    Text(
-                        text = statusLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (item.status == ReviewStatus.OVERDUE ||
-                            item.status == ReviewStatus.FINAL_URGENT_REVIEW)
-                            MaterialTheme.colorScheme.error else Color.Unspecified
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun OverloadWarningBanner() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFFFEBEE))
-            .padding(12.dp)
-            .semantics { contentDescription = "경고: 시험 전 일정이 초과되었습니다." },
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFC62828))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "시험 전 남은 기간에 모든 누락 복습을 배치하기 어렵습니다. 중요도 순으로 우선 복습하세요.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFFC62828)
-        )
-    }
 }
