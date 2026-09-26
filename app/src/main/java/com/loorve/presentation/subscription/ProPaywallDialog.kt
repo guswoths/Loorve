@@ -417,7 +417,6 @@ private fun PlanSelector(
         PlanCard(
             badge = "16% 할인",
             title = "연간 플랜",
-            subtitle = "1년 권장",
             price = "₩29,000/년",
             active = selectedBasePlanId == LOORVE_PRO_ANNUAL_BASE_PLAN_ID,
             onClick = { onPlanSelected(LOORVE_PRO_ANNUAL_BASE_PLAN_ID) }
@@ -425,7 +424,6 @@ private fun PlanSelector(
         PlanCard(
             badge = null,
             title = "월간 플랜",
-            subtitle = "정기 결제",
             price = "₩2,900/월",
             active = selectedBasePlanId == LOORVE_PRO_MONTHLY_BASE_PLAN_ID,
             onClick = { onPlanSelected(LOORVE_PRO_MONTHLY_BASE_PLAN_ID) }
@@ -437,12 +435,11 @@ private fun PlanSelector(
 private fun PlanCard(
     badge: String?,
     title: String,
-    subtitle: String,
     price: String,
     active: Boolean,
     onClick: () -> Unit
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
@@ -461,9 +458,12 @@ private fun PlanCard(
                 RoundedCornerShape(16.dp)
             )
             .clickable(onClick = onClick)
-            .padding(14.dp)
+            .padding(horizontal = 14.dp, vertical = 15.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Box(
                 modifier = Modifier
                     .size(20.dp)
@@ -474,37 +474,42 @@ private fun PlanCard(
             ) {
                 if (active) Text("✓", color = Color.White, fontWeight = FontWeight.Bold)
             }
-            Spacer(Modifier.width(9.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                if (subtitle.isNotBlank()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(top = 2.dp)
+            Spacer(Modifier.width(10.dp))
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+                if (badge != null) {
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(SaleGradient)
+                            .padding(horizontal = 7.dp, vertical = 2.5.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(subtitle, color = Color(0xFF7DD3FC), fontSize = 10.5.sp)
-                        if (badge != null) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(SaleGradient)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = badge,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 9.sp,
-                                    letterSpacing = (-0.2).sp
-                                )
-                            }
-                        }
+                        Text(
+                            text = badge,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.5.sp,
+                            letterSpacing = (-0.2).sp
+                        )
                     }
                 }
             }
-            Text(price, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+            Text(
+                text = price,
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp
+            )
         }
     }
 }
