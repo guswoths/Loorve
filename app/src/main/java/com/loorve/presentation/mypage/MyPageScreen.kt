@@ -27,14 +27,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -67,6 +72,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -344,6 +350,60 @@ fun MyPageScreen(
                     }
                 }
 
+                item {
+                    SectionTitle("계정 관리")
+                    LoorveCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = Color.White
+                    ) {
+                        SettingsRow(
+                            icon = Icons.Default.Delete,
+                            title = "계정 탈퇴 (계정 및 데이터 삭제)",
+                            subtitle = "탈퇴 시 학습 기록, 복습 일정 등 모든 데이터 영구 삭제",
+                            actionLabel = "탈퇴",
+                            actionColor = Error,
+                            onAction = { showDeleteDialog = true }
+                        )
+                    }
+                }
+
+                item {
+                    Spacer(Modifier.height(10.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "상호: guswoths | 대표자명: 손현재",
+                            style = LoorveTypography.bodySmall.copy(fontSize = 11.5.sp),
+                            color = Color(0xFF94A3B8),
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "사업자등록번호: 등록 예정 | 통신판매업신고번호: 신고 예정",
+                            style = LoorveTypography.bodySmall.copy(fontSize = 11.5.sp),
+                            color = Color(0xFF94A3B8),
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "고객지원 / 버그 문의: hjson7585@gmail.com",
+                            style = LoorveTypography.bodySmall.copy(fontSize = 11.5.sp),
+                            color = Color(0xFF94A3B8),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "© 2026 guswoths. All rights reserved.",
+                            style = LoorveTypography.labelSmall.copy(fontSize = 10.sp),
+                            color = Color(0xFFCBD5E1),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
             }
         }
     }
@@ -383,20 +443,95 @@ fun MyPageScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { if (!uiState.isLoading) showDeleteDialog = false },
-            containerColor = Surface,
-            title = { Text(stringResource(R.string.settings_delete_account), color = OnBackground) },
-            text = { Text(stringResource(R.string.settings_delete_account_message), color = OnBackground) },
+            containerColor = Color.White,
+            title = {
+                Text(
+                    text = "계정 탈퇴 (계정 및 데이터 삭제)",
+                    color = Color(0xFF0F172A),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "정말로 계정을 탈퇴하시겠습니까? 탈퇴 시 아래의 안내 사항을 반드시 확인해 주세요.",
+                        color = Color(0xFF334155),
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFF8FAFC),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "• 삭제 데이터 범위: 회원 프로필, 학습 기록, 복습 블록 및 복습 일정 전체, 알림 설정 등 계정과 연관된 모든 활동 데이터",
+                                fontSize = 12.sp,
+                                color = Color(0xFF475569),
+                                lineHeight = 16.sp
+                            )
+                            Text(
+                                text = "• 탈퇴 즉시 실제 모든 데이터가 영구 삭제되며 복구할 수 없습니다.",
+                                fontSize = 12.sp,
+                                color = Color(0xFFE11D48),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFFFF1F2),
+                        border = BorderStroke(1.dp, Color(0xFFFECDD3)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "⚠️ 정기결제(구독) 주의사항",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFE11D48)
+                            )
+                            Text(
+                                text = "앱 계정을 탈퇴하더라도 Google Play 스토어의 정기결제(구독)는 자동으로 해지되지 않습니다. 구독 해지 및 정기결제 관리는 Google Play 스토어의 [결제 및 정기 결제]에서 직접 진행하셔야 합니다.",
+                                fontSize = 12.sp,
+                                color = Color(0xFF9F1239),
+                                lineHeight = 16.5.sp
+                            )
+                        }
+                    }
+                }
+            },
             confirmButton = {
-                TextButton(
+                Button(
                     enabled = !uiState.isLoading,
                     onClick = {
                         showDeleteDialog = false
                         viewModel.deleteAccount()
-                    }
-                ) { Text(stringResource(R.string.settings_delete), color = Error) }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48))
+                ) {
+                    Text("데이터 모두 삭제 후 탈퇴", color = Color.White, fontWeight = FontWeight.Bold)
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
+                TextButton(
+                    enabled = !uiState.isLoading,
+                    onClick = { showDeleteDialog = false }
+                ) {
                     Text(stringResource(R.string.settings_cancel), color = OnSurfaceVariant)
                 }
             }

@@ -114,7 +114,8 @@ import java.util.Locale
 @Composable
 fun ReviewBlockDetailScreen(
     blockId: String,
-    block: ReviewBlock?,
+    initialTitle: String = "",
+    block: ReviewBlock? = null,
     onNavigateBack: () -> Unit,
     viewModel: ReviewBlockDetailViewModel = hiltViewModel(),
     @Suppress("UNUSED_PARAMETER") homeViewModel: HomeViewModel = hiltViewModel(),
@@ -151,7 +152,7 @@ fun ReviewBlockDetailScreen(
     val resolvedBlock = uiState.reviewBlock
     val title = resolvedBlock?.examName?.ifBlank { resolvedBlock.title }
         ?: resolvedBlock?.title
-        ?: blockId
+        ?: initialTitle.ifBlank { "" }
     val totalReviews = uiState.reviewScheduleRecords.size
     val completedReviews = uiState.reviewScheduleRecords.count {
         it.status == ReviewStatus.COMPLETED

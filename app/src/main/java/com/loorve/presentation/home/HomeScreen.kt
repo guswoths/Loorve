@@ -1374,7 +1374,7 @@ private fun HomeOverdueReviewSection(
                         )
                 )
                 Row(
-                    verticalAlignment = Alignment.Top,
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.padding(top = 4.dp)
                 ) {
@@ -1386,19 +1386,12 @@ private fun HomeOverdueReviewSection(
                             modifier = Modifier.padding(6.dp).size(18.dp)
                         )
                     }
-                    Column {
-                        Text(
-                            text = "기억이 흐려지기 전에 확인하세요",
-                            style = LoorveTypography.titleSmall.copy(fontSize = 15.5.sp),
-                            color = Color(0xFFE11D48),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${overdueSchedules.size}개의 복습 일정이 지연되었습니다.",
-                            style = LoorveTypography.bodySmall.copy(fontSize = 12.5.sp),
-                            color = OnSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = "${overdueSchedules.size}개의 복습 일정이 지연되었습니다.",
+                        style = LoorveTypography.titleSmall.copy(fontSize = 15.5.sp),
+                        color = Color(0xFFE11D48),
+                        fontWeight = FontWeight.Bold
+                    )
                 }
                 Spacer(Modifier.height(4.dp))
                 overdueSchedules.forEach { schedule ->

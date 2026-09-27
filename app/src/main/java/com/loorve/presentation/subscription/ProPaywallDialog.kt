@@ -1,7 +1,10 @@
 package com.loorve.presentation.subscription
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -149,7 +152,18 @@ fun ProPaywallDialog(
                     selectedBasePlanId = selectedBasePlanId,
                     onPlanSelected = { selectedBasePlanId = it }
                 )
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = "• 결제 즉시 청구되며, 무료 체험 기간은 제공되지 않습니다.\n• 구독 만료 전 취소하지 않으면 동일한 조건으로 자동 갱신됩니다.",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 11.5.sp,
+                    lineHeight = 16.5.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                )
+                Spacer(Modifier.height(14.dp))
                 PrimaryAction(
                     state = state,
                     context = context,
@@ -158,6 +172,13 @@ fun ProPaywallDialog(
                     onDismiss = onDismiss
                 )
                 LegalFooter(
+                    onManageSubscription = {
+                        legalContent = LegalContent(
+                            title = "구독 해지 및 관리 안내",
+                            body = "구독 해지 및 관리는 Google Play 스토어의 [결제 및 정기 결제]에서 언제든지 직접 진행하실 수 있습니다.\n\n구독 기간 만료 전 언제든지 해지하실 수 있으며, 해지하더라도 남은 구독 기간 동안은 Loorve Pro 혜택이 정상 유지됩니다.",
+                            isSubscriptionManagement = true
+                        )
+                    },
                     onRestore = {
                         viewModel.refresh()
                         legalContent = LegalContent(
@@ -167,14 +188,60 @@ fun ProPaywallDialog(
                     },
                     onTerms = {
                         legalContent = LegalContent(
-                            title = "이용약관",
-                            body = "Loorve Pro는 복습 블록과 학습 분석 기능을 제공하는 구독 서비스입니다. 구독은 결제 확인 후 적용되며, 결제 및 갱신은 Google Play 계정 설정에 따라 처리됩니다. 사용자는 언제든지 Google Play 구독 관리에서 갱신을 취소할 수 있습니다."
+                            title = "서비스 이용약관",
+                            body = """
+[Loorve Pro 서비스 이용약관]
+
+제1조 (유료 서비스 및 구독 안내)
+1. Loorve Pro는 결제 즉시 기능이 활성화되며, 무료 체험 기간은 제공되지 않습니다.
+2. 현재 구독 기간이 만료되기 전까지 Google Play 스토어에서 직접 해지하지 않는 한, 동일한 금액과 주기로 자동 갱신 청구됩니다.
+
+제2조 (청약철회 및 환불 조건 - Google Play 환불 정책 연동)
+1. 본 서비스는 Google Play 결제 시스템을 통해 처리되며, Google Play의 환불 정책을 준수합니다. 구매 후 48시간 이내에는 Google Play 웹사이트 또는 고객센터를 통해 환불 요청이 가능합니다.
+2. 본 유료 서비스는 결제 즉시 디지털 콘텐츠의 이용이 개시되므로, 전자상거래 등에서의 소비자보호에 관한 법률 제17조 제2항에 따라 이미 이용이 개시된 당월(당기) 구독 기간에 대한 중도 일할 계산 환불은 원칙적으로 제공되지 않습니다.
+3. 정기결제를 해지하더라도 이미 결제된 남은 구독 기간 동안은 Pro 혜택이 정상 유지되며, 다음 결제일부터 추가 요금이 청구되지 않습니다.
+4. 회사의 귀책 사유로 영구적으로 서비스를 제공할 수 없게 된 경우 잔여 기간에 대해 적법한 절차에 따라 환불 처리됩니다.
+
+제3조 (서비스 중단 및 이용 제한 규정)
+1. 회사는 이용자가 다음 각 호에 해당하는 경우 사전 통지 없이 서비스 이용을 제한하거나 계정을 정지할 수 있습니다.
+   • 타인의 결제 수단 또는 계정 정보를 도용한 경우
+   • 비정상적인 방법으로 결제를 진행하거나 시스템을 해킹, 변조하는 경우
+   • 서비스의 정상적인 운영을 방해하거나 관련 법령 및 본 약관을 위반한 경우
+2. 정기 점검, 시스템 교체, 통신망 장애 등 불가피한 사유 발생 시 서비스 제공이 일시적으로 중단될 수 있습니다.
+                            """.trimIndent()
                         )
                     },
                     onPrivacy = {
                         legalContent = LegalContent(
                             title = "개인정보처리방침",
-                            body = "Loorve는 구독 상태 확인과 서비스 제공에 필요한 정보만 처리합니다. 결제 정보는 Google Play가 관리하며 Loorve가 카드 번호를 직접 저장하지 않습니다. 서비스 이용 및 문의에 필요한 정보는 안전하게 보호하고, 법령에 정해진 경우를 제외하고 제3자에게 제공하지 않습니다."
+                            body = """
+[Loorve 개인정보처리방침]
+
+제1조 (수집하는 개인정보 항목 및 이용 목적)
+1. Google 로그인 수집 항목:
+   • 수집 항목: Google 계정 고유 식별자(UID), 이메일 주소, 프로필 이름(닉네임), 프로필 사진 URL
+   • 수집 목적: 회원 식별, 계정 연동 및 로그인 관리
+2. 광고 SDK(AdMob 등)를 통한 광고 ID(AD_ID) 수집 고지:
+   • 수집 항목: Google 광고 ID(AD_ID / GAID), 기기 모델, OS 버전, 네트워크 상태
+   • 수집 목적: 맞춤형 광고 송출, 비정상 트래픽 감지 및 앱 서비스 품질 분석
+   • 맞춤형 광고 거부 방법: Android 설정 > 보안 및 개인정보 보호 > 개인정보 보호 > 광고 > 광고 ID 재설정 또는 삭제
+
+제2조 (결제/구매 내역 기록 목적 및 보관 기간)
+1. 수집 항목: Google Play 주문 번호(Order ID), 구매 일시, 구독 상품 ID(SKU)
+   (주의: 신용카드 번호 등 실제 결제 금융 정보는 Google LLC가 직접 처리하며 Loorve 앱 및 서버에 일체 수집·저장되지 않습니다.)
+2. 기록 목적: 유료 구독 권한 부여, 결제 내역 확인 및 고객 지원
+3. 보유 및 보관 기간:
+   • 회원 탈퇴 시 즉시 파기 원칙
+   • 전자상거래 등에서의 소비자보호에 관한 법률에 따른 법정 의무 보관:
+     - 계약 또는 청약철회 등에 관한 기록: 5년
+     - 대금결제 및 재화 등의 공급에 관한 기록: 5년
+     - 소비자의 불만 또는 분쟁처리에 관한 기록: 3년
+
+제3조 (개인정보 보호책임자 및 고객 문의 창구)
+• 상호: guswoths
+• 개인정보 보호책임자(CPO): 손현재 (대표)
+• 공식 문의 이메일: hjson7585@gmail.com
+                            """.trimIndent()
                         )
                     }
                 )
@@ -184,11 +251,57 @@ fun ProPaywallDialog(
     legalContent?.let { content ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { legalContent = null },
-            title = { Text(content.title) },
-            text = { Text(content.body) },
+            title = {
+                Text(
+                    text = content.title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 380.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = content.body,
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp,
+                        color = Color(0xFF334155)
+                    )
+                }
+            },
             confirmButton = {
-                TextButton(onClick = { legalContent = null }) {
-                    Text("확인")
+                if (content.isSubscriptionManagement) {
+                    Button(
+                        onClick = {
+                            val playStoreUri = Uri.parse("https://play.google.com/store/account/subscriptions")
+                            val intent = Intent(Intent.ACTION_VIEW, playStoreUri).apply {
+                                setPackage("com.android.vending")
+                            }
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, playStoreUri))
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
+                    ) {
+                        Text("Google Play 정기결제 관리", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                } else {
+                    TextButton(onClick = { legalContent = null }) {
+                        Text("확인", fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                if (content.isSubscriptionManagement) {
+                    TextButton(onClick = { legalContent = null }) {
+                        Text("닫기")
+                    }
                 }
             }
         )
@@ -197,7 +310,8 @@ fun ProPaywallDialog(
 
 private data class LegalContent(
     val title: String,
-    val body: String
+    val body: String,
+    val isSubscriptionManagement: Boolean = false
 )
 
 @Composable
@@ -593,6 +707,7 @@ private fun PrimaryAction(
 
 @Composable
 private fun LegalFooter(
+    onManageSubscription: () -> Unit,
     onRestore: () -> Unit,
     onTerms: () -> Unit,
     onPrivacy: () -> Unit
@@ -600,21 +715,64 @@ private fun LegalFooter(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(top = 10.dp, bottom = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Row(horizontalArrangement = Arrangement.Center) {
-        TextButton(onClick = onRestore) {
-            Text("구매 내역 복원", color = Color(0xFF64748B), fontSize = 10.5.sp)
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(
+                onClick = onManageSubscription,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "구독 해지 및 관리",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Text("•", color = Color(0xFF475569), fontSize = 10.sp)
+            TextButton(
+                onClick = onRestore,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "구매 내역 복원",
+                    color = Color(0xFF64748B),
+                    fontSize = 11.sp
+                )
+            }
         }
-        Text("•", modifier = Modifier.padding(top = 12.dp), color = Color(0xFF64748B))
-        TextButton(onClick = onTerms) {
-            Text("이용약관", color = Color(0xFF64748B), fontSize = 10.5.sp)
-        }
-        Text("•", modifier = Modifier.padding(top = 12.dp), color = Color(0xFF64748B))
-        TextButton(onClick = onPrivacy) {
-            Text("개인정보처리방침", color = Color(0xFF64748B), fontSize = 10.5.sp)
-        }
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(
+                onClick = onTerms,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "서비스 이용약관",
+                    color = Color(0xFF64748B),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            Text("•", color = Color(0xFF475569), fontSize = 10.sp)
+            TextButton(
+                onClick = onPrivacy,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "개인정보처리방침",
+                    color = Color(0xFF64748B),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }

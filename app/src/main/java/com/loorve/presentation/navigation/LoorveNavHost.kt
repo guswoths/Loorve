@@ -109,8 +109,13 @@ sealed class Screen(val route: String) {
     object BatteryOptimizationGuide : Screen("battery_optimization_guide")
     object NotificationPermission : Screen("notification_permission")
 
-    object ReviewBlockDetail : Screen("reviewBlockDetail/{blockId}") {
-        fun createRoute(blockId: String): String = "reviewBlockDetail/$blockId"
+    object ReviewBlockDetail : Screen("reviewBlockDetail/{blockId}?title={title}") {
+        fun createRoute(blockId: String, title: String = ""): String =
+            if (title.isNotBlank()) {
+                "reviewBlockDetail/$blockId?title=${android.net.Uri.encode(title)}"
+            } else {
+                "reviewBlockDetail/$blockId"
+            }
     }
 
 }
@@ -486,12 +491,12 @@ fun LoorveNavHost(
                                     launchSingleTop = true
                                 }
                             },
-                            onNavigateToReviewBlockDetail = { blockId ->
+                            onNavigateToReviewBlockDetail = { blockId, title ->
                                 homeBackStackEntry?.savedStateHandle?.set(
                                     RETURN_TO_REVIEW_TAB_KEY,
                                     true
                                 )
-                                navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId)) {
+                                navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId, title)) {
                                     launchSingleTop = true
                                 }
                             }
@@ -563,8 +568,8 @@ fun LoorveNavHost(
             ReviewCalendarScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToAddReviewBlock = { navController.navigate(Screen.AddReviewBlock.route) },
-                onNavigateToReviewBlockDetail = { blockId ->
-                    navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId))
+                onNavigateToReviewBlockDetail = { blockId, title ->
+                    navController.navigate(Screen.ReviewBlockDetail.createRoute(blockId, title))
                 }
             )
         }
@@ -637,14 +642,20 @@ fun LoorveNavHost(
         composable(
             route = Screen.ReviewBlockDetail.route,
             arguments = listOf(
-                navArgument("blockId") { type = NavType.StringType }
+                navArgument("blockId") { type = NavType.StringType },
+                navArgument("title") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                }
             )
         ) { backStackEntry ->
             val blockId = backStackEntry.arguments?.getString("blockId")
                 ?: return@composable
+            val initialTitle = backStackEntry.arguments?.getString("title") ?: ""
 
             ReviewBlockDetailScreen(
                 blockId = blockId,
+                initialTitle = initialTitle,
                 block = null,  // ViewModel 내부에서 blockId로 자체 로드하도록 위임
                 onNavigateBack = { navController.popBackStack() }
             )

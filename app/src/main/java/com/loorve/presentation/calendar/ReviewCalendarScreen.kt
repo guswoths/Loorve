@@ -118,7 +118,7 @@ import androidx.compose.material3.Card
 fun ReviewCalendarScreen(
     onNavigateBack: () -> Unit,
     onNavigateToAddReviewBlock: () -> Unit,
-    onNavigateToReviewBlockDetail: (blockId: String) -> Unit = {},  // ✅ 신규 파라미터
+    onNavigateToReviewBlockDetail: (blockId: String, title: String) -> Unit = { _, _ -> },
     reviewCalendarViewModel: ReviewCalendarViewModel = hiltViewModel(),
     subscriptionViewModel: SubscriptionViewModel = hiltViewModel()
 ) {
@@ -347,7 +347,8 @@ fun ReviewCalendarScreen(
                                     if (block.blockId in uiState.lockedBlockIds) {
                                         showProDialog = true
                                     } else {
-                                        onNavigateToReviewBlockDetail(block.blockId)
+                                        val blockTitle = block.examName.ifBlank { block.title }
+                                        onNavigateToReviewBlockDetail(block.blockId, blockTitle)
                                     }
                                 }
                             )
@@ -381,7 +382,8 @@ fun ReviewCalendarScreen(
                                             if (block.blockId in uiState.lockedBlockIds) {
                                                 showProDialog = true
                                             } else {
-                                                onNavigateToReviewBlockDetail(block.blockId)
+                                                val blockTitle = block.examName.ifBlank { block.title }
+                                                onNavigateToReviewBlockDetail(block.blockId, blockTitle)
                                             }
                                         }
                                     )

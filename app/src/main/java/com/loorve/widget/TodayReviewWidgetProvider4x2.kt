@@ -75,19 +75,19 @@ class TodayReviewWidgetProvider4x2 : AppWidgetProvider() {
             // Responsive layout: check width for 2x2 vs 4x2
             val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
             val minWidth = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 0
-            val isCompact = minWidth in 1..210
+            val isCompact = minWidth in 1..240
 
             val today = LocalDate.now(seoulZone)
             if (isCompact) {
-                // 2x2: keep date text fixed at upper right with compact formatting
-                val compactFormatter = DateTimeFormatter.ofPattern("M.d (E)", Locale.KOREAN)
-                views.setTextViewText(R.id.widget_date_text, today.format(compactFormatter))
+                // 2x2: 날짜 텍스트와 구분자를 숨겨 공간 확보
+                views.setViewVisibility(R.id.widget_date_text, View.GONE)
+                views.setViewVisibility(R.id.widget_dot_separator, View.GONE)
             } else {
-                // 4x2: full Korean date formatting
+                // 4x2: 날짜 텍스트 및 구분자 표시
                 views.setTextViewText(R.id.widget_date_text, today.format(dateFormatter))
+                views.setViewVisibility(R.id.widget_date_text, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_dot_separator, View.VISIBLE)
             }
-            views.setViewVisibility(R.id.widget_date_text, View.VISIBLE)
-            views.setViewVisibility(R.id.widget_dot_separator, View.VISIBLE)
 
             // Progress text & progress bar
             val schedules = TodayReviewWidgetManager.cachedSchedules
@@ -95,7 +95,12 @@ class TodayReviewWidgetProvider4x2 : AppWidgetProvider() {
             val completedCount = schedules.count { it.isCompleted }
             val progress = if (totalCount > 0) (completedCount * 100) / totalCount else 0
 
-            views.setTextViewText(R.id.widget_progress_text, "${completedCount}/${totalCount} 완료")
+            val progressText = if (isCompact) {
+                "${completedCount}/${totalCount}"
+            } else {
+                "${completedCount}/${totalCount} 완료"
+            }
+            views.setTextViewText(R.id.widget_progress_text, progressText)
             views.setProgressBar(R.id.widget_progress_bar, 100, progress, false)
 
             // Header click -> Open app
