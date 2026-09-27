@@ -330,29 +330,59 @@ class HomeViewModel @Inject constructor(
     private fun updateReviewCountSummary() {
         val today = LocalDate.now(seoulZone)
         val chartDates = (0..6).map { today.minusDays((6 - it).toLong()) }
-        val activeBlockIds = _uiState.value.reviewBlocks.map { it.blockId }.toSet()
+        val activeBlockIds = _uiState.value.reviewBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
         val completedScheduleDates = linkedMapOf<String, LocalDate>()
 
-        rawReviewScheduleItems
-            .filter {
-                it.blockId in activeBlockIds &&
-                    it.status == com.loorve.domain.model.ReviewStatus.COMPLETED
-            }
-            .forEach { item ->
-                completedScheduleDates.putIfAbsent(
-                    item.id,
-                    Instant.ofEpochMilli(item.completedAt ?: item.reviewDate)
-                        .atZone(seoulZone)
-                        .toLocalDate()
-                )
+        val validItems = if (activeBlockIds.isNotEmpty()) {
+            rawReviewScheduleItems.filter { it.blockId in activeBlockIds }
+        } else {
+            rawReviewScheduleItems
+        }
+
+        validItems.forEach { item ->
+            val scheduleDate = runCatching {
+                Instant.ofEpochMilli(item.reviewDate)
+                    .atZone(seoulZone)
+                    .toLocalDate()
+            }.getOrNull() ?: return@forEach
+
+            val compositeKey = if (item.studyRecordId.isNotBlank()) {
+                "${scheduleDate}_${item.studyRecordId}_${item.reviewOrder}"
+            } else {
+                item.id
             }
 
-        legacyReviewScheduleUiModels
-            .filter { it.isCompleted && (it.examId.isBlank() || it.examId in activeBlockIds) }
-            .forEach { schedule ->
+            val isCompleted = completionOverrides[item.id]
+                ?: completionOverrides[compositeKey]
+                ?: (item.status == com.loorve.domain.model.ReviewStatus.COMPLETED)
+
+            if (isCompleted) {
+                // 미래 일정(scheduleDate > today)의 경우 chartDates(최대 today)와 비교 시
+                // !scheduleDate.isAfter(date)에 의해 차트에 반영되지 않으며, 실제 날짜 도달 시 반영됨.
+                // 과거 일정(일주일 전, 한참 전)의 경우 원래 복습 날짜에 반영되어 그래프 전체가 맞게 상향 조정됨.
+                completedScheduleDates.putIfAbsent(compositeKey, scheduleDate)
+            }
+        }
+
+        val filteredLegacy = if (activeBlockIds.isNotEmpty()) {
+            legacyReviewScheduleUiModels.filter { it.examId.isBlank() || it.examId in activeBlockIds }
+        } else {
+            legacyReviewScheduleUiModels
+        }
+
+        filteredLegacy.forEach { schedule ->
+            val legacyKey = schedule.scheduleId.ifBlank {
+                "${schedule.reviewDate}_${schedule.originProgressId}_${schedule.reviewOrder}"
+            }
+            val isCompleted = completionOverrides[schedule.scheduleId]
+                ?: completionOverrides[legacyKey]
+                ?: schedule.isCompleted
+
+            if (isCompleted) {
                 val identity = "${schedule.reviewDate}_${schedule.originProgressId}_${schedule.reviewOrder}"
                 completedScheduleDates.putIfAbsent(identity, schedule.reviewDate)
             }
+        }
 
         val cumulativeCounts = chartDates.map { date ->
             CumulativeReviewCountPoint(
@@ -617,6 +647,7 @@ class HomeViewModel @Inject constructor(
                 }
             )
         }
+        updateReviewCountSummary()
 
         viewModelScope.launch {
             val result = if (rawReviewScheduleItems.any { it.id == scheduleKey }) {
@@ -642,6 +673,7 @@ class HomeViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(errorMessage = exception.message ?: "복습 상태 변경에 실패했습니다.")
                     }
+                    updateReviewCountSummary()
                 }
             }
         }
