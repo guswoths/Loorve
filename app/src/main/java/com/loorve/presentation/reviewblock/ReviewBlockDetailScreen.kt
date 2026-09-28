@@ -208,7 +208,11 @@ fun ReviewBlockDetailScreen(
         AlertDialog(
             onDismissRequest = { viewModel.setRecordToDelete(null) },
             title = { Text("학습기록 삭제", fontWeight = FontWeight.Bold) },
-            text = { Text("\"${record.title.ifBlank { "이 학습기록" }}\"을 삭제할까요?") },
+            text = {
+                Text(
+                    "\"${record.title.ifBlank { "이 학습기록" }}\"을 삭제할까요?\n\n연관된 모든 복습 일정, 캘린더 기록 및 복습 통계 데이터도 함께 삭제됩니다."
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = { viewModel.deleteStudyRecord(uid, blockId, record) },

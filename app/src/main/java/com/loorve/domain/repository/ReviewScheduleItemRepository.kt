@@ -53,6 +53,11 @@ interface ReviewScheduleItemRepository {
         items: List<ReviewScheduleItem>
     ): Result<Unit>
 
+    suspend fun deleteScheduleItems(
+        uid: String,
+        scheduleIds: List<String>
+    ): Result<Unit>
+
     fun observeReviewScheduleItems(
         uid: String
     ): Flow<List<ReviewScheduleItem>>

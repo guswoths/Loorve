@@ -32,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -217,6 +218,9 @@ fun ProPaywallDialog(
                             body = """
 [Loorve 개인정보처리방침]
 
+• 공식 웹페이지 전문:
+  https://living-nitrogen-cfb.notion.site/3d8da8c67899800cb78be40cd9efdf97
+
 제1조 (수집하는 개인정보 항목 및 이용 목적)
 1. Google 로그인 수집 항목:
    • 수집 항목: Google 계정 고유 식별자(UID), 이메일 주소, 프로필 이름(닉네임), 프로필 사진 URL
@@ -241,7 +245,8 @@ fun ProPaywallDialog(
 • 상호: guswoths
 • 개인정보 보호책임자(CPO): 손현재 (대표)
 • 공식 문의 이메일: hjson7585@gmail.com
-                            """.trimIndent()
+                            """.trimIndent(),
+                            webUrl = "https://living-nitrogen-cfb.notion.site/3d8da8c67899800cb78be40cd9efdf97"
                         )
                     }
                 )
@@ -263,8 +268,55 @@ fun ProPaywallDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 380.dp)
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    if (content.webUrl != null) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFEFF6FF),
+                            border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(Intent.ACTION_VIEW, Uri.parse(content.webUrl))
+                                        )
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "🌐 웹페이지에서 전문 보기",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = Color(0xFF1D4ED8)
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = content.webUrl,
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF3B82F6),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Text(
+                                    text = "열기 ➔",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2563EB)
+                                )
+                            }
+                        }
+                    }
+
                     Text(
                         text = content.body,
                         fontSize = 13.sp,
@@ -291,6 +343,19 @@ fun ProPaywallDialog(
                     ) {
                         Text("Google Play 정기결제 관리", fontWeight = FontWeight.Bold, color = Color.White)
                     }
+                } else if (content.webUrl != null) {
+                    Button(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(content.webUrl))
+                                )
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
+                    ) {
+                        Text("웹페이지 이동", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 } else {
                     TextButton(onClick = { legalContent = null }) {
                         Text("확인", fontWeight = FontWeight.Bold)
@@ -298,7 +363,7 @@ fun ProPaywallDialog(
                 }
             },
             dismissButton = {
-                if (content.isSubscriptionManagement) {
+                if (content.isSubscriptionManagement || content.webUrl != null) {
                     TextButton(onClick = { legalContent = null }) {
                         Text("닫기")
                     }
@@ -311,7 +376,8 @@ fun ProPaywallDialog(
 private data class LegalContent(
     val title: String,
     val body: String,
-    val isSubscriptionManagement: Boolean = false
+    val isSubscriptionManagement: Boolean = false,
+    val webUrl: String? = null
 )
 
 @Composable

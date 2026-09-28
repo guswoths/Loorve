@@ -221,6 +221,23 @@ class ReviewScheduleItemRepositoryImpl @Inject constructor(
         }.await()
     }
 
+    override suspend fun deleteScheduleItems(
+        uid: String,
+        scheduleIds: List<String>
+    ): Result<Unit> = runCatching {
+        if (uid.isBlank() || scheduleIds.isEmpty()) return@runCatching
+        validateAuth(uid)
+        val distinctIds = scheduleIds.distinct()
+        distinctIds.chunked(500).forEach { chunk ->
+            val batch = firestore.batch()
+            chunk.forEach { id ->
+                val ref = schedulesRef(uid).document(id)
+                batch.delete(ref)
+            }
+            batch.commit().await()
+        }
+    }
+
     override fun observeReviewScheduleItems(
         uid: String
     ): Flow<List<ReviewScheduleItem>> = callbackFlow {

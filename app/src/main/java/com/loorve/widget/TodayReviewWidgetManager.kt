@@ -11,6 +11,7 @@ import com.loorve.domain.model.ReviewStatus
 import com.loorve.domain.repository.ReviewBlockRepository
 import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.loorve.domain.repository.ReviewScheduleRepository
+import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.util.CalendarRefreshBus
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -32,6 +33,7 @@ interface WidgetEntryPoint {
     fun reviewScheduleItemRepository(): ReviewScheduleItemRepository
     fun reviewScheduleRepository(): ReviewScheduleRepository
     fun reviewBlockRepository(): ReviewBlockRepository
+    fun studyRecordRepository(): StudyRecordRepository
     fun calendarRefreshBus(): CalendarRefreshBus
     fun reviewAlarmScheduler(): ReviewAlarmScheduler
 }
@@ -71,29 +73,31 @@ object TodayReviewWidgetManager {
         isLoaded = true
     }
 
-    fun updateAllWidgets(context: Context) {
+    fun updateAllWidgets(context: Context, forceFresh: Boolean = false) {
         CoroutineScope(Dispatchers.IO).launch {
+            if (forceFresh) {
+                cachedSchedules = emptyList()
+            }
             val freshSchedules = loadTodaySchedules(context)
 
-            // Keep optimistic completion state from memory cache so an item never reverts or disappears
-            val cachedMap = cachedSchedules.associateBy { it.id }
-            val cachedTitleOrderMap = cachedSchedules.associateBy { "${it.title}_${it.reviewOrder}" }
+            val finalSchedules = if (forceFresh || cachedSchedules.isEmpty()) {
+                freshSchedules
+            } else {
+                // Keep optimistic completion state from memory cache so an item never reverts during rapid clicking
+                val cachedMap = cachedSchedules.associateBy { it.id }
+                val cachedTitleOrderMap = cachedSchedules.associateBy { "${it.title}_${it.reviewOrder}" }
 
-            val mergedSchedules = freshSchedules.map { fresh ->
-                val cached = cachedMap[fresh.id] ?: cachedTitleOrderMap["${fresh.title}_${fresh.reviewOrder}"]
-                if (cached != null && cached.isCompleted != fresh.isCompleted) {
-                    fresh.copy(isCompleted = cached.isCompleted)
-                } else {
-                    fresh
+                freshSchedules.map { fresh ->
+                    val cached = cachedMap[fresh.id] ?: cachedTitleOrderMap["${fresh.title}_${fresh.reviewOrder}"]
+                    if (cached != null && cached.isCompleted != fresh.isCompleted) {
+                        fresh.copy(isCompleted = cached.isCompleted)
+                    } else {
+                        fresh
+                    }
                 }
             }
 
-            // Ensure any item currently in cachedSchedules is preserved in the widget
-            val missingFromFresh = cachedSchedules.filter { cached ->
-                mergedSchedules.none { it.id == cached.id || (it.title == cached.title && it.reviewOrder == cached.reviewOrder) }
-            }
-
-            cachedSchedules = (mergedSchedules + missingFromFresh).sortedWith(
+            cachedSchedules = finalSchedules.sortedWith(
                 compareBy<TodayWidgetScheduleItem> { it.reviewDate }
                     .thenBy { it.reviewOrder }
                     .thenBy { it.title }
@@ -121,9 +125,30 @@ object TodayReviewWidgetManager {
         val entryPoint = EntryPointAccessors.fromApplication(context.applicationContext, WidgetEntryPoint::class.java)
         val today = LocalDate.now(seoulZone)
 
+        // 0. 활성 블록 및 살아있는 학습기록 목록 확인
+        val activeBlocks = entryPoint.reviewBlockRepository().getReviewBlocks(uid).getOrDefault(emptyList())
+        val activeBlockIds = activeBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
+
+        val activeStudyRecords = entryPoint.studyRecordRepository().getAllStudyRecords(uid).getOrDefault(emptyList())
+        val activeStudyRecordIds = activeStudyRecords.map { it.id }.filter { it.isNotBlank() }.toSet()
+
         // 1. Fetch ReviewScheduleItem list
         val itemsResult = entryPoint.reviewScheduleItemRepository().getAllScheduleItems(uid)
         val items = itemsResult.getOrDefault(emptyList())
+
+        // 부모 학습기록이 삭제된 고아 스케줄 비동기 정리
+        if (activeStudyRecordIds.isNotEmpty() || activeStudyRecords.isNotEmpty()) {
+            val orphanedScheduleIds = items.filter { item ->
+                item.blockId in activeBlockIds &&
+                    item.studyRecordId.isNotBlank() &&
+                    item.studyRecordId !in activeStudyRecordIds
+            }.map { it.id }
+            if (orphanedScheduleIds.isNotEmpty()) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    entryPoint.reviewScheduleItemRepository().deleteScheduleItems(uid, orphanedScheduleIds)
+                }
+            }
+        }
 
         // 2. Fetch legacy schedules (if any)
         val dateStr = today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
@@ -132,6 +157,14 @@ object TodayReviewWidgetManager {
         }.getOrDefault(emptyList())
 
         val todayItems = items.filter { item ->
+            // 블록 검사
+            val blockMatches = if (activeBlockIds.isNotEmpty()) item.blockId in activeBlockIds else true
+            // 학습기록 검사 (부모 학습기록이 삭제된 스케줄은 위젯에서도 배제)
+            val recordMatches = if (item.studyRecordId.isNotBlank()) {
+                item.studyRecordId in activeStudyRecordIds
+            } else true
+            if (!blockMatches || !recordMatches) return@filter false
+
             val itemDate = Instant.ofEpochMilli(item.reviewDate).atZone(seoulZone).toLocalDate()
             val completedToday = item.completedAt != null &&
                 Instant.ofEpochMilli(item.completedAt).atZone(seoulZone).toLocalDate() == today

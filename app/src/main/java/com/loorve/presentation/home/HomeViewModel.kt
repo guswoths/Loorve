@@ -19,6 +19,7 @@ import com.loorve.domain.repository.ReviewScheduleItemRepository
 import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.util.CalendarRefreshBus  // ✅ 추가
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -138,6 +139,8 @@ class HomeViewModel @Inject constructor(
     private val completionOverrides = mutableMapOf<String, Boolean>()
     private var reviewScheduleItemsLoaded = false
     private var legacyReviewSchedulesLoaded = false
+    private var activeStudyRecordIds: Set<String> = emptySet()
+    private var studyRecordsLoaded = false
 
     init {
         // ✅ uid를 반드시 토큰 갱신 후 확보, 그 다음 모든 데이터 로드
@@ -147,6 +150,13 @@ class HomeViewModel @Inject constructor(
                 return@launch
             }
             loadExams()
+            // ✅ 학습기록 생존 목록을 선제적으로 확보하여 고아 스케줄이 홈화면에 노출되지 않도록 함
+            val allRecords = studyRecordRepository.getAllStudyRecords(uid).getOrDefault(emptyList())
+            val activeBlocks = reviewBlockRepository.getReviewBlocks(uid).getOrDefault(emptyList())
+            val activeBlockIds = activeBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
+            activeStudyRecordIds = allRecords.filter { it.blockId in activeBlockIds }.map { it.id }.toSet()
+            studyRecordsLoaded = true
+
             observeReviewBlocks(uid)  // ✅ 복습 블록 실시간 감시 (삭제 이벤트 즉시 반영)
             observeStudyRecordDates(uid)
             observeReviewScheduleItems(uid) // ✅ 복습 일정 실시간 감시 및 캘린더 dot 동기화
@@ -277,11 +287,26 @@ class HomeViewModel @Inject constructor(
 
     private fun updateCombinedReviewSchedules() {
         val activeBlockIds = _uiState.value.reviewBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
-        // legacy 일정 중에서도 블록 ID가 지정되어 있는데 현재 활성 블록에 없는 것은 제외
-        val filteredLegacyUiModels = if (activeBlockIds.isNotEmpty()) {
-            legacyReviewScheduleUiModels.filter { it.examId.isBlank() || it.examId in activeBlockIds }
-        } else {
-            legacyReviewScheduleUiModels.filter { it.examId.isBlank() }
+        val currentProgressIds = _uiState.value.progressList.map { it.id }.toSet()
+
+        // legacy 일정 중에서도 블록 ID가 지정되어 있는데 현재 활성 블록에 없는 것은 제외,
+        // 그리고 originProgressId가 지정되어 있는데 해당 학습기록이나 진도가 삭제된 것은 제외
+        val filteredLegacyUiModels = legacyReviewScheduleUiModels.filter { schedule ->
+            val blockMatches = if (activeBlockIds.isNotEmpty()) {
+                schedule.examId.isBlank() || schedule.examId in activeBlockIds
+            } else {
+                schedule.examId.isBlank()
+            }
+            val originMatches = if (schedule.originProgressId.isNotBlank()) {
+                if (studyRecordsLoaded) {
+                    schedule.originProgressId in activeStudyRecordIds || schedule.originProgressId in currentProgressIds
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+            blockMatches && originMatches
         }
         val filteredLegacyDates = filteredLegacyUiModels.map { it.reviewDate }.toSet()
 
@@ -331,12 +356,17 @@ class HomeViewModel @Inject constructor(
         val today = LocalDate.now(seoulZone)
         val chartDates = (0..6).map { today.minusDays((6 - it).toLong()) }
         val activeBlockIds = _uiState.value.reviewBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
+        val currentProgressIds = _uiState.value.progressList.map { it.id }.toSet()
         val completedScheduleDates = linkedMapOf<String, LocalDate>()
 
-        val validItems = if (activeBlockIds.isNotEmpty()) {
-            rawReviewScheduleItems.filter { it.blockId in activeBlockIds }
-        } else {
-            rawReviewScheduleItems
+        val validItems = rawReviewScheduleItems.filter { item ->
+            val blockMatches = if (activeBlockIds.isNotEmpty()) item.blockId in activeBlockIds else true
+            val recordMatches = if (studyRecordsLoaded && item.studyRecordId.isNotBlank()) {
+                item.studyRecordId in activeStudyRecordIds
+            } else {
+                true
+            }
+            blockMatches && recordMatches
         }
 
         validItems.forEach { item ->
@@ -364,10 +394,22 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        val filteredLegacy = if (activeBlockIds.isNotEmpty()) {
-            legacyReviewScheduleUiModels.filter { it.examId.isBlank() || it.examId in activeBlockIds }
-        } else {
-            legacyReviewScheduleUiModels
+        val filteredLegacy = legacyReviewScheduleUiModels.filter { schedule ->
+            val blockMatches = if (activeBlockIds.isNotEmpty()) {
+                schedule.examId.isBlank() || schedule.examId in activeBlockIds
+            } else {
+                true
+            }
+            val originMatches = if (schedule.originProgressId.isNotBlank()) {
+                if (studyRecordsLoaded) {
+                    schedule.originProgressId in activeStudyRecordIds || schedule.originProgressId in currentProgressIds
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+            blockMatches && originMatches
         }
 
         filteredLegacy.forEach { schedule ->
@@ -422,8 +464,9 @@ class HomeViewModel @Inject constructor(
     /**
      * 현재 복습캘린더에 존재하는 활성 복습블록(activeBlockIds)의 복습기록만 정확히 필터링하여 캘린더 dot 데이터에 반영.
      * 복습블록이 삭제되었거나 존재하지 않는 경우 해당 블록의 복습기록 dot은 즉시 제거됨.
+     * 또한 부모 학습기록(StudyRecord)이 삭제된 고아 스케줄은 즉시 화면에서 배제하고 Firestore에서도 비동기 일괄 삭제함.
      */
-    private fun applyActiveBlocksFilter(activeBlockIds: Set<String>) {
+    private fun applyActiveBlocksFilter(activeBlockIds: Set<String>, uid: String? = null) {
         if (activeBlockIds.isEmpty()) {
             reviewScheduleItemUiModels = emptyList()
             reviewScheduleItemDates = emptySet()
@@ -431,7 +474,16 @@ class HomeViewModel @Inject constructor(
             return
         }
 
-        val validItems = rawReviewScheduleItems.filter { it.blockId in activeBlockIds }
+        // ✅ 블록 존재 여부 + 부모 학습기록(StudyRecord) 존재 여부 엄격 검사
+        val validItems = rawReviewScheduleItems.filter { item ->
+            val blockMatches = item.blockId in activeBlockIds
+            val recordMatches = if (studyRecordsLoaded && item.studyRecordId.isNotBlank()) {
+                item.studyRecordId in activeStudyRecordIds
+            } else {
+                true
+            }
+            blockMatches && recordMatches
+        }
 
         val blockMap = _uiState.value.reviewBlocks.associateBy { it.blockId }
         val examMap = _uiState.value.exams.associateBy { it.id }
@@ -463,10 +515,47 @@ class HomeViewModel @Inject constructor(
         reviewScheduleItemUiModels = uiModels
         reviewScheduleItemDates = uiModels.map { it.reviewDate }.toSet()
         updateCombinedReviewSchedules()
+
+        // ✅ Firestore에 잔존하는 고아 스케줄(학습기록이 삭제된 스케줄) 비동기 완전 삭제
+        val targetUid = uid ?: FirebaseAuth.getInstance().currentUser?.uid
+        if (studyRecordsLoaded && !targetUid.isNullOrBlank()) {
+            val orphanedScheduleIds = rawReviewScheduleItems.filter { item ->
+                item.blockId in activeBlockIds &&
+                    item.studyRecordId.isNotBlank() &&
+                    item.studyRecordId !in activeStudyRecordIds
+            }.map { it.id }
+
+            if (orphanedScheduleIds.isNotEmpty()) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    reviewScheduleItemRepository.deleteScheduleItems(targetUid, orphanedScheduleIds)
+                }
+            }
+        }
     }
 
     private suspend fun syncReviewScheduleItems(items: List<ReviewScheduleItem>, uid: String) {
         rawReviewScheduleItems = items
+
+        // ✅ 삭제되었거나 현재 유효 데이터셋에 존재하지 않는 스케줄 키는 completionOverrides에서 즉시 완전 정리
+        val currentItemIds = items.map { it.id }.toSet()
+        val currentCompositeKeys = items.mapNotNull { item ->
+            val scheduleDate = runCatching {
+                Instant.ofEpochMilli(item.reviewDate)
+                    .atZone(seoulZone)
+                    .toLocalDate()
+            }.getOrNull()
+            if (scheduleDate != null && item.studyRecordId.isNotBlank()) {
+                "${scheduleDate}_${item.studyRecordId}_${item.reviewOrder}"
+            } else null
+        }.toSet()
+        val currentLegacyIds = legacyReviewScheduleUiModels.map { it.scheduleId }.toSet()
+        val currentLegacyIdentities = legacyReviewScheduleUiModels.map {
+            "${it.reviewDate}_${it.originProgressId}_${it.reviewOrder}"
+        }.toSet()
+
+        val validKeys = currentItemIds + currentCompositeKeys + currentLegacyIds + currentLegacyIdentities
+        completionOverrides.keys.retainAll(validKeys)
+
         items.forEach { item ->
             val serverCompleted = item.status == com.loorve.domain.model.ReviewStatus.COMPLETED
             if (completionOverrides[item.id] == serverCompleted) {
@@ -480,7 +569,7 @@ class HomeViewModel @Inject constructor(
             ?.filter { it.isNotBlank() }
             ?.toSet() ?: emptySet()
 
-        applyActiveBlocksFilter(activeBlockIds)
+        applyActiveBlocksFilter(activeBlockIds, uid)
     }
 
     private var studyRecordJob: Job? = null
@@ -503,13 +592,18 @@ class HomeViewModel @Inject constructor(
         val activeBlockIds = reviewBlockRepository.getReviewBlocks(uid)
             .getOrNull()
             ?.map { it.blockId }
-            ?.toSet() ?: emptySet()
+            ?.filter { it.isNotBlank() }
+            ?.toSet() ?: _uiState.value.reviewBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
 
         val validRecords = if (activeBlockIds.isEmpty()) {
             emptyList()
         } else {
             records.filter { it.blockId in activeBlockIds }
         }
+
+        // ✅ 살아있는 학습기록 ID 집합 갱신 및 로드 완료 플래그 활성화
+        activeStudyRecordIds = validRecords.map { it.id }.filter { it.isNotBlank() }.toSet()
+        studyRecordsLoaded = true
 
         val dates = validRecords.mapNotNull { record ->
             runCatching {
@@ -522,6 +616,9 @@ class HomeViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(studyRecordDates = dates)
         }
+
+        // ✅ 학습기록의 변경(삭제/추가)이 복습 스케줄 및 지연일정, 캘린더, 그래프에 즉시 반영되도록 재필터링
+        applyActiveBlocksFilter(activeBlockIds, uid)
     }
 
     // ✅ 복습 블록에서 저장된 StudyRecord의 learningDate 조회하여 캘린더 dot 연동
@@ -745,7 +842,7 @@ class HomeViewModel @Inject constructor(
                     updateReviewCountSummary()
                     // ✅ 활성 블록 ID 추출 후 즉시 필터 적용
                     val activeBlockIds = uiBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
-                    applyActiveBlocksFilter(activeBlockIds)
+                    applyActiveBlocksFilter(activeBlockIds, uid)
                 }
         }
     }
@@ -847,13 +944,43 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // ✅ 복습 로그 생성 또는 완료 처리 후 캘린더 강제 갱신
+    // ✅ 복습 로그 생성, 완료 처리 또는 학습기록 삭제 후 캘린더 및 홈 전체 강제 갱신
     fun refreshCalendar() {
         viewModelScope.launch {
             val uid = getUidSafely() ?: return@launch
-            observeReviewBlocks(uid)
-            observeReviewScheduleItems(uid)
+
+            // 1. 임시 오버라이드 및 타 월간 레거시 날짜 캐시 완전 초기화 (삭제 잔여물 제거)
+            completionOverrides.clear()
+            legacyReviewScheduleDates = emptySet()
+
+            // 2. 실시간 감시기가 미동작 중이면 재연결
+            if (observeReviewBlocksJob == null || observeReviewBlocksJob?.isActive != true) {
+                observeReviewBlocks(uid)
+            }
+            if (observeReviewScheduleItemsJob == null || observeReviewScheduleItemsJob?.isActive != true) {
+                observeReviewScheduleItems(uid)
+            }
+            if (observeStudyRecordsJob == null || observeStudyRecordsJob?.isActive != true) {
+                observeStudyRecordDates(uid)
+            }
+
+            // 3. 최신 학습 기록 전체를 먼저 조회하여 activeStudyRecordIds 확보
+            studyRecordRepository.getAllStudyRecords(uid).onSuccess { allRecords ->
+                syncStudyRecordDates(allRecords, uid)
+            }
+
+            // 4. Firestore 최신 복습 일정 즉시 직접 로드하여 뷰모델 실시간 동기화 (그래프/지연일정/캘린더 즉각 반영)
+            reviewScheduleItemRepository.getAllScheduleItems(uid).onSuccess { items ->
+                syncReviewScheduleItems(items, uid)
+            }
+
+            // 5. 현재 월간 레거시 복습 일정 및 진도 로드
             loadReviewScheduleDatesByMonth(uid, _displayYearMonth.value)
+            loadStudyRecordDatesByMonth(uid, _displayYearMonth.value)
+            try {
+                val list = getProgressListUseCase(uid).first()
+                applyProgressList(list)
+            } catch (_: Exception) {}
         }
     }
 

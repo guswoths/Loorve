@@ -29,6 +29,7 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import com.loorve.domain.model.ReviewBlock
 import com.loorve.domain.repository.ReviewBlockRepository
+import com.loorve.domain.repository.StudyRecordRepository
 import com.loorve.domain.subscription.ReviewBlockAccessPolicy
 import com.loorve.domain.subscription.SubscriptionEntitlement
 import com.loorve.domain.subscription.SubscriptionRepository
@@ -58,6 +59,7 @@ data class ReviewCalendarUiState(
 class ReviewCalendarViewModel @Inject constructor(
     private val reviewScheduleRepository: ReviewScheduleRepository,
     private val reviewScheduleItemRepository: ReviewScheduleItemRepository,
+    private val studyRecordRepository: StudyRecordRepository,
     private val updateReviewCompletionUseCase: UpdateReviewCompletionUseCase,
     private val reviewBlockRepository: ReviewBlockRepository,
     private val calendarRefreshBus: CalendarRefreshBus,
@@ -77,12 +79,15 @@ class ReviewCalendarViewModel @Inject constructor(
     private val seoulZone = ZoneId.of("Asia/Seoul")
     private var loadJob: Job? = null
     private var recentBlocksJob: Job? = null
+    private var recentStudyRecordsJob: Job? = null
     private var recentLegacyJob: Job? = null
     private var recentItemsJob: Job? = null
     private var recentLegacySchedules: List<ReviewCompletionSchedule> = emptyList()
     private var recentScheduleItems: List<ReviewCompletionSchedule> = emptyList()
     private var recentActiveBlockIds: Set<String> = emptySet()
+    private var recentActiveStudyRecordIds: Set<String> = emptySet()
     private var recentBlocksLoaded = false
+    private var recentStudyRecordsLoaded = false
     private var recentLegacyLoaded = false
     private var recentItemsLoaded = false
 
@@ -124,12 +129,15 @@ class ReviewCalendarViewModel @Inject constructor(
     suspend fun refreshUid() {
         loadJob?.cancel()
         recentBlocksJob?.cancel()
+        recentStudyRecordsJob?.cancel()
         recentLegacyJob?.cancel()
         recentItemsJob?.cancel()
         recentLegacySchedules = emptyList()
         recentScheduleItems = emptyList()
         recentActiveBlockIds = emptySet()
+        recentActiveStudyRecordIds = emptySet()
         recentBlocksLoaded = false
+        recentStudyRecordsLoaded = false
         recentLegacyLoaded = false
         recentItemsLoaded = false
         _uiState.update { state ->
@@ -353,6 +361,11 @@ class ReviewCalendarViewModel @Inject constructor(
 
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
+            val activeBlocks = reviewBlockRepository.getReviewBlocks(uid).getOrDefault(emptyList())
+            val activeBlockIds = activeBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
+            val activeStudyRecords = studyRecordRepository.getAllStudyRecords(uid).getOrDefault(emptyList())
+            val activeStudyRecordIds = activeStudyRecords.map { it.id }.filter { it.isNotBlank() }.toSet()
+
             reviewScheduleRepository
                 .getReviewSchedulesByDateRange(uid, startDate, endDate)
                 .catch { exception ->
@@ -361,7 +374,14 @@ class ReviewCalendarViewModel @Inject constructor(
                     }
                 }
                 .collectLatest { schedules ->
-                    val schedulesMap = schedules.groupBy { schedule ->
+                    val validSchedules = schedules.filter { schedule ->
+                        val blockValid = schedule.blockId.isBlank() || (schedule.blockId in activeBlockIds)
+                        val recordValid = if (activeStudyRecordIds.isNotEmpty() && schedule.originProgressId.isNotBlank()) {
+                            schedule.originProgressId in activeStudyRecordIds
+                        } else true
+                        blockValid && recordValid
+                    }
+                    val schedulesMap = validSchedules.groupBy { schedule ->
                         java.time.Instant.ofEpochMilli(schedule.reviewDate)
                             .atZone(java.time.ZoneId.of("Asia/Seoul"))
                             .toLocalDate()
@@ -406,6 +426,20 @@ class ReviewCalendarViewModel @Inject constructor(
                 }
         }
 
+        recentStudyRecordsJob = viewModelScope.launch {
+            studyRecordRepository
+                .observeStudyRecords(uid)
+                .catch { }
+                .collectLatest { records ->
+                    recentStudyRecordsLoaded = true
+                    recentActiveStudyRecordIds = records
+                        .map { it.id }
+                        .filter { it.isNotBlank() }
+                        .toSet()
+                    updateCompletionStats(today)
+                }
+        }
+
         recentLegacyJob = viewModelScope.launch {
             reviewScheduleRepository
                 .getReviewSchedulesByDateRange(uid, startDate, endDate)
@@ -421,7 +455,11 @@ class ReviewCalendarViewModel @Inject constructor(
                 }
                 .collectLatest { schedules ->
                     recentLegacyLoaded = true
-                    recentLegacySchedules = schedules.map { schedule ->
+                    recentLegacySchedules = schedules.mapNotNull { schedule ->
+                        if (recentStudyRecordsLoaded && schedule.originProgressId.isNotBlank() &&
+                            schedule.originProgressId !in recentActiveStudyRecordIds) {
+                            return@mapNotNull null
+                        }
                         ReviewCompletionSchedule(
                             id = schedule.scheduleId,
                             dueDate = java.time.Instant.ofEpochMilli(schedule.reviewDate)
@@ -453,16 +491,24 @@ class ReviewCalendarViewModel @Inject constructor(
                 .collectLatest { items ->
                     recentItemsLoaded = true
                     val delayedItemBlockIds = items
-                        .filter {
-                            it.blockId.isNotBlank() &&
-                                it.reviewDate < today.atStartOfDay(seoulZone)
+                        .filter { item ->
+                            val blockValid = item.blockId.isNotBlank() && (item.blockId in recentActiveBlockIds)
+                            val recordValid = if (recentStudyRecordsLoaded && item.studyRecordId.isNotBlank()) {
+                                item.studyRecordId in recentActiveStudyRecordIds
+                            } else true
+                            blockValid && recordValid &&
+                                item.reviewDate < today.atStartOfDay(seoulZone)
                                     .toInstant()
                                     .toEpochMilli() &&
-                                it.status != com.loorve.domain.model.ReviewStatus.COMPLETED
+                                item.status != com.loorve.domain.model.ReviewStatus.COMPLETED
                         }
                         .map { it.blockId }
                         .toSet()
                     recentScheduleItems = items.mapNotNull { item ->
+                        if (recentStudyRecordsLoaded && item.studyRecordId.isNotBlank() &&
+                            item.studyRecordId !in recentActiveStudyRecordIds) {
+                            return@mapNotNull null
+                        }
                         val dueDate = runCatching {
                             java.time.Instant.ofEpochMilli(item.reviewDate)
                                 .atZone(seoulZone)

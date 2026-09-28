@@ -1,6 +1,7 @@
 package com.loorve.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.loorve.data.model.StudyRecordDto
@@ -107,7 +108,7 @@ class StudyRecordRepositoryImpl @Inject constructor(
             ).await()
     }
 
-    // ✅ [추가] 개별 학습기록 Firestore 문서 삭제
+    // ✅ [추가] 개별 학습기록 및 연관된 복습 일정, 캘린더 기록, 알림 일괄 삭제
     override suspend fun deleteStudyRecord(
         uid: String,
         record: StudyRecord
@@ -117,7 +118,63 @@ class StudyRecordRepositoryImpl @Inject constructor(
         require(currentUid == uid) { "본인의 학습기록만 삭제할 수 있습니다." }
         require(record.id.isNotBlank()) { "삭제할 학습기록의 ID가 없습니다." }
 
-        studyRecordsRef(uid).document(record.id).delete().await()
+        val toDeleteRefs = mutableListOf<DocumentReference>()
+
+        // 1) 학습기록 문서
+        toDeleteRefs.add(studyRecordsRef(uid).document(record.id))
+
+        // 2) 연관된 복습 일정 항목(reviewScheduleItems) 일괄 조회 (studyRecordId 기준)
+        val schedulesSnapshot = firestore.collection("users")
+            .document(uid)
+            .collection("reviewScheduleItems")
+            .whereEqualTo("studyRecordId", record.id)
+            .get()
+            .await()
+        toDeleteRefs.addAll(schedulesSnapshot.documents.map { it.reference })
+
+        // 3) 혹시 originProgressId로 저장된 reviewScheduleItems도 조회
+        val schedulesByOriginSnapshot = firestore.collection("users")
+            .document(uid)
+            .collection("reviewScheduleItems")
+            .whereEqualTo("originProgressId", record.id)
+            .get()
+            .await()
+        toDeleteRefs.addAll(schedulesByOriginSnapshot.documents.map { it.reference })
+
+        // 4) 연관된 구버전 복습 일정(reviewSchedules) 일괄 조회 (originProgressId 기준)
+        val legacySchedulesSnapshot = firestore.collection("users")
+            .document(uid)
+            .collection("reviewSchedules")
+            .whereEqualTo("originProgressId", record.id)
+            .get()
+            .await()
+        toDeleteRefs.addAll(legacySchedulesSnapshot.documents.map { it.reference })
+
+        // 5) 혹시 studyRecordId로 저장된 구버전 복습 일정(reviewSchedules)도 조회
+        val legacySchedulesByRecordIdSnapshot = firestore.collection("users")
+            .document(uid)
+            .collection("reviewSchedules")
+            .whereEqualTo("studyRecordId", record.id)
+            .get()
+            .await()
+        toDeleteRefs.addAll(legacySchedulesByRecordIdSnapshot.documents.map { it.reference })
+
+        // 6) 연관된 알림 이벤트(reviewNotificationOutbox) 일괄 조회 (studyRecordId 기준)
+        val outboxSnapshot = firestore.collection("users")
+            .document(uid)
+            .collection("reviewNotificationOutbox")
+            .whereEqualTo("studyRecordId", record.id)
+            .get()
+            .await()
+        toDeleteRefs.addAll(outboxSnapshot.documents.map { it.reference })
+
+        // 7) 일괄 원자적(Atomic) 배치 삭제 수행 (중복 참조 제거 후 500개씩 청크 분할 커밋)
+        val distinctRefs = toDeleteRefs.distinctBy { it.path }
+        distinctRefs.chunked(500).forEach { chunk ->
+            val batch = firestore.batch()
+            chunk.forEach { batch.delete(it) }
+            batch.commit().await()
+        }
     }
 
     // ✅ [추가] 기간별 학습기록 조회 (홈 캘린더 dot 연동용)
@@ -188,7 +245,7 @@ class StudyRecordRepositoryImpl @Inject constructor(
         }
     }
 
-    // ✅ [추가] 특정 블록에 속한 모든 학습기록 일괄 삭제
+    // ✅ [추가] 특정 블록에 속한 모든 학습기록 및 연관 복습일정/알림 일괄 삭제
     override suspend fun deleteStudyRecordsByBlockId(
         uid: String,
         blockId: String
@@ -203,8 +260,58 @@ class StudyRecordRepositoryImpl @Inject constructor(
             .get()
             .await()
 
-        for (doc in snapshot.documents) {
-            doc.reference.delete().await()
+        val toDeleteRefs = mutableListOf<DocumentReference>()
+        toDeleteRefs.addAll(snapshot.documents.map { it.reference })
+
+        val recordIds = snapshot.documents.map { it.id }.toSet()
+
+        for (recordId in recordIds) {
+            val schedulesSnapshot = firestore.collection("users")
+                .document(uid)
+                .collection("reviewScheduleItems")
+                .whereEqualTo("studyRecordId", recordId)
+                .get()
+                .await()
+            toDeleteRefs.addAll(schedulesSnapshot.documents.map { it.reference })
+
+            val schedulesByOrigin = firestore.collection("users")
+                .document(uid)
+                .collection("reviewScheduleItems")
+                .whereEqualTo("originProgressId", recordId)
+                .get()
+                .await()
+            toDeleteRefs.addAll(schedulesByOrigin.documents.map { it.reference })
+
+            val legacySnapshot = firestore.collection("users")
+                .document(uid)
+                .collection("reviewSchedules")
+                .whereEqualTo("originProgressId", recordId)
+                .get()
+                .await()
+            toDeleteRefs.addAll(legacySnapshot.documents.map { it.reference })
+
+            val legacyByRecordId = firestore.collection("users")
+                .document(uid)
+                .collection("reviewSchedules")
+                .whereEqualTo("studyRecordId", recordId)
+                .get()
+                .await()
+            toDeleteRefs.addAll(legacyByRecordId.documents.map { it.reference })
+
+            val outboxSnapshot = firestore.collection("users")
+                .document(uid)
+                .collection("reviewNotificationOutbox")
+                .whereEqualTo("studyRecordId", recordId)
+                .get()
+                .await()
+            toDeleteRefs.addAll(outboxSnapshot.documents.map { it.reference })
+        }
+
+        val distinctRefs = toDeleteRefs.distinctBy { it.path }
+        distinctRefs.chunked(500).forEach { chunk ->
+            val batch = firestore.batch()
+            chunk.forEach { batch.delete(it) }
+            batch.commit().await()
         }
     }
 }

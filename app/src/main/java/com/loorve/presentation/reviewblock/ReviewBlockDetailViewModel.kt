@@ -20,6 +20,9 @@ import com.loorve.domain.usecase.CreateStudyRecordWithReviewSchedulesUseCase
 import com.loorve.domain.usecase.CompleteReviewWithReschedulingUseCase
 import com.loorve.domain.usecase.ReviewCompletionOutcome
 import com.loorve.domain.usecase.CreateStudyRecordResult
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import com.loorve.widget.TodayReviewWidgetManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,7 +70,8 @@ class ReviewBlockDetailViewModel @Inject constructor(
     private val calendarRefreshBus: CalendarRefreshBus,
     private val notificationTimePreferences: NotificationTimePreferences,
     private val reviewAlarmScheduler: ReviewAlarmScheduler,
-    private val subscriptionRepository: SubscriptionRepository
+    private val subscriptionRepository: SubscriptionRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewBlockDetailUiState())
@@ -363,6 +367,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
             reviewBlockRepository.deleteReviewBlock(uid, blockId)
                 .onSuccess {
                     calendarRefreshBus.notifyRefresh()
+                    TodayReviewWidgetManager.updateAllWidgets(context, forceFresh = true)
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         deleteSuccess = true,
@@ -387,11 +392,17 @@ class ReviewBlockDetailViewModel @Inject constructor(
         if (_uiState.value.isLoading) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            val schedulesToDelete = scheduleRepository.getSchedulesByStudyRecord(uid, record.id)
+                .getOrDefault(emptyList())
+            schedulesToDelete.forEach { schedule ->
+                reviewAlarmScheduler.cancelReviewAlarm(schedule.id)
+            }
             studyRecordRepository.deleteStudyRecord(uid, record)
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(recordToDelete = null)
                     loadBlockData(uid, blockId)
                     calendarRefreshBus.notifyRefresh()
+                    TodayReviewWidgetManager.updateAllWidgets(context, forceFresh = true)
                 }
                 .onFailure { e ->
                     _uiState.value = _uiState.value.copy(
