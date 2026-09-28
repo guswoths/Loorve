@@ -136,31 +136,19 @@ object TodayReviewWidgetManager {
         val itemsResult = entryPoint.reviewScheduleItemRepository().getAllScheduleItems(uid)
         val items = itemsResult.getOrDefault(emptyList())
 
-        // 부모 학습기록이 삭제된 고아 스케줄 비동기 정리
-        if (activeStudyRecordIds.isNotEmpty() || activeStudyRecords.isNotEmpty()) {
-            val orphanedScheduleIds = items.filter { item ->
-                item.blockId in activeBlockIds &&
-                    item.studyRecordId.isNotBlank() &&
-                    item.studyRecordId !in activeStudyRecordIds
-            }.map { it.id }
-            if (orphanedScheduleIds.isNotEmpty()) {
-                CoroutineScope(Dispatchers.IO).launch {
-                    entryPoint.reviewScheduleItemRepository().deleteScheduleItems(uid, orphanedScheduleIds)
-                }
-            }
-        }
-
         // 2. Fetch legacy schedules (if any)
         val dateStr = today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
         val legacyResult: List<ReviewSchedule> = runCatching {
             entryPoint.reviewScheduleRepository().getReviewSchedulesByDateRange(uid, dateStr, dateStr).first()
         }.getOrDefault(emptyList())
 
+        val now = System.currentTimeMillis()
         val todayItems = items.filter { item ->
             // 블록 검사
             val blockMatches = if (activeBlockIds.isNotEmpty()) item.blockId in activeBlockIds else true
-            // 학습기록 검사 (부모 학습기록이 삭제된 스케줄은 위젯에서도 배제)
-            val recordMatches = if (item.studyRecordId.isNotBlank()) {
+            // 학습기록 검사 (부모 학습기록이 삭제된 스케줄은 위젯에서도 배제하되, 최근 생성된 것은 보호)
+            val isRecentlyCreated = item.createdAt > (now - 10 * 60 * 1000L)
+            val recordMatches = if (item.studyRecordId.isNotBlank() && !isRecentlyCreated) {
                 item.studyRecordId in activeStudyRecordIds
             } else true
             if (!blockMatches || !recordMatches) return@filter false

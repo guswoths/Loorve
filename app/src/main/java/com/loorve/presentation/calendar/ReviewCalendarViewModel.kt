@@ -490,10 +490,12 @@ class ReviewCalendarViewModel @Inject constructor(
                 }
                 .collectLatest { items ->
                     recentItemsLoaded = true
+                    val now = System.currentTimeMillis()
                     val delayedItemBlockIds = items
                         .filter { item ->
                             val blockValid = item.blockId.isNotBlank() && (item.blockId in recentActiveBlockIds)
-                            val recordValid = if (recentStudyRecordsLoaded && item.studyRecordId.isNotBlank()) {
+                            val isRecentlyCreated = item.createdAt > (now - 10 * 60 * 1000L)
+                            val recordValid = if (recentStudyRecordsLoaded && item.studyRecordId.isNotBlank() && !isRecentlyCreated) {
                                 item.studyRecordId in recentActiveStudyRecordIds
                             } else true
                             blockValid && recordValid &&
@@ -505,7 +507,8 @@ class ReviewCalendarViewModel @Inject constructor(
                         .map { it.blockId }
                         .toSet()
                     recentScheduleItems = items.mapNotNull { item ->
-                        if (recentStudyRecordsLoaded && item.studyRecordId.isNotBlank() &&
+                        val isRecentlyCreated = item.createdAt > (now - 10 * 60 * 1000L)
+                        if (recentStudyRecordsLoaded && item.studyRecordId.isNotBlank() && !isRecentlyCreated &&
                             item.studyRecordId !in recentActiveStudyRecordIds) {
                             return@mapNotNull null
                         }

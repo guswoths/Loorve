@@ -37,8 +37,8 @@ android {
         applicationId = "com.loorve_2"
         minSdk = 26
         targetSdk = 36
-        versionCode = 32
-        versionName = "1.0.15"
+        versionCode = 33
+        versionName = "1.0.16"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -69,7 +69,8 @@ android {
                             "Set the real Ad Unit ID before publishing to the Play Store."
                 )
             }
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -27,9 +27,18 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.Instant
+import java.time.ZoneId
+import android.util.Log
+import com.loorve.domain.review.ReviewSchedulingEngine
+import com.loorve.domain.review.SchedulerConfig
+import com.loorve.domain.review.SchedulerExam
+import com.loorve.domain.review.SchedulerStudyRecord
+import com.loorve.domain.review.ReviewNotificationPlan
+import com.loorve.domain.usecase.toScheduleItem
 import javax.inject.Inject
 import com.loorve.util.CalendarRefreshBus
 import com.loorve.domain.subscription.ReviewBlockAccessPolicy
@@ -139,13 +148,7 @@ class ReviewBlockDetailViewModel @Inject constructor(
 
     fun loadReviewRecords(uid: String, blockId: String) {
         viewModelScope.launch {
-            val records = studyRecordRepository.getStudyRecords(uid, blockId)
-                .getOrDefault(emptyList())
-            val allSchedules = records.flatMap { record ->
-                scheduleRepository.getSchedulesByStudyRecord(uid, record.id)
-                    .getOrDefault(emptyList())
-            }.sortedBy { it.reviewDate }
-            _uiState.value = _uiState.value.copy(reviewScheduleRecords = allSchedules)
+            loadBlockData(uid, blockId)
         }
     }
 
@@ -193,11 +196,58 @@ class ReviewBlockDetailViewModel @Inject constructor(
                 .getOrDefault(emptyList())
                 .sortedWith(compareBy<StudyRecord> { it.learningDate }.thenBy { it.createdAt })
 
-            val allSchedules = records.flatMap { record ->
-                scheduleRepository.getSchedulesByStudyRecord(uid, record.id)
+            val allSchedules = mutableListOf<ReviewScheduleItem>()
+            val zone = ZoneId.of("Asia/Seoul")
+
+            for (record in records) {
+                val recordSchedules = scheduleRepository.getSchedulesByStudyRecord(uid, record.id)
                     .getOrDefault(emptyList())
+                if (recordSchedules.isNotEmpty()) {
+                    allSchedules.addAll(recordSchedules)
+                } else if (resolvedBlock.examDate > 0L) {
+                    // ⚠️ 복습 일정이 누락/삭제된 학습기록 발견 시 자동 복구(Auto-Heal)
+                    try {
+                        val examDate = Instant.ofEpochMilli(resolvedBlock.examDate).atZone(zone).toLocalDate()
+                        val studiedAt = Instant.ofEpochMilli(record.learningDate).atZone(zone).toLocalDate()
+                        val schedulerExam = SchedulerExam(
+                            examId = record.examId,
+                            examName = resolvedBlock.examName.ifBlank { resolvedBlock.title },
+                            examDate = examDate,
+                            timezone = zone,
+                            maxDailyReviewMinutes = null,
+                            finalReviewBufferDays = 0
+                        )
+                        val schedulerRecord = SchedulerStudyRecord(
+                            studyRecordId = record.id,
+                            studiedAtDate = studiedAt,
+                            title = record.title,
+                            content = record.content,
+                            difficulty = record.difficulty,
+                            importance = record.importance,
+                            estimatedReviewMinutes = record.estimatedReviewMinutes,
+                            initialMastery = record.initialMastery,
+                            optionalMinReviewCount = record.optionalMinReviewCount
+                        )
+                        val generated = ReviewSchedulingEngine.createReviewSchedules(
+                            schedulerRecord, schedulerExam, studiedAt,
+                            SchedulerConfig(finalReviewBufferDays = 0),
+                            ReviewNotificationPlan(timezone = zone),
+                            customIntervalDays = resolvedBlock.customIntervalDays
+                        )
+                        if (generated.schedules.isNotEmpty()) {
+                            val items = generated.schedules.map {
+                                it.toScheduleItem(uid, blockId, zone, record.title.ifBlank { record.content.take(20) })
+                            }
+                            scheduleRepository.saveSchedules(uid, record.id, items)
+                            allSchedules.addAll(items)
+                        }
+                    } catch (e: Exception) {
+                        Log.w("ReviewBlockDetail", "Failed to auto-heal schedules for record ${record.id}: ${e.message}")
+                    }
+                }
             }
 
+            allSchedules.sortBy { it.reviewDate }
             val today = LocalDate.now()
             val overdueResult = ReviewScheduler.handleOverdue(today, allSchedules)
             val updatedSchedules = overdueResult.updatedItems
@@ -268,13 +318,18 @@ class ReviewBlockDetailViewModel @Inject constructor(
                     initialMastery = initialMastery,
                     estimatedReviewMinutes = estimatedReviewMinutes
                 )
-            ).onSuccess {
-                val result = it
-                loadBlockData(uid, blockId)
+            ).onSuccess { result ->
+                val newSchedules = result.schedules
+                val updatedSchedules = (_uiState.value.reviewScheduleRecords + newSchedules)
+                    .distinctBy { it.id }
+                    .sortedBy { it.reviewDate }
                 _uiState.value = _uiState.value.copy(
                     savedSuccess = true,
-                    lastCreationResult = result
+                    lastCreationResult = result,
+                    reviewScheduleRecords = updatedSchedules,
+                    scheduleItems = updatedSchedules
                 )
+                loadBlockData(uid, blockId)
                 calendarRefreshBus.notifyRefresh()
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(

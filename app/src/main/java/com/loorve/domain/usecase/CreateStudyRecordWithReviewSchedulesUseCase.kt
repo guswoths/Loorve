@@ -227,7 +227,7 @@ class CreateStudyRecordWithReviewSchedulesUseCase @Inject constructor(
             .filter { it.examId == examId }.map { it.id }
 }
 
-private fun ReviewScheduleEntry.toScheduleItem(
+fun ReviewScheduleEntry.toScheduleItem(
     uid: String,
     blockId: String,
     zone: ZoneId,

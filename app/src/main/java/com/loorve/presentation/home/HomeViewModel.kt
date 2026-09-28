@@ -357,17 +357,19 @@ class HomeViewModel @Inject constructor(
         val chartDates = (0..6).map { today.minusDays((6 - it).toLong()) }
         val activeBlockIds = _uiState.value.reviewBlocks.map { it.blockId }.filter { it.isNotBlank() }.toSet()
         val currentProgressIds = _uiState.value.progressList.map { it.id }.toSet()
-        val completedScheduleDates = linkedMapOf<String, LocalDate>()
-
+        val now = System.currentTimeMillis()
         val validItems = rawReviewScheduleItems.filter { item ->
             val blockMatches = if (activeBlockIds.isNotEmpty()) item.blockId in activeBlockIds else true
-            val recordMatches = if (studyRecordsLoaded && item.studyRecordId.isNotBlank()) {
+            val isRecentlyCreated = item.createdAt > (now - 10 * 60 * 1000L)
+            val recordMatches = if (studyRecordsLoaded && item.studyRecordId.isNotBlank() && !isRecentlyCreated) {
                 item.studyRecordId in activeStudyRecordIds
             } else {
                 true
             }
             blockMatches && recordMatches
         }
+
+        val completedScheduleDates = mutableMapOf<String, LocalDate>()
 
         validItems.forEach { item ->
             val scheduleDate = runCatching {
@@ -474,10 +476,13 @@ class HomeViewModel @Inject constructor(
             return
         }
 
-        // ✅ 블록 존재 여부 + 부모 학습기록(StudyRecord) 존재 여부 엄격 검사
+        val now = System.currentTimeMillis()
+        // ✅ 블록 존재 여부 + 부모 학습기록(StudyRecord) 생존 여부 검사
+        // 단, 최근 생성된 스케줄(10분 이내)은 리스너 전파 지연 중이므로 무조건 유효로 인정하여 삭제/누락 방지
         val validItems = rawReviewScheduleItems.filter { item ->
             val blockMatches = item.blockId in activeBlockIds
-            val recordMatches = if (studyRecordsLoaded && item.studyRecordId.isNotBlank()) {
+            val isRecentlyCreated = item.createdAt > (now - 10 * 60 * 1000L)
+            val recordMatches = if (studyRecordsLoaded && item.studyRecordId.isNotBlank() && !isRecentlyCreated) {
                 item.studyRecordId in activeStudyRecordIds
             } else {
                 true
@@ -515,22 +520,6 @@ class HomeViewModel @Inject constructor(
         reviewScheduleItemUiModels = uiModels
         reviewScheduleItemDates = uiModels.map { it.reviewDate }.toSet()
         updateCombinedReviewSchedules()
-
-        // ✅ Firestore에 잔존하는 고아 스케줄(학습기록이 삭제된 스케줄) 비동기 완전 삭제
-        val targetUid = uid ?: FirebaseAuth.getInstance().currentUser?.uid
-        if (studyRecordsLoaded && !targetUid.isNullOrBlank()) {
-            val orphanedScheduleIds = rawReviewScheduleItems.filter { item ->
-                item.blockId in activeBlockIds &&
-                    item.studyRecordId.isNotBlank() &&
-                    item.studyRecordId !in activeStudyRecordIds
-            }.map { it.id }
-
-            if (orphanedScheduleIds.isNotEmpty()) {
-                viewModelScope.launch(Dispatchers.IO) {
-                    reviewScheduleItemRepository.deleteScheduleItems(targetUid, orphanedScheduleIds)
-                }
-            }
-        }
     }
 
     private suspend fun syncReviewScheduleItems(items: List<ReviewScheduleItem>, uid: String) {
