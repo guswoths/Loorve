@@ -37,8 +37,8 @@ android {
         applicationId = "com.loorve_2"
         minSdk = 26
         targetSdk = 36
-        versionCode = 33
-        versionName = "1.0.16"
+        versionCode = 39
+        versionName = "1.0.22"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -48,7 +48,7 @@ android {
         buildConfigField(
             "String",
             "GOOGLE_WEB_CLIENT_ID",
-            "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\""
+            "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "711486350418-plbdidlveqnocbqngk3324grffaf9aj8.apps.googleusercontent.com")}\""
         )
 
         buildConfigField(

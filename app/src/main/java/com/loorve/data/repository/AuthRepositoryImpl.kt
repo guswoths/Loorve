@@ -211,9 +211,11 @@ class AuthRepositoryImpl @Inject constructor(
     // ─────────────────────────────────────────────────────────────
     override suspend fun launchGoogleSignIn(activityContext: Context): Result<Pair<User, Boolean>> {
         return try {
-            val serverClientId = activityContext
-                .getString(R.string.default_web_client_id)
-                .trim()
+            val serverClientId = runCatching {
+                activityContext.getString(R.string.default_web_client_id).trim()
+            }.getOrDefault("").ifBlank {
+                com.loorve.BuildConfig.GOOGLE_WEB_CLIENT_ID.trim()
+            }
             if (serverClientId.isBlank()) {
                 Log.e(TAG, "Google 로그인 설정 오류: default_web_client_id가 비어 있습니다.")
                 return Result.failure(
@@ -512,7 +514,17 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     private fun googleAuthDiagnostic(error: Throwable): String {
-        return "${error::class.java.name}: " +
+        val root = generateSequence(error) { it.cause }.firstOrNull { it is ApiException }
+        if (root is ApiException) {
+            return when (root.statusCode) {
+                10 -> "Google 로그인 설정 오류 (코드 10: DEVELOPER_ERROR). Play Console 앱 서명 키(SHA-1) 또는 OAuth 설정을 확인해주세요."
+                12500 -> "Google 로그인 실패 (코드 12500: SIGN_IN_FAILED). OAuth 동의 화면 및 테스트 사용자를 확인해주세요."
+                7 -> "네트워크 오류입니다 (코드 7). 인터넷 연결을 확인해주세요."
+                16 -> "Google 로그인이 취소되었습니다 (코드 16)."
+                else -> "Google 로그인 오류 (${root.statusCode}): ${root.localizedMessage ?: root.message ?: ""}"
+            }
+        }
+        return "${error::class.java.simpleName}: " +
             "${error.localizedMessage ?: error.message ?: "no localized message"}"
     }
 

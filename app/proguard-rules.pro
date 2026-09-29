@@ -93,11 +93,13 @@
 -keep class com.google.android.gms.ads.mediation.** { *; }
 
 # ------------------------------------------------------------------------------
-# 9. Google Identity & Credentials (Google 로그인)
+# 9. Google Identity & Play Services (Google 로그인 및 GMS API)
 # ------------------------------------------------------------------------------
 -keep class androidx.credentials.** { *; }
--keep class com.google.android.libraries.identity.googleid.** { *; }
+-keep class com.google.android.libraries.identity.** { *; }
 -keep class com.google.android.gms.auth.** { *; }
+-keep class com.google.android.gms.common.** { *; }
+-keep class com.google.android.gms.common.api.** { *; }
 
 # ------------------------------------------------------------------------------
 # 10. Kotlin Coroutines & DataStore
@@ -106,3 +108,10 @@
     volatile <fields>;
 }
 -keep class androidx.datastore.** { *; }
+
+# Google Play Services & Google Sign-In
+-keep class com.google.android.gms.auth.api.signin.** { *; }
+-keep class com.google.android.gms.common.** { *; }
+-keep class androidx.credentials.** { *; }
+-keep class com.google.android.libraries.identity.googleid.** { *; }
+
