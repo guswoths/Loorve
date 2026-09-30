@@ -17,24 +17,37 @@ class ReviewBlockAccessPolicyTest {
     )
 
     @Test
-    fun freeUserCanCreateFirstBlock() {
+    fun freeUserCanCreateUpToTwoBlocks() {
         assertTrue(
             ReviewBlockAccessPolicy.canCreate(
                 emptyList(),
                 SubscriptionEntitlement.Free
             )
         )
+        assertTrue(
+            ReviewBlockAccessPolicy.canCreate(
+                listOf(block("first", 1L)),
+                SubscriptionEntitlement.Free
+            )
+        )
+        assertTrue(
+            !ReviewBlockAccessPolicy.canCreate(
+                listOf(block("first", 1L), block("second", 2L)),
+                SubscriptionEntitlement.Free
+            )
+        )
     }
 
     @Test
-    fun freeUserCanAccessOnlyBlockWithEarliestUpcomingExam() {
+    fun freeUserCanAccessUpToTwoBlocksWithEarliestUpcomingExam() {
         val blocks = listOf(
-            block("later", 1L, LocalDate.of(2099, 1, 2)),
-            block("earlier", 2L, LocalDate.of(2099, 1, 1))
+            block("latest", 1L, LocalDate.of(2099, 1, 3)),
+            block("middle", 2L, LocalDate.of(2099, 1, 2)),
+            block("earliest", 3L, LocalDate.of(2099, 1, 1))
         )
 
         assertEquals(
-            setOf("earlier"),
+            setOf("earliest", "middle"),
             ReviewBlockAccessPolicy.accessibleBlockIds(
                 blocks,
                 SubscriptionEntitlement.Free
@@ -44,7 +57,7 @@ class ReviewBlockAccessPolicyTest {
 
     @Test
     fun proUserCanCreateAndAccessAllBlocks() {
-        val blocks = listOf(block("old", 1L), block("new", 2L))
+        val blocks = listOf(block("old", 1L), block("new", 2L), block("third", 3L))
 
         assertTrue(
             !ReviewBlockAccessPolicy.canCreate(
@@ -59,7 +72,7 @@ class ReviewBlockAccessPolicyTest {
             )
         )
         assertEquals(
-            setOf("old", "new"),
+            setOf("old", "new", "third"),
             ReviewBlockAccessPolicy.accessibleBlockIds(
                 blocks,
                 SubscriptionEntitlement.Pro
@@ -71,11 +84,12 @@ class ReviewBlockAccessPolicyTest {
     fun freeUserCanAccessEarliestUpcomingBlockBeforeEndedBlocks() {
         val blocks = listOf(
             block("ended", 1L, LocalDate.of(2020, 1, 1)),
-            block("upcoming", 2L, LocalDate.of(2099, 1, 1))
+            block("upcoming-1", 2L, LocalDate.of(2099, 1, 1)),
+            block("upcoming-2", 3L, LocalDate.of(2099, 1, 2))
         )
 
         assertEquals(
-            setOf("upcoming"),
+            setOf("upcoming-1", "upcoming-2"),
             ReviewBlockAccessPolicy.accessibleBlockIds(
                 blocks,
                 SubscriptionEntitlement.Free

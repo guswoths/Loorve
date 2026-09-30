@@ -106,8 +106,14 @@ sealed class Screen(val route: String) {
     object AddReviewBlock : Screen("add_review_block")
     object NotificationTimeSetting : Screen("notification_time_setting")
     object MyPage : Screen("my_page")
-    object BatteryOptimizationGuide : Screen("battery_optimization_guide")
-    object NotificationPermission : Screen("notification_permission")
+    object BatteryOptimizationGuide : Screen("battery_optimization_guide?fromOnboarding={fromOnboarding}") {
+        fun createRoute(fromOnboarding: Boolean = false): String =
+            "battery_optimization_guide?fromOnboarding=$fromOnboarding"
+    }
+    object NotificationPermission : Screen("notification_permission?fromOnboarding={fromOnboarding}") {
+        fun createRoute(fromOnboarding: Boolean = false): String =
+            "notification_permission?fromOnboarding=$fromOnboarding"
+    }
 
     object ReviewBlockDetail : Screen("reviewBlockDetail/{blockId}?title={title}") {
         fun createRoute(blockId: String, title: String = ""): String =
@@ -376,7 +382,7 @@ fun LoorveNavHost(
             OnboardingScreen(
                 onFinished = {
                     splashViewModel.completeOnboarding()
-                    navController.navigate(Screen.Home.route) {
+                    navController.navigate(Screen.BatteryOptimizationGuide.createRoute(fromOnboarding = true)) {
                         popUpTo(Screen.Onboarding.route) {
                             inclusive = true
                         }
@@ -585,28 +591,78 @@ fun LoorveNavHost(
             )
         }
 
-        composable(Screen.BatteryOptimizationGuide.route) {
+        composable(
+            route = Screen.BatteryOptimizationGuide.route,
+            arguments = listOf(
+                navArgument("fromOnboarding") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
+            )
+        ) { backStackEntry ->
+            val fromOnboarding = backStackEntry.arguments?.getBoolean("fromOnboarding") ?: false
             BatteryOptimizationGuideScreen(
                 onNavigateBack = {
-                    navController.popBackStack()
+                    if (fromOnboarding) {
+                        navController.navigate(Screen.NotificationPermission.createRoute(fromOnboarding = true)) {
+                            popUpTo(Screen.BatteryOptimizationGuide.route) {
+                                inclusive = true
+                            }
+                        }
+                    } else {
+                        navController.popBackStack()
+                    }
                 },
                 onSkip = {
-                    navController.popBackStack()
+                    if (fromOnboarding) {
+                        navController.navigate(Screen.NotificationPermission.createRoute(fromOnboarding = true)) {
+                            popUpTo(Screen.BatteryOptimizationGuide.route) {
+                                inclusive = true
+                            }
+                        }
+                    } else {
+                        navController.popBackStack()
+                    }
                 }
             )
         }
 
-        composable(Screen.NotificationPermission.route) {
+        composable(
+            route = Screen.NotificationPermission.route,
+            arguments = listOf(
+                navArgument("fromOnboarding") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
+            )
+        ) { backStackEntry ->
+            val fromOnboarding = backStackEntry.arguments?.getBoolean("fromOnboarding") ?: false
             NotificationPermissionRoute(
                 onNavigateBack = {
-                    navController.popBackStack()
+                    if (fromOnboarding) {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.NotificationPermission.route) {
+                                inclusive = true
+                            }
+                        }
+                    } else {
+                        navController.popBackStack()
+                    }
                 },
                 onPermissionGranted = {
-                    navController.navigate(Screen.NotificationTimeSetting.route) {
-                        popUpTo(Screen.NotificationPermission.route) {
-                            inclusive = true
+                    if (fromOnboarding) {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.NotificationPermission.route) {
+                                inclusive = true
+                            }
                         }
-                        launchSingleTop = true
+                    } else {
+                        navController.navigate(Screen.NotificationTimeSetting.route) {
+                            popUpTo(Screen.NotificationPermission.route) {
+                                inclusive = true
+                            }
+                            launchSingleTop = true
+                        }
                     }
                 }
             )

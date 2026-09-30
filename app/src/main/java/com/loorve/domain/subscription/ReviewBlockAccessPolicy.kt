@@ -22,6 +22,8 @@ object ReviewBlockAccessPolicy {
         )
     }
 
+    const val MAX_FREE_BLOCKS = 2
+
     fun accessibleBlockIds(
         blocks: List<ReviewBlock>,
         entitlement: SubscriptionEntitlement
@@ -31,15 +33,13 @@ object ReviewBlockAccessPolicy {
         }
 
         return sortBlocks(blocks)
-            .firstOrNull()
-            ?.blockId
-            ?.takeIf(String::isNotBlank)
-            ?.let(::setOf)
-            .orEmpty()
+            .take(MAX_FREE_BLOCKS)
+            .mapNotNull { it.blockId.takeIf(String::isNotBlank) }
+            .toSet()
     }
 
     fun canCreate(blocks: List<ReviewBlock>, entitlement: SubscriptionEntitlement): Boolean {
-        return entitlement is SubscriptionEntitlement.Pro || blocks.isEmpty()
+        return entitlement is SubscriptionEntitlement.Pro || blocks.size < MAX_FREE_BLOCKS
     }
 
     private fun endDate(block: ReviewBlock): LocalDate {

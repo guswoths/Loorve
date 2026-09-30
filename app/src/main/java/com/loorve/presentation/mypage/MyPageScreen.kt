@@ -360,7 +360,7 @@ fun MyPageScreen(
                                     context.startActivity(
                                         Intent(
                                             Intent.ACTION_VIEW,
-                                            Uri.parse("https://living-nitrogen-cfb.notion.site/3d8da8c67899800cb78be40cd9efdf97")
+                                            Uri.parse("https://hjson7585.github.io/Loorve-Privacy-Policy/")
                                         )
                                     )
                                 }
@@ -395,30 +395,6 @@ fun MyPageScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "개인정보처리방침 (웹페이지 바로가기)",
-                                style = LoorveTypography.bodySmall.copy(
-                                    fontSize = 11.5.sp,
-                                    textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
-                                ),
-                                color = Color(0xFF2563EB),
-                                modifier = Modifier.clickable {
-                                    runCatching {
-                                        context.startActivity(
-                                            Intent(
-                                                Intent.ACTION_VIEW,
-                                                Uri.parse("https://living-nitrogen-cfb.notion.site/3d8da8c67899800cb78be40cd9efdf97")
-                                            )
-                                        )
-                                    }
-                                }
-                            )
-                        }
-                        Spacer(Modifier.height(2.dp))
                         Text(
                             text = "상호: guswoths | 대표자명: 손현재",
                             style = LoorveTypography.bodySmall.copy(fontSize = 11.5.sp),

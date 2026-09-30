@@ -219,7 +219,7 @@ fun ProPaywallDialog(
 [Loorve 개인정보처리방침]
 
 • 공식 웹페이지 전문:
-  https://living-nitrogen-cfb.notion.site/3d8da8c67899800cb78be40cd9efdf97
+  https://hjson7585.github.io/Loorve-Privacy-Policy/
 
 제1조 (수집하는 개인정보 항목 및 이용 목적)
 1. Google 로그인 수집 항목:
@@ -246,7 +246,7 @@ fun ProPaywallDialog(
 • 개인정보 보호책임자(CPO): 손현재 (대표)
 • 공식 문의 이메일: hjson7585@gmail.com
                             """.trimIndent(),
-                            webUrl = "https://living-nitrogen-cfb.notion.site/3d8da8c67899800cb78be40cd9efdf97"
+                            webUrl = "https://hjson7585.github.io/Loorve-Privacy-Policy/"
                         )
                     }
                 )
@@ -497,7 +497,7 @@ private fun SubscriptionContent(state: SubscriptionState) {
         ) {
             ComparisonHeader()
             HorizontalDivider(color = Color.White.copy(alpha = 0.14f))
-            ComparisonRow("복습 블록 생성", "1개", "무제한 생성", "시험/목표별 생성 개수")
+            ComparisonRow("복습 블록 생성", "2개", "무제한 생성", "시험/목표별 생성 개수")
             ComparisonRow("광고 노출", "광고 노출됨", "완전 제거", "하단 배너 및 팝업 광고")
         }
         when (val entitlement = state.entitlement) {

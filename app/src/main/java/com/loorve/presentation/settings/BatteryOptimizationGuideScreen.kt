@@ -239,7 +239,7 @@ fun BatteryOptimizationGuideScreen(
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                 ) {
                     Text(
-                        if (isIgnoring) "확인" else "배터리 최적화 제외 허용하기",
+                        if (isIgnoring) "다음" else "배터리 최적화 제외 허용하기",
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
                     )
