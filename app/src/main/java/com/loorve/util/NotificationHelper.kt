@@ -61,8 +61,17 @@ fun showReviewNotification(
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
+    val largeIconBitmap = runCatching {
+        android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
+    }.getOrNull()
+
     val notification = NotificationCompat.Builder(context, REVIEW_NOTIFICATION_CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_notification)
+        .apply {
+            if (largeIconBitmap != null) {
+                setLargeIcon(largeIconBitmap)
+            }
+        }
         .setContentTitle(title)
         .setContentText(text)
         .setPriority(NotificationCompat.PRIORITY_HIGH)
